@@ -81,9 +81,9 @@ class BlobSummary:
          self.nRollouts += blob.nRollouts
          self.nUpdates  += blob.nUpdates
 
-         self.lifetime += blob.lifetime
-         self.reward   += blob.reward
-         self.value    += blob.value
+         self.lifetime.append(blob.lifetime)
+         self.reward.append(blob.reward)
+         self.value.append(blob.value)
 
       return self
 
@@ -106,11 +106,10 @@ class Blob:
       self.lifetime += 1
 
    def finish(self):
-      self.reward   = [np.mean(self.reward)]
-      self.value    = [np.mean(self.value)]
-      self.lifetime = [self.lifetime]
+      self.reward  = np.mean(self.reward)
+      self.value   = np.mean(self.value)
 
-      self.nUpdates  = self.lifetime[0]
+      self.nUpdates  = self.lifetime
       self.nRollouts = 1
 
 class Quill:
