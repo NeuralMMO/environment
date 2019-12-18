@@ -122,12 +122,15 @@ class MarketVisualizer:
 
         def switch_scale(attr, old, new):
             self.scale = self.scales[new]
+            # redraw graph
+            self.doc.remove_root(structure)
+            self.init(self.doc)
 
-        timescales = RadioButtonGroup(
-            labels=[str(scale) for scale in self.scales], active=0)
-        timescales.on_change('active', switch_scale)
+        self.timescales = RadioButtonGroup(
+            labels=[str(scale) for scale in self.scales], active=self.scales.index(self.scale))
+        self.timescales.on_change('active', switch_scale)
 
-        structure = layout([[timescales], [fig]])
+        structure = layout([[self.timescales], [fig]])
         self.doc.add_root(structure)
 
         self.fig = fig
@@ -198,7 +201,7 @@ class BokehServer:
 
             # Ingest market data, add upper and lower values for each scale
             # self.visu.data stores all data
-            # self.packet adds lower and upper to current packet to stream
+            # self.packet streams latest tick to visualizer
 
             for key, val in packet.items():
                 for scale in self.scales:
@@ -221,7 +224,8 @@ class BokehServer:
         '''Stream current data buffer to Bokeh client'''
         # TODO update with better buffers
         # visu is visualizer object
-        self.visu.source.stream(self.packet, self.visu.history_len)
+        if self.tick % self.visu.scale == 0:
+            self.visu.source.stream(self.packet, self.visu.history_len)
 
 
 @ray.remote
