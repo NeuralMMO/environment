@@ -121,13 +121,25 @@ class MarketVisualizer:
             fig.add_layout(band) 
 
         def switch_scale(attr, old, new):
+            """
+            Callback for RadioButtonGroup to switch tick scale
+            and refresh document
+
+            Args:
+                attr: variable to be changed, in this case 'active'
+                old: old index of active button
+                new: new index of active button
+            """
+
             self.scale = self.scales[new]
             # redraw graph
             self.doc.remove_root(structure)
             self.init(self.doc)
 
         self.timescales = RadioButtonGroup(
-            labels=[str(scale) for scale in self.scales], active=self.scales.index(self.scale))
+            labels=[str(scale) for scale in self.scales],
+            active=self.scales.index(self.scale),
+            background=RADIO_BACKGROUND)
         self.timescales.on_change('active', switch_scale)
 
         structure = layout([[self.timescales], [fig]])
