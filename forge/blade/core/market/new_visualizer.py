@@ -36,6 +36,12 @@ class MarketVisualizer:
                  ylabel: str = "Dummy Values"):
         """Visualizes a stream of data with threaded refreshing
 
+        # Remove keys/make optional arg and add functionality 
+        #   to draw/redraw graph based on available data
+        # To be done entirely within the market visualizer
+        # User shouldn't have to think about it
+        # Only thing needed to specify is tick?
+
         Args:
             keys        : List of object names (str) to be displayed on market
             history_len : How far back to plot data
@@ -44,7 +50,7 @@ class MarketVisualizer:
             x           : Name of x axis data
             ylabel      : Name of y axis on plot
         """
-        self.colors = 'blue red green yellow orange purple'.split()
+        self.colors = 'blue red green yellow orange purple brown white'.split()
         self.data        = {}
 
         # Market stores data in a dictionary of lists
@@ -121,31 +127,71 @@ class MarketVisualizer:
             fig.add_layout(band) 
 
         def switch_scale(attr, old, new):
-            """
-            Callback for RadioButtonGroup to switch tick scale
+            """Callback for RadioButtonGroup to switch tick scale
             and refresh document
-
             Args:
                 attr: variable to be changed, in this case 'active'
                 old: old index of active button
                 new: new index of active button
             """
-
             self.scale = self.scales[new]
-            # redraw graph
-            self.doc.remove_root(structure)
-            self.init(self.doc)
+            self.source.data = self.data[self.scale]
 
-        self.timescales = RadioButtonGroup(
-            labels=[str(scale) for scale in self.scales],
-            active=self.scales.index(self.scale),
-            background=RADIO_BACKGROUND)
+        self.timescales = RadioButtonGroup(labels=[str(scale) for scale in self.scales],
+                                           active=self.scales.index(self.scale))
         self.timescales.on_change('active', switch_scale)
 
-        structure = layout([[self.timescales], [fig]])
-        self.doc.add_root(structure)
+        self.structure = layout([[self.timescales], [fig]])
+        self.doc.add_root(self.structure)
 
         self.fig = fig
+
+    def stream(self, packet: dict):
+        '''Wrapper function for source.stream to enable
+        adding new items mid-stream. Overwrite graph
+        with new figure if packet has different keys.
+
+        Args:
+            packet: dictionary of singleton lists'''
+
+        # Stream items & append data if no new entries
+        if packet.keys() == self.data[self.scale].keys():
+            for scale in self.scales:
+                # Skip over irrelevant scales
+                if packet[self.x][0] % scale != 0:
+                    continue
+                for key, val in packet.items():
+                    self.data[scale][key].append(val[0])
+            # Once data is added, stream if tick is member
+            # of current scale
+            if packet[self.x][0] % self.scale == 0:
+                self.source.stream(packet, self.history_len)
+            return
+
+        # Add new data entry & refresh document if new entry
+        for scale in self.scales:
+            for key, val in packet.items():
+
+                # Pads new data with 0 entry before adding
+                if key not in self.data[scale].keys():
+                    pad_len = len(self.data[scale][self.x])
+                    self.data[scale][key] = ([0] * pad_len)
+
+                    # Adds new entry value if relevant
+                    if packet[self.x][0] % scale == 0 and pad_len > 0:
+                        self.data[scale][key][-1] = val[0]
+                    # Adds new entry to keys if valid key
+                    if key[-5:] not in ['lower', 'upper'] and key not in self.keys + [self.x]:
+                        self.keys.append(key)
+
+                # If not new entry, add to data
+                elif packet[self.x][0] % scale != 0:
+                    self.data[scale][key].append(val[0])
+
+        # Refreshes document to add new item
+        self.doc.remove_root(self.structure)
+        self.init(self.doc)
+
 
 @ray.remote
 class BokehServer:
@@ -212,17 +258,9 @@ class BokehServer:
             self.packet = packet.copy() if type(packet) == dict else {}
 
             # Ingest market data, add upper and lower values for each scale
-            # self.visu.data stores all data
             # self.packet streams latest tick to visualizer
-
             for key, val in packet.items():
-                for scale in self.scales:
-                    # Ignore any irrelevant buffers
-                    if packet['tick'] % scale != 0:
-                        continue
-                    self.visu.data[scale][key].append(val)
-                    self.visu.data[scale][key + 'lower'].append(val - 0.1)
-                    self.visu.data[scale][key + 'upper'].append(val + 0.1)
+                # Add to packet
                 self.packet[key] = [self.packet[key]]
                 self.packet[key + 'lower'] = [val - 0.1]
                 self.packet[key + 'upper'] = [val + 0.1]
@@ -234,10 +272,8 @@ class BokehServer:
     @gen.coroutine
     def stream(self):
         '''Stream current data buffer to Bokeh client'''
-        # TODO update with better buffers
         # visu is visualizer object
-        if self.tick % self.visu.scale == 0:
-            self.visu.source.stream(self.packet, self.visu.history_len)
+        self.visu.stream(self.packet)
 
 
 @ray.remote
@@ -295,6 +331,14 @@ class Market:
                 self.data[key] = self.tick
 
         self.tick += 1
+
+        # dummy code to inject new items, it's as easy as just
+        # adding new data to the market
+
+        if self.tick % 100 == 0:
+            self.data['new_item'] = 5
+        if self.tick % 130 == 0:
+            self.data['new_item_2'] = 5
         self.middleman.setData.remote(self.data)
 
 # Example setup
