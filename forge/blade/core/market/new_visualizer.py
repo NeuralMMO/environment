@@ -28,19 +28,15 @@ from config import *
 
 class MarketVisualizer:
     def __init__(self,
-                 keys,
+                 keys: list = [],
                  scales: list = [1],
                  history_len: int = 256,
                  title: str = "NeuralMMO Market Data",
                  x: str = "tick",
                  ylabel: str = "Dummy Values"):
-        """Visualizes a stream of data with threaded refreshing
-
-        # Remove keys/make optional arg and add functionality 
-        #   to draw/redraw graph based on available data
-        # To be done entirely within the market visualizer
-        # User shouldn't have to think about it
-        # Only thing needed to specify is tick?
+        """Visualizes a stream of data with threaded refreshing. To
+        add items, initialize using 'keys' kwarg or add to packet in
+        stream()
 
         Args:
             keys        : List of object names (str) to be displayed on market
@@ -344,12 +340,14 @@ class Market:
 # Example setup
 PORT=5009
 ray.init()
+
 ITEMS = ['Food', 'Water', 'Health', 'Melee', 'Range', 'Mage']
+# ITEMS = []    <-- Also a valid setup, new items can be added dynamically
 SCALES = [1, 10, 100, 1000]
 
 middleman  = Middleman.remote()
 market     = Market(ITEMS, middleman)
-visualizer = BokehServer.remote(middleman, ITEMS, scales=SCALES)
+visualizer = BokehServer.remote(middleman, keys=ITEMS, scales=SCALES)
 
 while True:
   time.sleep(0.1)
