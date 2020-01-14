@@ -180,8 +180,8 @@ We're almost done. The IO API handles batching, normalization, and serialization
 
      policy = torch.nn.Sequential(
         ethyr.Input(*args),
-        ethyr.Output(*args)
-
+        ethyr.Output(*args))
+      
      while not done:
         input, _ = io.inputs(obs, rewards, dones, *args)
         output   = policy(input)
