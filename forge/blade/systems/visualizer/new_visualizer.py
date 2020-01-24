@@ -36,11 +36,13 @@ parser.add_argument('--name',
 parser.add_argument('--load', action="store_true",
                     help='Loads saved json into visualizer with name specified by --name')
 parser.add_argument("--xaxis", default='tick', help='Name of key in data to be used for the x axis of the graph, defaults to \'tick\'')
+parser.add_argument("--history-len", default=256, help='Length of max number of data points to be displayed')
 
 arguments = parser.parse_args()
 LOAD_DATA = {}
 LOG = True if arguments.log else False
 LOAD = True if arguments.load else False
+HISTORY_LEN = int(arguments.history_len)
 SCALES = []
 XAXIS = ''
 
@@ -98,6 +100,9 @@ class MarketVisualizer:
         # TODO figure out a better way to ensure unique colors
         assert len(self.keys) <= len(self.colors), 'Limited color pool'
         # data initialization
+
+        if type(self.scales[0]) != str:
+            self.scales = [str(s) for s in self.scales]
         if self.data == {}:
             for scale in self.scales:
                 self.data[scale] = {}
@@ -110,12 +115,7 @@ class MarketVisualizer:
                 # Isn't necessary, but makes code for packet handling nicer
                 self.data[scale][self.x + 'upper'] = []
                 self.data[scale][self.x + 'lower'] = []
-        if type(self.scales[0]) != str:
-            self.scales = [str(s) for s in self.scales]
         self.scale = self.scales[0]
-        print("scale", self.scale)
-        print(self.data)
-        print(self.data[self.scale])
 
     def init(self, doc):
         # Source must only be modified through a stream
@@ -190,13 +190,13 @@ class MarketVisualizer:
         if packet.keys() == self.data[self.scale].keys():
             for scale in self.scales:
                 # Skip over irrelevant scales
-                if packet[self.x][0] % scale != 0:
+                if packet[self.x][0] % int(scale) != 0:
                     continue
                 for key, val in packet.items():
                     self.data[scale][key].append(val[0])
             # Once data is added, stream if tick is member
             # of current scale
-            if packet[self.x][0] % self.scale == 0:
+            if packet[self.x][0] % int(self.scale) == 0:
                 self.source.stream(packet, self.history_len)
             return
 
@@ -210,14 +210,14 @@ class MarketVisualizer:
                     self.data[scale][key] = ([0] * pad_len)
 
                     # Adds new entry value if relevant
-                    if packet[self.x][0] % scale == 0 and pad_len > 0:
+                    if packet[self.x][0] % int(scale) == 0 and pad_len > 0:
                         self.data[scale][key][-1] = val[0]
                     # Adds new entry to keys if valid key
                     if key[-5:] not in ['lower', 'upper'] and key not in self.keys + [self.x]:
                         self.keys.append(key)
 
                 # If not new entry, add to data
-                elif packet[self.x][0] % scale != 0:
+                elif packet[self.x][0] % int(scale) != 0:
                     self.data[scale][key].append(val[0])
 
         # Refreshes document to add new item
@@ -432,10 +432,10 @@ if LOG:
 
 middleman  = Middleman.remote()
 market     = Market(ITEMS, middleman)
-visualizer = BokehServer.remote(middleman, data=LOAD_DATA, keys=ITEMS, scales=SCALES)
+visualizer = BokehServer.remote(middleman, data=LOAD_DATA, keys=ITEMS, scales=SCALES, history_len=HISTORY_LEN)
 
 if LOAD:
-    input()
+    input("Press any key to close")
     sys.exit(0)
 
 
