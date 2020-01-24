@@ -46,6 +46,7 @@ HISTORY_LEN = int(arguments.history_len)
 SCALES = []
 XAXIS = ''
 
+# Load in data from file specified
 if arguments.load:
     if not arguments.name:
         print("Please specify file name to load with --name")
@@ -101,8 +102,11 @@ class MarketVisualizer:
         assert len(self.keys) <= len(self.colors), 'Limited color pool'
         # data initialization
 
+        # set all scales to be strings instead of ints to match file reading
         if type(self.scales[0]) != str:
             self.scales = [str(s) for s in self.scales]
+
+        # initialize blank data if no data loaded from file
         if self.data == {}:
             for scale in self.scales:
                 self.data[scale] = {}
@@ -115,6 +119,9 @@ class MarketVisualizer:
                 # Isn't necessary, but makes code for packet handling nicer
                 self.data[scale][self.x + 'upper'] = []
                 self.data[scale][self.x + 'lower'] = []
+
+
+        # Set default open scale to leftmost scale
         self.scale = self.scales[0]
 
     def init(self, doc):
@@ -342,9 +349,11 @@ class Middleman:
         '''
         self.data = data.copy()
 
+    # Notify remotes of visualizer shutdown
     def setShutdown(self):
         self.shutdown = 1
 
+    # Retreive shutdown status
     def getShutdown(self):
         return self.shutdown
 
@@ -386,6 +395,7 @@ class Market:
             self.data['new_item'] = 5
         if self.tick % 130 == 0:
             self.data['new_item_2'] = 5
+
         # update if not shutting down visualizer
         if not ray.get(middleman.getShutdown.remote()):
             self.middleman.setData.remote(self.data)
@@ -401,10 +411,11 @@ SCALES = [1, 10, 100, 1000]
 
 def log_on_exit(*args):
     '''Logging function called when visualizer is terminated '''
-    # Prevents multiple exit signals from printing multiple logs
-    middleman.setShutdown.remote()
-    time.sleep(2)
-    signal(SIGTERM, clean_exit)
+
+    middleman.setShutdown.remote()     # Prevents multiple exit signals from printing multiple logs
+
+    time.sleep(1)                      # Wait for middleman to receive update
+    signal(SIGTERM, clean_exit)        # Prevents multiple interrupts from triggering multiple logs
     signal(SIGINT, clean_exit)
     
     if arguments.name:
@@ -413,7 +424,7 @@ def log_on_exit(*args):
         filename = strftime("%Y-%m-%d %H:%M:%S", gmtime()) + '.json'
     
     logdata = ray.get(middleman.getData.remote())
-    logdata['XAXIS'] = arguments.xaxis
+    logdata['XAXIS'] = arguments.xaxis    # save data not stored in MarketVisualizer.data
     logdata['SCALES'] = SCALES
     logdata['ITEMS'] = ITEMS
     f = open(filename, "w")
@@ -422,9 +433,10 @@ def log_on_exit(*args):
     sys.exit(0)
 
 def clean_exit(*args):
+    '''Function to replace shutdown function after more than one interrupt'''
     sys.exit(0)
 
-
+# Run log at shutdown to receive most up to date data
 if LOG:
     signal(SIGTERM, log_on_exit)
     signal(SIGINT, log_on_exit)
@@ -434,6 +446,7 @@ middleman  = Middleman.remote()
 market     = Market(ITEMS, middleman)
 visualizer = BokehServer.remote(middleman, data=LOAD_DATA, keys=ITEMS, scales=SCALES, history_len=HISTORY_LEN)
 
+# Keeps bokeh running on load since new update loops aren't keeping the script open
 if LOAD:
     input("Press any key to close")
     sys.exit(0)
