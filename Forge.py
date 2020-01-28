@@ -38,6 +38,22 @@ def parseArgs():
          help='Ray mode (local/default/remote)')
    parser.add_argument('--render', action='store_true', default=False, 
          help='Render env')
+   parser.add_argument('--log', action="store_true",
+         help='Log data on visualizer exit. Default file is timestamp, filename overwrite with --name')
+   parser.add_argument('--name', default='log',
+         help='Name of file to save json data to')
+   parser.add_argument('--load-exp', action="store_true",
+         help='Loads saved json into visualizer with name specified by --name')
+   parser.add_argument("--xaxis", default='tick',
+         help='Name of key in data to be used for the x axis of the graph, defaults to \'tick\'')
+   parser.add_argument("--history-len", default=256, 
+         help='Length of max number of data points to be displayed')
+   parser.add_argument("--title", default='NeuralMMO Data',
+         help='Name of chart title')
+   parser.add_argument("--ylabel", default='value',
+         help='Name of y axis on chart')
+   parser.add_argument("--scales", default=[1, 10, 100, 1000], nargs='*',
+         help='Timescale options to view visualizer data')
    return parser.parse_args()
 
 def render(trinity, config, args):
@@ -79,9 +95,18 @@ def render(trinity, config, args):
 if __name__ == '__main__':
    #Experiment + command line args specify configuration
    #Trinity specifies Cluster-Server-Core infra modules
-   config  = Experiment('pop', Config).init()
-   trinity = Trinity(Pantheon, God, Sword)
-   args    = parseArgs()
+   config             = Experiment('pop', Config).init()
+   trinity            = Trinity(Pantheon, God, Sword)
+
+   args               = parseArgs()
+   config.LOG         = args.log
+   config.LOAD_EXP    = args.load_exp
+   config.NAME        = args.name
+   config.TITLE       = args.title
+   config.HISTORY_LEN = args.history_len
+   config.XAXIS       = args.xaxis
+   config.XLABEL       = args.ylabel
+   config.SCALES      = args.scales
 
    #Blocking call: switches execution to a
    #Web Socket Server module

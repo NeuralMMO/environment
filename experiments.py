@@ -63,6 +63,17 @@ class Config(config.Config):
    PERMPOPS = 4                 #Number of permutations
    PERMVAL  = 1e-2              #Permutation strength
 
+   ###############################LOGGING parameters
+   LOG         = False              # Whether to enable data logging
+   LOAD_EXP    = False              # Whether to load from file
+   NAME        = "log"              # Name of file to load/log to
+   HISTORY_LEN = 0                  # Length of graph history, change from 0 to improve performance
+   XAXIS       = "tick"             # Label of xaxis data values
+   YLABEL      = "Value"           # Label of data values
+   TITLE       = "NeuralMMO Data"   # Title of graph
+   SCALES      = [1, 10, 100, 1000] # Time scales to use for visualizer to load data efficiently
+   
+
    #Parameter overrides for debugging
    if DEBUG:
       NGOD = 1
