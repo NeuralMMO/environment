@@ -1,17 +1,9 @@
 #Ray infra
-<<<<<<< HEAD
 ray==0.7.6
 cloudpickle==0.8.1
 setproctitle==1.1.10
 service-identity==18.1.0
 redis==3.2.1
-=======
-ray>=0.6.6
-cloudpickle>=0.8.1
-setproctitle>=1.1.10
-service-identity>=18.1.0
-redis>=3.2.1
->>>>>>> pssh script updates
 
 #Terrain maps
 opensimplex>=0.2
