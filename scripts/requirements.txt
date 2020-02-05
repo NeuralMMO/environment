@@ -1,9 +1,9 @@
 #Ray infra
-ray==0.8.1
-cloudpickle==1.2.2
+ray==0.7.6
+cloudpickle==0.8.1
 setproctitle==1.1.10
 service-identity==18.1.0
-redis==3.4.0
+redis==3.2.1
 
 #Terrain maps
 opensimplex==0.2
