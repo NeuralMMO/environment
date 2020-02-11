@@ -1,0 +1,18 @@
+I ran this project by Prof Goldschmidt, and he said it was all good:
+
+I'm working with the developer of Neural-MMO [1] to assist in logging
+and visualizing simluation data, namely training data (reward values,
+iteration time, etc) and market data. We are using Bokeh [2] for visualization
+and Ray [3] for distributed computing. I'm hoping by the end of this
+semester to create an interactive dashboard that can save and load 
+data from a file to allow users to view a run of an experiment.
+
+
+
+
+
+
+
+[1] https://jsuarez5341.github.io/neural-mmo/build/html/overview.html#
+[2] https://bokeh.org/
+[3] https://github.com/ray-project/ray
