@@ -11,13 +11,14 @@ import time
 import ray
 
 from forge.blade.systems import visualizer
+# from forge.blade.systems.visualizer import config as visconf
 
 class Logger:                                                                 
    def __init__(self, middleman):                                             
       self.items     = 'reward lifetime value'.split()                              
       self.middleman = middleman                                              
       self.tick      = 0                                                      
-                                                                              
+
    def update(self, lifetime_mean, reward_mean, value_mean,
               lifetime_std, reward_std, value_std):
       data = {}                                                               
@@ -27,8 +28,9 @@ class Logger:
       data['lifetime_std']  = lifetime_std
       data['reward_std']    = reward_std
       data['value_std']     = value_std
-      data['tick']     = self.tick                                            
+      data['tick']     = self.tick                                           
                                                                               
+      open('traceback.txt','w').write('test')
       self.tick += 1                                                          
       self.middleman.setData.remote(data)
 
@@ -131,10 +133,20 @@ class Quill:
       except:
          pass
 
-      if config.LOG:
+      if self.config.LOG:
+         # IMPORT CONFIG HERE AND SET NEW VARIABLES
+         #   config_dic[member] = vars(self.config)[member]
+
          middleman   = visualizer.Middleman.remote()
          self.logger = Logger(middleman)
-         vis         = visualizer.BokehServer.remote(middleman, self.config)
+         # You can't pass to remote it seems, convert to DICT instead
+         # Convert config to dict, since config class can't be 
+         self.market = visualizer.Market(['test1', 'test2'], middleman)
+         self.vis    = visualizer.BokehServer.remote(middleman, config)
+         print('Everything loaded')
+         self.vis.update.remote()
+         print('Visualizer loop started')
+
  
    def timestamp(self):
       cur = time.time()
@@ -147,8 +159,8 @@ class Quill:
       rollouts = 'Rollouts: (Total) ' + str(self.nRollouts)
 
       padlen   = len(updates)
-      updates  = updates.ljust(padlen)  
-      rollouts = rollouts.ljust(padlen) 
+      updates  = updates.ljust(padlen)
+      rollouts = rollouts.ljust(padlen)
 
       updates  += '  |  (Epoch) ' + str(self.curUpdates)
       rollouts += '  |  (Epoch) ' + str(self.curRollouts)
@@ -170,6 +182,8 @@ class Quill:
       self.reward_std    = np.std(logs.reward)
       self.lifetime_std  = np.std(logs.lifetime)
 
+      print('scrawl')
+      self.market.update()
       print('Value Function: ', self.value_mean)
 
       return self.stats(), self.lifetime_mean

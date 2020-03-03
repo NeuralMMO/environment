@@ -27,8 +27,21 @@ from tornado import gen
 from tornado.ioloop import IOLoop
 
 from forge.blade.systems.visualizer.config import *
-from signal import signal, SIGTERM, SIGINT
 from time import gmtime, strftime
+
+
+class Config():
+    LOG         = False                       #Whether to enable data logging
+    LOAD_EXP    = False                       #Whether to load from file
+    NAME        = 'log'                       #Name of file to load/log to
+    HISTORY_LEN = 0                           #Length of graph history
+    TITLE       = 'Neural MMO Training Curve' #Graph title
+    XAXIS       = 'Training Epochs' #Label of xaxis data values
+    YLABEL      = 'Agent Lifetime'            #Label of data values
+    TITLE       = 'Neural MMO Data'            #Title of graph
+    SCALES      = [1, 10, 100, 1000]          #Plot time scale
+
+
 
 def pickle_write(content, name, append=1):
     'function to open file, pickle dump, then close'
@@ -44,7 +57,7 @@ def pickle_read(name):
     return ret
 
 class MarketVisualizer:
-    def __init__(self, config, *args):
+    def __init__(self, config):
         """Visualizes a stream of data with threaded refreshing. To
         add items, initialize using 'keys' kwarg or add to packet in
         stream()
@@ -58,24 +71,27 @@ class MarketVisualizer:
         """
         self.colors = 'blue red green yellow orange purple brown white'.split()
         self.data        = {}
+        self.config = vars(config[0])
 
         # Market stores data in a dictionary of lists
         # MarketVisualizer stores the data for each view as a dictionary,
-
         # inside another dictionary with keys of each scale.
 
-        self.history_len = config.HISTORY_LEN
-        self.title       = config.TITLE
+        self.history_len = self.config['HISTORY_LEN'] if 'HISTORY_LEN' in self.config else Config.HISTORY_LEN
+        self.title       = self.config['TITLE'] if 'TITLE' in self.config else Config.TITLE
 
-        self.ylabel      = config.YLABEL
-        self.x           = config.XAXIS
-        self.XAXIS       = config.XAXIS
+        self.ylabel      = self.config['YLABEL'] if 'YLABEL' in self.config else Config.YLABEL
+        self.x           = self.config['XAXIS'] if 'XAXIS' in self.config else Config.XAXIS
+        self.XAXIS       = self.config['X'] if 'X' in self.config else Config.XAXIS
+
+
+        self.scales      = self.config['SCALES'] if 'SCALES' in self.config else Config.SCALES
+        self.title       = self.config['TITLE'] if 'TITLE' in self.config else Config.TITLE
+        self.log         = self.config['LOG'] if 'LOG' in self.config else Config.LOG
+        self.load        = self.config['LOAD_EXP'] if 'LOAD_EXP' in self.config else Config.LOAD
+        self.filename    = self.config['NAME'] if 'NAME' in self.config else Config.NAME
+
         self.keys        = [self.x]
-        self.scales      = config.SCALES
-        self.title       = config.TITLE
-        self.log         = config.LOG
-        self.load        = config.LOAD_EXP
-        self.filename    = config.NAME
 
         # set all scales to be strings instead of ints to match file reading
         if type(self.scales[0]) != str:
@@ -98,7 +114,6 @@ class MarketVisualizer:
                 self.data[scale][self.x + 'upper'] = []
                 self.data[scale][self.x + 'lower'] = []
         else:
-            # TODO write loading from pickle here
             file = open(self.filename, 'rb')
             self.scales = pickle.load(file)
             self.x      = pickle.load(file)
@@ -138,7 +153,7 @@ class MarketVisualizer:
 
     def init(self, doc):
         # Source must only be modified through a stream
-        self.source = ColumnDataSource(data=self.data)
+        self.source = ColumnDataSource(data=self.data[self.scale])
         self.colors[0] = 'cyan'
         #self.source = ColumnDataSource(data=self.data[self.scale])
 
@@ -251,15 +266,14 @@ class MarketVisualizer:
 
 @ray.remote
 class BokehServer:
-    def __init__(self, market, *args, **kwargs):
+    def __init__(self, market, *args):
         """ Runs an asynchronous Bokeh data streaming server.
       
         Args:
            market : The market to visualize
            args   : Additional arguments
-           kwargs : Additional keyword arguments
         """
-        self.visu   = MarketVisualizer(*args, **kwargs)
+        self.visu   = MarketVisualizer(args)
         self.market = market
         if not 'PORT' in args:
             PORT = 5006
@@ -275,15 +289,11 @@ class BokehServer:
         self.tick   = 0
         self.packet = {}
 
-        if 'scales' in kwargs and type(kwargs['scales']) is list:
-            self.scales = kwargs['scales']
-        else:
-            self.scales = [1]
-
         server.start()
 
         server.io_loop.add_callback(server.show, "/")
         server.io_loop.start()
+
 
     def init(self, doc):
         '''Initialize document and threaded update loop
@@ -308,7 +318,6 @@ class BokehServer:
                continue 
 
             # Get remote market data
-
             if ray.get(self.market.getShutdown.remote()):
                 self.market.setData.remote(self.visu.data)
                 sys.exit(0)
@@ -327,6 +336,7 @@ class BokehServer:
                 self.packet[key + 'upper'] = [val + 0.1]
 
             # Stream to Bokeh client
+            print('Visualizer.stream()')
             self.doc.add_next_tick_callback(partial(self.stream))
             self.tick += 1
 
@@ -350,8 +360,12 @@ class Middleman:
         Returns:
            data: From buffer
         '''
+        print('getData')
         data = self.data
         self.data = None
+        file = open("middleman.txt", "a")
+        file.write('getData\n')
+        file.close()
         return data
 
     def setData(self, data):
@@ -359,10 +373,14 @@ class Middleman:
         Args:
            data: To set buffer
         '''
+        file = open("middleman.txt", "a")
+        file.write('setData\n')
+        file.close()
         self.data = data.copy()
 
     # Notify remotes of visualizer shutdown
     def setShutdown(self):
+        self.file.close()
         self.shutdown = 1
 
     # Retreive shutdown status
@@ -388,9 +406,12 @@ class Market:
             self.data[key] = 0
 
     def update(self):
-        '''Updates market data and propagates to Bokeh server
+        '''
+        Updates market data and propagates to Bokeh server
         # update data and send to middle man
-        Note: best to update all at once. Current version may cause bugs'''
+        Note: best to update all at once. Current version may cause bugs
+        '''
+        print(self.data, file=open('yeet.txt', 'w+'))
         for key, val in self.data.items():
             if key == 'tick':
                 self.data[key] = self.tick
@@ -408,5 +429,5 @@ class Market:
             self.data['new_item_2'] = 5
 
         # update if not shutting down visualizer
-        if not ray.get(middleman.getShutdown.remote()):
+        if not ray.get(self.middleman.getShutdown.remote()):
             self.middleman.setData.remote(self.data)

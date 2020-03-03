@@ -31,19 +31,22 @@ from forge.ethyr.torch import Model
 from experiments import Experiment, Config
 from projekt import Pantheon, God, Sword, Policy
 
+
+from forge.blade.systems.visualizer import config
+
 def parseArgs(config):
    '''Processes command line arguments'''
    parser = argparse.ArgumentParser('Projekt Godsword')
-   parser.add_argument('--ray', type=str, default='default', 
+   parser.add_argument('--ray', type=str, default='default',
          help='Ray mode (local/default/remote)')
-   parser.add_argument('--render', action='store_true', default=False, 
+   parser.add_argument('--render', action='store_true', default=False,
          help='Render env')
    parser.add_argument('--log', action="store_true",
          help='Log data on visualizer exit. Default file is timestamp, filename overwrite with --name')
    parser.add_argument('--name', default='log',
-         help='Name of file to save json data to')
+         help='Name of file to save pickle data')
    parser.add_argument('--load-exp', action="store_true",
-         help='Loads saved json into visualizer with name specified by --name')
+         help='Loads saved pickle data into visualizer with name specified by --name')
 
    args               = parser.parse_args()
    config.LOG         = args.log
