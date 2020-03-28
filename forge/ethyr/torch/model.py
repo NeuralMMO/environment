@@ -28,7 +28,7 @@ class GradientOptimizer:
          gradList: a list of gradients
       '''
       grads = np.mean(grads, 0)
-      print('Gradient magnitude: ', np.sqrt(np.sum(grads**2)))
+      #print('Gradient magnitude: ', np.sqrt(np.sum(grads**2)))
       mag = self.config.GRAD_CLIP
       grads = np.clip(grads, -mag, mag)
 
@@ -89,7 +89,6 @@ class Model:
             'models', 'bests', resetTol=256)
       self.config = config
 
-      print('Initializing new model...')
       self.net = ann(config)
       self.parameters = Parameter(torch.Tensor(
             np.array(getParameters(self.net))))
@@ -119,7 +118,6 @@ class Model:
          best (bool): Whether to load the best (True)
              or most recent (False) checkpoint
       '''
-      print('Loading model...')
       epoch = self.saver.load(opt, self.parameters, best)
       self.syncParameters()
       return self
@@ -132,10 +130,10 @@ class Model:
       '''
       return self.saver.checkpoint(self.parameters, opt, lifetime)
 
-   def printParams(self):
+   def nParams(self):
       '''Print the number of model parameters'''
       nParams = len(self.weights)
-      print('#Params: ', str(nParams/1000), 'K')
+      return nParams
 
    def syncParameters(self):
       parameters = self.parameters.detach().numpy().tolist()

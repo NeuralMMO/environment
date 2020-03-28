@@ -16,24 +16,27 @@ class Config(config.Config):
    ###############################Saving and logging locations
    MODELDIR  = 'resource/exps'  #Where to store models
    HOST      = 'localhost'      #Host for client
-   STAT_FILE = 'run_stats.txt'  #Run statistics log file
+   STAT_FILE = 'stats_drop_alt.txt'  #Run statistics log file
    DEVICE    = 'cpu'            #Hardware specification
 
    ###############################Train/test mode settings
    DEBUG     = False            #Whether to run with debug settings
    LOAD      = True             #Load model from file?
    BEST      = True             #If loading, most recent or highest lifetime?
-   TEST      = True             #Update the model during run?
+   TEST      = False            #Update the model during run?
 
    ###############################Distributed infrastructure config
-   NGOD    = 12                 #Number of environment servers
-   NSWORD  = 1                  #Number of clients per server
-   NCORE   = NGOD*(NSWORD + 1)  #Total number of cores
+   NPANTHEON = 2                #Number of optimizers
+   NGOD      = 4                #Number of environment servers
+   NSWORD    = 2                #Number of clients per server
+   NCORE     = 12               #Number of cores per machine
 
-   _ = 16384
+   _ = 1
    CLUSTER_UPDATES = _          #Number of samples per optim
    SERVER_UPDATES  = _ // NGOD  #step at each hardware layer
 
+   #stats_drop: don't finish collecting partials
+   #stats_drop_alt: same thing for consistency check
    ###############################Population and network sizes
    NENT    = 128                #Maximum population size
    NPOP    = 8                  #Number of populations

@@ -5,33 +5,10 @@ import inspect
 
 from forge.blade.io.stimulus import node
 
-#Makes private attributes read only
-class InnerClassIterable(type):
-   def __iter__(cls):
-      stack = list(cls.__dict__.items())
-      while len(stack) > 0:
-         name, attr = stack.pop()
-         if type(name) != tuple:
-            name = tuple([name])
-         if not inspect.isclass(attr):
-            continue
-         if issubclass(attr, node.Flat):
-            for n, a in attr.__dict__.items():
-               n = name + tuple([n]) 
-               stack.append((n, a))
-            continue
-         yield name, attr
-
-class Config(metaclass=InnerClassIterable):
-   pass
-
-class Stimulus(Config):
-   def dict():
-      return { k[0] : v for k, v in dict(Stimulus).items()}
-
-   class Entity(Config):
+class Stimulus(node.Flat):
+   class Entity(node.Flat):
       #Base data
-      class Base(Config, node.Flat):
+      class Base(node.Flat):
          class Self(node.Discrete):
             def init(self, config):
                self.default = 0
@@ -65,7 +42,7 @@ class Stimulus(Config):
                return self.asserts(val)
 
       #Historical stats
-      class History(Config, node.Flat):
+      class History(node.Flat):
          class Damage(node.Continuous):
             def init(self, config):
                self.default = None
@@ -77,7 +54,7 @@ class Stimulus(Config):
                self.scale = 0.01
 
       #Resources
-      class Resources(Config, node.Flat):
+      class Resources(node.Flat):
          class Food(node.Continuous):
             def init(self, config):
                self.default = config.RESOURCE
@@ -94,7 +71,7 @@ class Stimulus(Config):
                self.max     = config.HEALTH
 
       #Status effects
-      class Status(Config, node.Flat):
+      class Status(node.Flat):
          class Freeze(node.Continuous):
             def init(self, config):
                self.default = 0
@@ -111,16 +88,7 @@ class Stimulus(Config):
                self.min     = -1
                self.max     = 126
 
-   class Tile(Config):
-      #A multiplicative interaction between pos and index
-      #is required at small training scale
-      #class PosIndex(node.Discrete):
-      #   def init(self, config):
-      #      self.max = config.NTILE*15*15
-
-      #   def get(self, tile, r, c):
-      #      return (r*15+c)*tile.state.index
-     
+   class Tile(node.Flat):
       class NEnts(node.Continuous):
          def init(self, config):
             self.max = config.NENT
@@ -134,15 +102,6 @@ class Stimulus(Config):
 
          def get(self, tile, r, c):
             return tile.state.index
-
-      '''
-      class Position(node.Discrete):
-         def init(self, config):
-            self.max = 9
-
-         def get(self, tile, r, c):
-            return r*3+c
-      '''
 
       class RRel(node.Discrete):
          def init(self, config):

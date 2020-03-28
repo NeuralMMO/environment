@@ -29,7 +29,7 @@ class Action:
       actions = defaultdict(list)
       outputs = defaultdict(list)
 
-      entKey = Serial.key(ent)
+      entKey = ent.serial
       roots  = Static.edges
       #roots  = [static.Move]
 
@@ -38,9 +38,11 @@ class Action:
          for args in root.edges:
             idxs = []
             for arg in args.args(env, ent, config):
-               key = Serial.key(arg)
+               key = arg.serial
                if type(arg) is not type: #Entity reference
-                  key = entKey + key
+                  key = (entKey, key)
+               else:
+                  key = (0, key)
 
                idx = inp.lookup.data[key]
                idxs.append(idx)

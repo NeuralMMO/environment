@@ -49,14 +49,18 @@ class Output(nn.Module):
 
             #Gen Atn_Arg style names for backward pass
             name = '_'.join([atn.__name__, arg.__name__])
-            if not self.config.TEST:
+            if not self.config.TEST and manager is not None:
+               atnsIdx = obs.atn.actions[atn].idxs[arg]
                manager.collectOutputs(name, obs.keys, atns, atnsIdx, values)
+            else:
+               atnsIdx = atnsIdx.cpu().numpy().tolist()
 
             #Convert from local index over atns to
             #absolute index into entity lookup table
-            idxs = atnsIdx.cpu().numpy().tolist()
-            idxs = [t[a] for t, a in zip(tensor, idxs)]
-            obs.atn.actions[atn].arguments[arg] = idxs
+            mapping = obs.lookup.back
+            idxs = [mapping[t[a]] for t, a in zip(tensor, atnsIdx)]
+            obs.atn.actions[atn].args[arg] = idxs
+            obs.atn.actions[atn].idxs[arg] = atnsIdx
 
 class Action(nn.Module):
    '''Head for selecting an action'''

@@ -1,12 +1,33 @@
 from pdb import set_trace as T
 import numpy as np
+import inspect
 
 from forge.blade.lib.utils import classproperty
 
-class Flat:
+#Makes private attributes read only                                           
+class ClassIterable(type):                                                    
+   items = [1, 2, 3]                                                          
+   def __iter__(cls):                                                         
+      for e in cls.__dict__.values():                                         
+         if not inspect.isclass(e):                                           
+            continue                                                          
+         yield e                                                              
+                                                                              
+   def leaves(cls):                                                           
+      stack = [([], cls)]
+      while len(stack) > 0:                                                   
+         name, node  = stack.pop()                                                  
+         added = False                                                        
+         for lve in node:                                                     
+            stack.append((name+[lve.__name__], lve))
+            added = True
+         if not added:                                                        
+            yield '-'.join(name), node
+
+class Flat(metaclass=ClassIterable):
    pass
 
-class Stim:
+class Stim(metaclass=ClassIterable):
    default = 0
    max = float('inf')
    min = 0

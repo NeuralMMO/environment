@@ -9,9 +9,10 @@ def camel(string):
 
 class Tile(StimHook):
    SERIAL = 1
-   def __init__(self, config, mat, r, c, nCounts, tex):
+   def __init__(self, config, mat, idx, r, c, nCounts, tex):
       super().__init__(Stimulus.Tile, config)
       self.r, self.c = r, c
+      self.idx = idx
       self.mat = mat()
       self.ents = {}
       self.state = mat()
@@ -21,7 +22,7 @@ class Tile(StimHook):
 
    @property
    def serial(self):
-      return self.r, self.c
+      return 10*self.idx + Tile.SERIAL
 
    def addEnt(self, entID, ent):
       assert entID not in self.ents

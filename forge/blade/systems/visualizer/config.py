@@ -9,4 +9,3 @@ MAIN_COLOR  = 'white'
 
 LINE_WIDTH = 1.5
 MARK_SIZE  = 25
-

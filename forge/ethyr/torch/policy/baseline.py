@@ -1,4 +1,4 @@
-
+from pdb import set_trace as T
 
 import torch
 from torch import nn
@@ -49,7 +49,7 @@ class Entities(nn.Module):
       conv = x[-225:].view(1, 15, 15, -1).permute(0, 3, 1, 2)
       conv = self.conv(conv)
       conv = self.pool(conv)
-      conv = conv.view(-1)
+      conv = conv.reshape(-1)
       conv = self.fc1(conv)
 
       attn = x[:-225]

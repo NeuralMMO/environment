@@ -19,6 +19,7 @@ class Output:
       self.atnLogits = atnLogits
       self.atnIdx    = atnIdx      
       self.value     = value
+      self.reward    = 0 #Probably being assigned wrong
 
 class Rollout:
    def __init__(self, config):
@@ -28,7 +29,6 @@ class Rollout:
          config: A configuration object
       '''
       self.actions = defaultdict(list)
-      self.values  = []
       self.rewards = []
 
       self.done = False
@@ -55,15 +55,10 @@ class Rollout:
       '''
       #Also check if blob is not none. This prevents
       #recording the first reward of a partial trajectory
-      if reward is not None and self.blob is not None:
+      if reward is not None:
          self.rewards.append(reward)
 
-      if self.blob is None:
-         annID, entID = key
-         self.blob = Blob(entID, annID)
-
       self.time += 1
-      self.blob.inputs(reward)
 
    def outputs(self, atnArgKey, atnLogits, atnIdx, value):
       '''Collects output data to internal buffers
@@ -74,23 +69,23 @@ class Rollout:
          atnsIdx   : Argument indices sampled from logits                       
          value     : Value function prediction  
       '''
-      if len(self.actions[self.time]) == 0:
-         self.blob.outputs(float(value))
-         self.values.append(value)
-
       output = Output(atnArgKey, atnLogits, atnIdx, value)
       self.actions[self.time].append(output)
 
    def finish(self):
       '''Called internally once the full rollout has been collected'''
       self.rewards.append(-1)
-      self.blob.inputs(-1)
+      #self.returns = self.gae(
+      #      self.config.GAMMA,
+      #      self.config.LAMBDA,
+      #      self.config.HORIZON)
 
-      #self.returns     = self.gae(self.config.GAMMA, self.config.LAMBDA, self.config.HORIZON)
-      self.returns     = self.discount(self.config.GAMMA)
-      self.lifespan    = len(self.rewards)
-
-      self.blob.finish()
+      self.returns = self.discount(self.config.GAMMA)
+      for k, atns in self.actions.items():
+         for e, ret in zip(atns, self.rewards):
+            e.reward = ret
+      
+      self.lifespan = len(self.rewards)
 
    def gae(self, gamma, lamb, H):
       '''Applies generalized advantage estimation to the given trajectory

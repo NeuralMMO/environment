@@ -19,6 +19,7 @@ class RolloutManager:
       self.inputs  = defaultdict(lambda: Rollout(config))
       self.outputs = defaultdict(lambda: Rollout(config))
       self.logs    = BlobSummary()
+      self.entity  = set()
 
    @property
    def nUpdates(self):
@@ -37,6 +38,11 @@ class RolloutManager:
          n: The number of rollouts
       '''
       return self.logs.nRollouts
+
+   def clearInputs(self):
+      for key in list(self.inputs):
+         del self.inputs[key]
+         self.entity.add(key)
 
    def collectInputs(self, stims):
       '''Collects observation data to internal buffers
@@ -58,10 +64,14 @@ class RolloutManager:
          rollout.finish()
          del self.inputs[key]
 
-         self.logs.add([rollout.blob])
+         #self.logs.add([rollout.blob])
 
       #Update inputs 
       for key, reward in zip(stims.keys, stims.rewards):
+         #Don't finish collecting partials
+         if key in self.entity:
+            continue
+
          assert key not in self.outputs
          rollout = self.inputs[key]
          rollout.inputs(reward, key)
@@ -77,7 +87,10 @@ class RolloutManager:
          values  : Value function prediction
       '''
       for key, atn, atnIdx, val in zip(keys, atns, atnsIdx, values):
-         assert key in self.inputs
+         #Don't collect output if we've decided not to collect input
+         if key not in self.inputs:
+            continue
+
          assert not self.inputs[key].done
          self.inputs[key].outputs(atnArg, atn, atnIdx, val)
 

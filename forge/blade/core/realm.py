@@ -26,6 +26,7 @@ class Spawner:
       self.popSz  = self.nEnt // self.nPop
       self.config = config
 
+      self.entLogs = {}
       self.ents = 0
       self.pops = defaultdict(int)
       self.palette = Palette(self.nPop)
@@ -55,7 +56,7 @@ class Spawner:
       self.ents      += 1
 
       color = self.palette.colors[pop]
-      ent   = entity.Player(self.config, iden, pop, name, color)
+      ent   = entity.Player(self.config, iden, pop, realm.idx, name, color)
       assert ent not in realm.desciples
 
       r, c = ent.base.pos
@@ -94,6 +95,7 @@ class Realm(Timed):
 
       self.entID     = 1
       self.tick      = 0
+      self.idx       = idx
 
    ###################################################################
    ### Internal API (+ constructor) documented at forge.blade.core.api
@@ -151,6 +153,9 @@ class Realm(Timed):
             }
 
       return packet
+
+   def entLog(self):
+      return self.entLogs, len(self.desciples)
 
    def act(self, actions):
       '''Execute agent actions
@@ -215,7 +220,7 @@ class Realm(Timed):
       for entID in decisions.keys():
          ent    = self.desciples[entID]
          if self.postmortem(ent, dead):
-            dones.add(ent.serial)
+            dones.add(ent)
          else:
             packets[entID].reward = self.reward(entID)
             packets[entID].stim = ent
@@ -245,14 +250,18 @@ class Realm(Timed):
       Args: 
          dead: A list of dead agent IDs to remove
       '''
+      logs = set()
       for entID in dead:
          ent  = self.desciples[entID]
          r, c = ent.base.pos
 
          self.world.env.tiles[r, c].delEnt(entID)
          self.spawner.cull(ent.annID)
+         logs.add(ent.log())
 
          del self.desciples[entID]
+      
+      self.entLogs = logs
 
    def getStims(self, packets):
       '''Gets agent stimuli from the environment

@@ -1,24 +1,115 @@
 from pdb import set_trace as T
 from collections import defaultdict
-from forge.blade.lib.enums import Material
-from forge.blade.lib import enums
-from copy import deepcopy
-import os
+from collections import deque
 
+from tqdm import tqdm
 import numpy as np
 import json, pickle
 import time
 import ray
+import os
 
+from forge.blade.lib.utils import EDA
+from forge.blade.lib.enums import Material
+from forge.blade.lib import enums
+from copy import deepcopy
+
+from forge.trinity.ascend import Ascend
 from forge.blade.systems import visualizer
-# from forge.blade.systems.visualizer import config as visconf
 
+def Test(filename, msg='test'):
+      file = open(filename,"w")
+      print(msg,file=file)
+      file.close()
+
+class TimePacket:
+   def __init__(self, x):
+      self.time = time.time()
+      self.val  = x
+
+class TimeQueue:
+   def __init__(self, tMinutes=10):
+      self.histLen = 60*tMinutes
+      self.data    = deque()
+
+   def update(self, x):
+      t = time.time()
+      packet = TimePacket(x)
+      self.data.append(packet)
+      
+      #Remove elements that are too old
+      while len(self.data) > 0:
+         pkt = self.data.popleft()
+         if t - pkt.time < self.histLen:
+            self.data.appendleft(pkt)
+            break
+
+   @property
+   def val(self):
+      if len(self.data) < 2:
+         return 0
+
+      t   = self.data[-1].time - self.data[0].time
+      val = sum([e.val for e in self.data])
+      return val / t 
+
+class Stat:
+   def __init__(self, k=0.99):
+      self.data = []
+      self.min  = np.inf
+      self.max  = -np.inf
+      self.eda  = EDA(k)
+      self.val  = 0
+
+   def update(self, x, add=False):
+      if add:
+         x = self.val + x
+
+      self.val = x
+      self.eda.update(x)
+      #self.data.append(x)
+      if x < self.min:
+         self.min = x
+      if x > self.max:
+         self.max = x
+
+   @property
+   def summary(self):
+      return self.eda.eda
+
+class Bar(tqdm):
+   def __init__(self, position=0, title='title', form=None):
+      lbar = '{desc}: {percentage:3.0f}%|'
+      bar = '{bar}'
+      rbar  = '| [' '{elapsed}{postfix}]'
+      fmt = ''.join([lbar, bar, rbar])
+
+      if form is not None:
+         fmt = form
+
+      super().__init__(
+            total=100,
+            position=position,
+            bar_format=fmt)
+
+      self.title(title)
+
+   def percent(self, val):
+      self.update(100*val - self.n)
+
+   def title(self, txt):
+      self.desc = txt
+      self.refresh()
+
+# Not in use
 class Logger:                                                                 
    def __init__(self, middleman):                                             
       self.items     = 'reward lifetime value'.split()                              
       self.middleman = middleman                                              
       self.tick      = 0                                                      
+      Test('Logger.txt')
 
+                                                                              
    def update(self, lifetime_mean, reward_mean, value_mean,
               lifetime_std, reward_std, value_std):
       data = {}                                                               
@@ -28,14 +119,102 @@ class Logger:
       data['lifetime_std']  = lifetime_std
       data['reward_std']    = reward_std
       data['value_std']     = value_std
-      data['tick']     = self.tick                                           
+      data['tick']     = self.tick                                            
                                                                               
-      open('traceback.txt','w').write('test')
       self.tick += 1                                                          
       self.middleman.setData.remote(data)
 
+class BlobSummary:
+   def __init__(self):
+      self.nRollouts = 0
+      self.nUpdates  = 0
+
+      self.lifetime = []
+      self.reward   = [] 
+      self.value    = []
+
+   def add(self, blobs):
+      for blob in blobs:
+         self.nRollouts += blob.nRollouts
+         self.nUpdates  += blob.nUpdates
+
+         self.lifetime += blob.lifetime
+         self.reward   += blob.reward
+         self.value    += blob.value
+
+      return self
+
+#Agent logger
+class Blob:
+   def __init__(self, entID, annID, lifetime, exploration): 
+      self.exploration = exploration
+      self.lifetime    = lifetime
+
+      self.entID = entID 
+      self.annID = annID
+
 #Static blob analytics
+# Used in Quill
+#   Inkwell.step() is called when Quill.step() is called
+#   Inkwell handles the data of quill
 class InkWell:
+   def __init__(self):
+      self.util = defaultdict(lambda: defaultdict(Stat))
+      self.stat = defaultdict(lambda: defaultdict(Stat))
+      # self.middleman = middleman                                              
+
+   def summary(self):
+      return
+
+   def step(self, utilization, statistics):
+      '''Calls utilization and statistics'''
+      self.utilization(utilization)
+      self.statistics(statistics)
+
+   def statistics(self, logs):
+      for rollouts, updates, nPkt in logs['Pantheon_Updates']:
+         performance = self.stat['Performance']
+         performance['Epochs'].update(1, add=True)
+         performance['Rollouts'].update(rollouts, add=True)
+         performance['Packets'].update(nPkt)
+         performance['Updates'].update(updates, add=True)
+
+         t = 'Time'
+         if t not in performance:
+            performance[t] = TimeQueue()
+         performance[t].update(updates)
+         # self.middleman.setData.remote(data)
+
+
+      for blobs, nEnt in logs['Realm_Logs']:
+         self.stat['Agent']['Population'].update(nEnt)
+         for blob in blobs:
+            #self.stat['Blobs'].append(blob)
+            self.stat['Agent']['Lifetime'].update(blob.lifetime)
+            for tile, count in blob.exploration.items():
+               self.stat['Agent'][tile].update(count)
+
+   def utilization(self, logs):
+      for k, vList in logs.items():
+         for v in vList:
+            self.util[k]['run'].update(v.run)
+            self.util[k]['wait'].update(v.wait)
+
+   def summary(self):
+      summary = defaultdict(dict)
+      for log, vDict in self.stat.items():
+         for k, stat in vDict.items():
+            if log not in self.stat:
+               continue
+            summary[log][k] = stat
+     
+      for log, vDict in self.util.items():
+         for k, stat in vDict.items():
+            if log not in self.util:
+               continue
+            summary[log][k] = stat
+      return summary
+            
    def unique(blobs):
       tiles = defaultdict(list)
       for blob in blobs:
@@ -69,73 +248,24 @@ class InkWell:
    def value(blobs):
       return {'value': [blob.value for blob in blobs]}
 
-class BlobSummary:
-   def __init__(self):
-      self.nRollouts = 0
-      self.nUpdates  = 0
-
-      self.lifetime = []
-      self.reward   = [] 
-      self.value    = []
-
-   def add(self, blobs):
-      for blob in blobs:
-         self.nRollouts += blob.nRollouts
-         self.nUpdates  += blob.nUpdates
-
-         self.lifetime += blob.lifetime
-         self.reward   += blob.reward
-         self.value    += blob.value
-
-      return self
-
-#Agent logger
-class Blob:
-   def __init__(self, entID, annID): 
-      self.lifetime = 0
-      self.reward   = [] 
-      self.value    = []
-
-      self.entID = entID 
-      self.annID = annID
-
-   def inputs(self, reward):
-      if reward is not None:
-         self.reward.append(reward)
-
-   def outputs(self, value):
-      self.value.append(value)
-      self.lifetime += 1
-
-   def finish(self):
-      self.reward   = [np.mean(self.reward)]
-      self.value    = [np.mean(self.value)]
-      self.lifetime = [self.lifetime]
-
-      self.nUpdates  = self.lifetime[0]
-      self.nRollouts = 1
-
-class Quill:
-   def __init__(self, config):
-      self.config = config
-      modeldir = config.MODELDIR
-
-      self.time = time.time()
-      self.dir = modeldir
-
-      self.curUpdates  = 0
-      self.curRollouts = 0
-      self.nUpdates    = 0
-      self.nRollouts   = 0
-
-      try:
-         os.remove(modeldir + 'logs.p')
-      except:
-         pass
+@ray.remote
+# Quill is an Ascend class, which means it's a remote instance with send/recv functions. It's a data hub, aggregates logs from all other workers
+class Quill(Ascend):
+   def __init__(self, config, idx):
+      
+      super().__init__(config, 0)
+      self.inkwell = InkWell()
+      self.config     = config
+      self.stats      = defaultdict(Stat)
+      self.epochs     = 0
+      self.rollouts   = 0
+      self.updates    = 0
+      Test('Quill.txt', msg=self.config.LOG)
 
       if self.config.LOG:
          # IMPORT CONFIG HERE AND SET NEW VARIABLES
          #   config_dic[member] = vars(self.config)[member]
+         Test('Quill2.txt')
 
          middleman   = visualizer.Middleman.remote()
          self.logger = Logger(middleman)
@@ -143,65 +273,33 @@ class Quill:
          # Convert config to dict, since config class can't be 
          self.market = visualizer.Market(['test1', 'test2'], middleman)
          self.vis    = visualizer.BokehServer.remote(middleman, config)
-         print('Everything loaded')
          self.vis.update.remote()
-         print('Visualizer loop started')
 
+   def init(self, trinity):
+      self.trinity = trinity
+      return 'Quill', 'Initialized'
+
+   def step(self):
+      utilization, statistics = {}, {}
+
+      #Utilization
+      for key in 'Pantheon God Sword'.split():
+         utilization[key] = self.recv(key + '_Utilization')
+
+      #Statistics
+      for key in 'Pantheon_Updates God_Logs Realm_Logs'.split():
+         statistics[key] = self.recv(key)
  
-   def timestamp(self):
-      cur = time.time()
-      ret = cur - self.time
-      self.time = cur
-      return str(ret)
-
-   def stats(self):
-      updates  = 'Updates:  (Total) ' + str(self.nUpdates)
-      rollouts = 'Rollouts: (Total) ' + str(self.nRollouts)
-
-      padlen   = len(updates)
-      updates  = updates.ljust(padlen)
-      rollouts = rollouts.ljust(padlen)
-
-      updates  += '  |  (Epoch) ' + str(self.curUpdates)
-      rollouts += '  |  (Epoch) ' + str(self.curRollouts)
-
-      return updates + '\n' + rollouts
-
-   def scrawl(self, logs):
-      #Collect experience information
-      self.nUpdates      += logs.nUpdates
-      self.nRollouts     += logs.nRollouts
-      self.curUpdates    =  logs.nUpdates
-      self.curRollouts   =  logs.nRollouts
-
-      self.value_mean    = np.mean(logs.value)
-      self.reward_mean   = np.mean(logs.reward)
-      self.lifetime_mean = np.mean(logs.lifetime)
-
-      self.value_std     = np.std(logs.value)
-      self.reward_std    = np.std(logs.reward)
-      self.lifetime_std  = np.std(logs.lifetime)
-
-      print('scrawl')
-      self.market.update()
-      print('Value Function: ', self.value_mean)
-
-      return self.stats(), self.lifetime_mean
-
-   def latest(self):
-      return self.lifetime_mean, self.reward_mean
-
-   def save(self, blobs):
-      with open(self.dir + 'logs.p', 'ab') as f:
-         pickle.dump(blobs, f)
-
-   def scratch(self):
-      pass
+      time.sleep(0.1)
+      self.inkwell.step(utilization, statistics)
+      return self.inkwell.summary()
 
 #Log wrapper and benchmarker
+# Not in use
 class Benchmarker:
    def __init__(self, logdir):
       self.benchmarks = {}
+      Test('benchmarker.txt')
 
    def wrap(self, func):
       self.benchmarks[func] = Utils.BenchmarkTimer()

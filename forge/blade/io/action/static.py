@@ -33,7 +33,7 @@ class Action(Node):
                continue
             for arg in args.edges: 
                arguments.append(arg)
-               arg.serial = tuple([idx])
+               arg.serial = 10*idx + Node.SERIAL
                arg.idx = idx 
                idx += 1
       Action.arguments = arguments

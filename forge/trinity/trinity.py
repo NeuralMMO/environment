@@ -1,13 +1,15 @@
 from pdb import set_trace as T
 
+import time
 import os
 
 from forge.blade import lib
+
 from forge.trinity.ascend import Ascend, runtime, waittime, Log
 from forge.trinity.timed import Summary
 
 class Trinity():
-   def __init__(self, pantheon, god, sword):
+   def __init__(self, cluster, pantheon, god, sword, quill):
       '''Pantheon-God-Sword (Cluster-Server-Core) infra 
 
       Trinity is three layer distributed infra design pattern for generic, 
@@ -36,11 +38,14 @@ class Trinity():
          broadcast-reduce to OpenAI's Rapid to our  MMO style communications
          using Ascend + Trinity with relatively little code and testing.
       '''
+      self.cluster  = cluster
+      self.quill    = quill
+
       self.pantheon = pantheon
       self.god      = god
       self.sword    = sword
 
-   def init(self, config, args):
+   def init(self, config, args, policy):
       '''
       Instantiates a Pantheon object to make Trinity runnable. Separated
       from __init__ to make Trinity usable as a stuct to hold Pantheon, 
@@ -54,8 +59,36 @@ class Trinity():
          self: A self reference
       '''
       lib.ray.init(config, args.ray)
-      self.cluster = self.pantheon(self, config, 1)
-      self.config  = config
+      self.config   = config
+
+      ###Logging
+      self.quill    = Ascend.proselytize(
+            self.quill,
+            config, 1)[0]
+      self.cluster  = Ascend.proselytize(
+            self.cluster,
+            config, 1, policy)[0]
+      acolytes = [self.cluster, self.quill]
+      
+      ###Remote trinity workers
+      self.pantheon = Ascend.proselytize(
+            self.pantheon,
+            config,
+            config.NPANTHEON)
+      self.god = Ascend.proselytize(
+            self.god,
+            config,
+            config.NGOD)
+      self.sword = Ascend.proselytize(
+            self.sword,
+            config,
+            config.NSWORD)
+      trinity = self.pantheon + self.god + self.sword
+
+      #Sync model to rollout workers
+      Ascend.init(acolytes, self)
+      Ascend.init(trinity, self)
+
       return self
 
    def step(self):
@@ -64,10 +97,15 @@ class Trinity():
       Returns:
          txt: Logging string
       '''
-      save, stats, log = self.cluster.step()
+      #blobs = BlobSummary().add(blobs)                                        
+      #Update/checkpoint model and write logs                                 
+      #stats, lifetime = self.quill.scrawl(blobs)  
 
-      log   = Log.summary([self.cluster.discipleLogs(), 
-            *log, self.cluster.logs()])
+      cluster          = self.pantheon[0]
+      save, stats, log = cluster.step()
+
+      log   = Log.summary([cluster.discipleLogs(), 
+            *log, cluster.logs()])
       log   = str(Summary(log))
 
       #Write stats to txt file

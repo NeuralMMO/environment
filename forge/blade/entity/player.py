@@ -1,9 +1,13 @@
 import numpy as np
 from pdb import set_trace as T
 
+from collections import defaultdict
+
 from forge.blade.systems import ai
 from forge.blade.lib.enums import Material, Neon
+from forge.blade.lib.log import Blob
 
+from forge.blade.io.stimulus.node import ClassIterable
 from forge.blade.io.stimulus.hook import StimHook
 from forge.blade.io.stimulus.static import Stimulus
 from forge.blade.io.action import static as action
@@ -25,6 +29,7 @@ class Base(StimHook):
       self.c.update(c)
 
       self.population.update(pop)
+      self.exploration = defaultdict(int)
 
    def update(self, ent, world, actions):
       if ent.resources.health.val <= 0:
@@ -32,12 +37,14 @@ class Base(StimHook):
          return
 
       r, c = self.pos
-      if type(world.env.tiles[r, c].mat) == Material.LAVA.value:
+      tile = world.env.tiles[r, c]
+      if type(tile.mat) == Material.LAVA.value:
          self.alive = False
          return
 
       #Update counts
       r, c = self.pos
+      self.exploration[tile.tex] += 1
       world.env.tiles[r, c].counts[self.population.val] += 1
 
    @property
@@ -131,14 +138,13 @@ class Status(StimHook):
       lvl = wilderness(self.config, ent.base.pos)
       self.wilderness.update(lvl)
 
-class Player():
+class Player(StimHook):
    SERIAL = 0
-   def __init__(self, config, iden, pop, name='', color=None):
-      self.config = config
-
+   def __init__(self, config, iden, pop, env, name='', color=None):
       #Identifiers
-      self.entID = iden 
-      self.annID = pop
+      self.entID   = iden 
+      self.annID   = pop
+      self.realmID = env
 
       #Submodules
       self.base      = Base(config, iden, pop, name, color)
@@ -147,6 +153,8 @@ class Player():
       self.status    = Status(config)
       self.skills    = Skills(config)
       self.history   = History(config)
+
+      super().__init__(Stimulus.Entity, config, inputs=False)
       #self.inventory = Inventory(config)
       #self.chat      = Chat(config)
 
@@ -170,7 +178,13 @@ class Player():
 
    @property
    def serial(self):
-      return self.annID, self.entID
+      return 10*self.entID + Player.SERIAL
+
+   def log(self):
+      return Blob(
+            self.entID, self.annID,
+            self.history.timeAlive.val,
+            self.base.exploration)
  
    def packet(self):
       data = {}

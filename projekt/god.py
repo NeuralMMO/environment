@@ -1,14 +1,15 @@
 from pdb import set_trace as T
-
 import numpy as np
+
 import ray
+import time
 
 from collections import defaultdict
 
 from forge.blade import core
 from forge.blade.lib.log import BlobSummary 
 
-from forge.trinity.ascend import Ascend, runtime, Log
+from forge.trinity.ascend import Ascend, runtime, waittime, Log
 from forge.blade import IO
 
 import projekt
@@ -30,7 +31,7 @@ class Realm(core.Realm):
       '''Example override of the reward function'''
       return super().reward(ent)
 
-@ray.remote(num_gpus=0)
+@ray.remote
 class God(Ascend):
    '''Server level infrastructure layer 
 
@@ -52,7 +53,7 @@ class God(Ascend):
    128 agents, not thousands. However, we built with future scale in mind
    and invested in infrastructure early.''' 
 
-   def __init__(self, trinity, config, idx):
+   def __init__(self, config, idx):
       '''Initializes an environment and logging utilities
 
       Args:
@@ -60,15 +61,16 @@ class God(Ascend):
          config  : A Config object as shown in __main__
          idx     : Hardware index used to specify the game map
       '''
-      super().__init__(trinity.sword, config.NSWORD, trinity, config)
+      super().__init__(config, idx)
       self.nPop, self.ent       = config.NPOP, 0
       self.config, self.idx     = config, idx
       self.nUpdates, self.grads = 0, []
 
-      self.env      = Realm(config, idx)
-      self.blobs    = BlobSummary()
+      self.env   = Realm(config, idx)
+      self.blobs = BlobSummary()
 
       self.obs, self.rewards, self.dones, _ = self.env.reset()
+      self.workerName = 'God+Realm {}'.format(self.idxStr)
 
    def getEnv(self):
       '''Ray does not allow direct access to remote attributes
@@ -84,33 +86,10 @@ class God(Ascend):
       Returns:
          clientID: A client membership ID
       '''
+      return self.idx % self.config.NSWORD
       return entID % self.config.NSWORD
 
-   def batch(self, nUpdates):
-      '''Set backward pass flag and reset update counts
-      if the end of the data batch has been reached
-
-      Args:
-         nUpdates: The number of agent steps collected since the last call
-
-      Returns:
-         backward: (bool) Whether of not a backward pass should be performed
-
-      Note: the actual batch size will be smaller than set in the
-      configuration file due to discarded partial trajectories'''
-      SERVER_UPDATES = self.config.SERVER_UPDATES
-      TEST           = self.config.TEST
-
-      self.backward  =  False
-      self.nUpdates  += nUpdates
-
-      if not TEST and self.nUpdates > SERVER_UPDATES:
-         self.backward = True
-         self.nUpdates = 0
-
-      return self.backward
- 
-   def distribute(self, weights):
+   def distribute(self):
       '''Shards input data across clients using the Ascend async API
 
       Args:
@@ -121,17 +100,20 @@ class God(Ascend):
       '''
 
       #Preprocess obs
-      clientData, nUpdates = IO.inputs(
+      clientData, deserialize, nUpdates = IO.inputs(
          self.obs, self.rewards, self.dones, 
          self.config, self.clientHash)
 
-      #Handle possible end of batch
-      backward = self.batch(nUpdates)
-
       #Shard entities across clients
-      return super().distribute(clientData, weights, backward, shard=(1, 0, 0))
+      return Ascend.distribute(self.trinity.sword,
+            clientData, shard=[True]), deserialize
 
-   def synchronize(self, rets):
+   @waittime
+   def syn(dat):
+      time.sleep(0.1)
+      return ray.get(dat)
+
+   def synchronize(self, rets, deserialize):
       '''Aggregates output data across shards with the Ascend async API
 
       Args:
@@ -141,19 +123,23 @@ class God(Ascend):
          atnDict: Dictionary of actions to be submitted to the environment
       '''
       atnDict, gradList, blobList = None, [], []
-      for obs, grads, blobs in super().synchronize(rets):
+      #for obs in self.syn(rets):
+      for obs in super().synchronize(rets):
          #Process outputs
-         atnDict = IO.outputs(obs, atnDict)
+         atnDict = IO.outputs(obs, deserialize, atnDict)
 
          #Collect update
-         if self.backward:
+         if False and self.backward:
             self.grads.append(grads)
             self.blobs.add([blobs])
 
       return atnDict
 
-   @runtime
-   def step(self, recv):
+   def init(self, trinity):
+      self.trinity = trinity
+      return self.workerName, 'Initialized'
+
+   def step(self):
       '''Sync weights and compute a model update by collecting
       a batch of trajectories from remote clients.
 
@@ -165,20 +151,14 @@ class God(Ascend):
          summary : A BlobSummary object logging agent statistics
          log     : Logging object for infrastructure timings
       '''
-      self.grads, self.blobs = [], BlobSummary()
-      while len(self.grads) == 0:
-         self.tick(recv)
-         recv = None
+      Ascend.send(self.trinity.quill, self.logs(), 'God_Utilization')
+      entLog = self.env.entLog()
+      if len(entLog) > 0:
+         Ascend.send(self.trinity.quill, entLog, 'Realm_Logs')
+      self.tick()
 
-      #Aggregate updates and logs
-      grads = np.mean(self.grads, 0)
-      log   = Log.summary([
-                  self.discipleLogs(), 
-                  self.env.logs()])
-
-      return grads, self.blobs, log
-
-   def tick(self, recv=None):
+   @runtime
+   def tick(self):
       '''Simulate a single server tick and all remote clients.
       The optional data packet specifies a new model parameter vector
 
@@ -186,7 +166,8 @@ class God(Ascend):
          recv: Upstream data from the cluster (in this case, a param vector)
       '''
       #Make decisions
-      actions = super().step(recv)
+      packet, deserialize = self.distribute()
+      actions             = self.synchronize(packet, deserialize)
 
       #Step the environment and all agents at once.
       #The environment handles action priotization etc.

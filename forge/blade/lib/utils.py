@@ -3,6 +3,20 @@ import time
 
 import numpy as np
 
+from queue import Queue as NonIterableQueue
+from queue import Empty
+
+def printf(header, content, pad=15):
+   print('['+ header.center(pad) + ']: ' + content)
+
+class Queue(NonIterableQueue):
+   def __iter__(self):
+      while True:
+         try:
+            yield self.get_nowait()
+         except Empty:
+            return
+
 class staticproperty(property):
     def __get__(self, cls, owner):
         return self.fget.__get__(None, owner)()
@@ -132,6 +146,7 @@ class BenchmarkTimer:
    def __init__(self):
       self.eda = EDA() 
       self.accum = 0
+
    def startRecord(self):
       self.start = time.time()
 

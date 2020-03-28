@@ -47,7 +47,7 @@ def merge(rollouts):
             outk['atns'].append(out.atnLogits)
             outk['idxs'].append(out.atnIdx)
             outk['vals'].append(out.value)
-            outk['rets'].append(out.returns)
+            outk['rets'].append(out.reward)
             n += 1
 
    return outs, n
@@ -80,10 +80,9 @@ def backward(rollouts, config):
 
       l, v, e = loss.PG(atns, idxs, vals, rets)
 
-      #Averaging results in no learning. Need to retune LR?
-      pgLoss  += l# / n
-      valLoss += v# / n
-      entLoss += e# / n
+      pgLoss  += l
+      valLoss += v
+      entLoss += e
 
    totLoss = (
          config.PG_WEIGHT*pgLoss + 

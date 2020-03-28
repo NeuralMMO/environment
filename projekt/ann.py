@@ -1,6 +1,7 @@
 '''Policy submodules and a baseline agent.'''
 from pdb import set_trace as T
 
+import time
 import numpy as np
 from collections import defaultdict
 
@@ -51,6 +52,7 @@ class Policy(nn.Module):
          config: A Configuration object
       '''
       super().__init__()
+      self.device = config.DEVICE
       self.config = config
 
       self.IO     = baseline.IO(config)
@@ -97,8 +99,13 @@ class Policy(nn.Module):
             lambda key: key[0])
 
       #Initialize output buffers
-      hidden = torch.zeros((packet.obs.n, self.config.HIDDEN))
-      values = torch.zeros((packet.obs.n, 1))
+      hidden = torch.zeros(
+            (packet.obs.n, self.config.HIDDEN),
+            device=self.device)
+
+      values = torch.zeros(
+            (packet.obs.n, 1),
+            device=self.device)
 
       #Per-population policies rearranged in input order
       for pop in groups:

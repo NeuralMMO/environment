@@ -21,32 +21,37 @@ infrastructure and IO code.'''
 
 #My favorite debugging macro
 from pdb import set_trace as T 
-
 import argparse
+import numpy as np
+import time
+
+import ray
+import ray.experimental.signal as signal
 
 from forge.blade import lib
+from forge.blade.core import Realm
+from forge.blade.lib.log import Quill, Bar
+
 from forge.trinity import Trinity
 from forge.ethyr.torch import Model
+from forge.ethyr.torch.param import getParameters
 
 from experiments import Experiment, Config
-from projekt import Pantheon, God, Sword, Policy
-
-
-from forge.blade.systems.visualizer import config
+from projekt import Cluster, Pantheon, God, Sword, Policy, Evaluator
 
 def parseArgs(config):
    '''Processes command line arguments'''
    parser = argparse.ArgumentParser('Projekt Godsword')
-   parser.add_argument('--ray', type=str, default='default',
+   parser.add_argument('--ray', type=str, default='default', 
          help='Ray mode (local/default/remote)')
-   parser.add_argument('--render', action='store_true', default=False,
+   parser.add_argument('--render', action='store_true', default=False, 
          help='Render env')
    parser.add_argument('--log', action="store_true",
          help='Log data on visualizer exit. Default file is timestamp, filename overwrite with --name')
    parser.add_argument('--name', default='log',
-         help='Name of file to save pickle data')
+         help='Name of file to save json data to')
    parser.add_argument('--load-exp', action="store_true",
-         help='Loads saved pickle data into visualizer with name specified by --name')
+         help='Loads saved json into visualizer with name specified by --name')
 
    args               = parser.parse_args()
    config.LOG         = args.log
@@ -80,23 +85,89 @@ def render(trinity, config, args):
 
    #Instantiate environment and load the model,
    #Pass the tick thunk to a twisted WebSocket server
-   god   = trinity.god.remote(trinity, config, idx=0)
-   model = Model(Policy, config).load(None, config.BEST).weights
-   env   = god.getEnv.remote()
-   god.tick.remote(model)
+   evaluator = Evaluator(config, envIdx=0)
 
    #Start a websocket server for rendering. This requires
    #forge/embyr, which is automatically downloaded from
    #jsuarez5341/neural-mmo-client in scripts/setup.sh
    from forge.embyr.twistedserver import Application
-   Application(env, god.tick.remote)
+   Application(evaluator.env, evaluator.tick)
+
+class LogBars:
+   def __init__(self):
+      self.perf     = Bar(title='', position=0,
+            form='[{elapsed}] {desc}')
+      self.stat = 'Epochs: {}, Agents: {}, Actions: {} ({:.1f}/s, {:.1f} queue)'
+      self.perf.title(self.stat.format(0, 0, 0, 0, 0))
+
+      self.pantheon = Bar(title='Pantheon', position=1)
+      self.god      = Bar(title='God     ', position=2)
+      self.sword    = Bar(title='Sword   ', position=3)
+
+      self.len      = 0
+      self.pos      = 4
+      self.stats    = {}
+      self.start = time.time()
+
+   def log(self, percent, bar):
+      bar.refresh()
+      if percent != 0:
+         bar.start_t = self.start
+         bar.percent(percent)
+         self.start = time.time()
+
+   def step(self, packet):
+      keys = 'Pantheon God Sword'.split()
+      bars = [self.pantheon, self.god, self.sword]
+      for k, b in zip(keys, bars):
+         b.refresh()
+         if k not in packet:
+            continue
+         pkt = packet[k]
+         run  = pkt['run'].summary
+         wait = pkt['wait'].summary
+         if 0 == run == wait:
+            continue
+         else:
+            percent = run / (run + wait)
+            self.log(percent, b)
+
+      self.perf.refresh()
+      if 'Performance' in packet:
+         pkt      = packet['Performance']
+         epochs   = pkt['Epochs'].val
+         rollouts = pkt['Rollouts'].val
+         updates  = pkt['Updates'].val
+         nPkt     = pkt['Packets'].val
+         perf     = pkt['Time'].val
+
+         self.perf.title(self.stat.format(
+               epochs, rollouts, updates, perf, nPkt))
+
+      if 'Agent' in packet:
+         data = packet['Agent']
+         for k, v in data.items():
+            self.len = max(self.len, len(k))
+            if k not in self.stats:
+               self.stats[k] = Bar(title='', position=self.pos, form='{desc}')
+               self.pos += 1
+
+            bar = self.stats[k]
+            l = str(self.len)
+            bar.title(
+                  ('   {: <'+l+'}: {:.2f}<{:.2f}'
+                  ).format(k.capitalize(), v.summary, v.max))
+
 
 if __name__ == '__main__':
    #Experiment + command line args specify configuration
    #Trinity specifies Cluster-Server-Core infra modules
    config  = Experiment('pop', Config).init()
-   trinity = Trinity(Pantheon, God, Sword)
+   trinity = Trinity(Cluster, Pantheon, God, Sword, Quill)
    args    = parseArgs(config)
+
+   bars = LogBars()
+
 
    #Blocking call: switches execution to a
    #Web Socket Server module
@@ -104,7 +175,23 @@ if __name__ == '__main__':
       render(trinity, config, args)
 
    #Train until AGI emerges
-   trinity.init(config, args)
+   trinity.init(config, args, Policy)
+   workers = trinity.pantheon + trinity.god
+   workers.append(trinity.cluster)
+   workers.append(trinity.quill)
+   handles = dict((w.step.remote(), w) for w in workers)
+   #handles = [w.step.remote() for w in workers]
+
    while True:
-      log = trinity.step()
-      print(log)
+      #ready = ray.get(handles)
+      #handles = [w.step.remote() for w in workers]
+
+      ready, _ = ray.wait(list(handles.keys()))
+      rets = ray.get(ready)
+      for k, ret in zip(ready, rets):
+         actor = handles[k]
+         if actor is trinity.quill:
+            bars.step(ret)
+         del handles[k]
+         k = actor.step.remote()
+         handles[k] = actor

@@ -87,12 +87,13 @@ Engineering
 
 .. code-block:: python
 
-   #Ensure python 3.7.x with Anacona pip
-   #You may also need to install gcc on a fresh OS
-   conda install pip
-
    #Download the Neural MMO environment
+   #We assume a Python 3.7+ setup with Anaconda pip
    git clone https://github.com/jsuarez5341/neural-mmo && cd neural-mmo
+
+   #Installation options:
+   #   --no-client:   Omit the Embyr 3D Unity client
+   #   --virtual-env: Install in a virtual env
    python scripts/setup.py
 
    #Run the pretrained demo model to test the installation

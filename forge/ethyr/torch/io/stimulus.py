@@ -34,19 +34,19 @@ class Input(nn.Module):
    def initEmbeddings(self, embedF):
       '''Initialize embedding networks'''
       emb  = nn.ModuleDict()
-      for name, subnet in stimulus.Static:
-         name = '-'.join(name)
+      for subnet in stimulus.Static:
+         name = subnet.__name__
          emb[name] = nn.ModuleDict()
-         for param, val in subnet:
-            param = '-'.join(param)
+         for param, val in subnet.leaves():
             emb[name][param] = embedF(val(self.config), self.config)
       self.emb = emb
 
    def initAttributes(self, attrF):
       '''Initialize attribute networks'''
       self.attributes = nn.ModuleDict()
-      for name, subnet in stimulus.Static:  
-         self.attributes['-'.join(name)] = attrF(self.config)
+      for subnet in stimulus.Static:  
+         name = subnet.__name__
+         self.attributes[name] = attrF(self.config)
 
    def initEntities(self, entF):
       '''Initialize entity network'''
@@ -68,7 +68,6 @@ class Input(nn.Module):
       '''Embed and pack attributes of each entity'''
       embeddings = []
       for param, val in entities.attributes.items():
-         param = '-'.join(param)
          val = torch.Tensor(val).to(self.device)
          emb = self.emb[name][param](val)
          embeddings.append(emb)

@@ -360,12 +360,8 @@ class Middleman:
         Returns:
            data: From buffer
         '''
-        print('getData')
         data = self.data
         self.data = None
-        file = open("middleman.txt", "a")
-        file.write('getData\n')
-        file.close()
         return data
 
     def setData(self, data):

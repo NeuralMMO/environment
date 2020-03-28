@@ -33,6 +33,8 @@ class AtnData:
 class ArgsData:
    def __init__(self):
       self.arguments = defaultdict(list)
+      self.idxs = {}
+      self.args = {}
 ### End Internal IO Packet Objects ###
 
 class IOPacket:
@@ -48,14 +50,14 @@ class IOPacket:
 
    def actions(self, serialize=True):
       for atn in action.Static.arguments:
-         serial = atn
+         key = atn
          if serialize:
-            serial = Serial.key(serial)
-         self.lookup.add(serial, orig=atn)
+            key = (0, key.serial)
+         self.lookup.add(key, orig=atn)
 
    def key(self, env, ent, reward, config):
-      annID, entID = ent.annID, ent.entID
-      key = (annID, entID)
+      annID, entID, realmID = ent.annID, ent.entID, ent.realmID
+      key = (annID, entID, realmID)
       self.keys.append(key)
       self.rewards.append(reward)
 
@@ -116,9 +118,12 @@ class IO:
       if clientHash is None:
          clientHash=lambda x: 0
 
-      for done in dones:
-         idx = clientHash(done[1])
-         inputs[idx].dones.append(done)
+      for ent in dones:
+         annID, entID, realmID = ent.annID, ent.entID, ent.realmID
+         key = (annID, entID, realmID)
+ 
+         idx = clientHash(entID)
+         inputs[idx].dones.append(key)
 
       ### Process inputs
       n = 0
@@ -130,10 +135,15 @@ class IO:
          inputs[idx].obs.n += 1
          n += 1
       
-      start = time.time()
       #Index actions
+      deserialize = {}
       for idx, inp in inputs.items():
          inputs[idx].actions()
+         mapping = inputs[idx].lookup.deserialize
+         deserialize = {**deserialize, **mapping}
+   
+      #Don't send raw env data to clients
+      del inputs[idx].lookup.deserialize
 
       ### Process outputs
       for ob, reward in zip(obs, rewards):
@@ -149,9 +159,9 @@ class IO:
       if default:
          inputs = inputs[0]
 
-      return inputs, n
+      return inputs, deserialize, n
 
-   def outputs(obs, atnDict=None):
+   def outputs(obs, deserialize, atnDict=None):
       '''Core Output library for postprocessing flat agent decisions into
       structured action argument lists
 
@@ -186,10 +196,10 @@ class IO:
       #Reverse format lookup over actions
       names = list(obs.obs.names.keys())
       for atn, action in obs.atn.actions.items():
-         for arg, atnsIdx in action.arguments.items():
+         for arg, atnsIdx in action.args.items():
             for idx, a in enumerate(atnsIdx):
-               _, entID, _ = names[idx]
-               a = obs.lookup.reverse(a)
+               entID = names[idx].entID
+               a     = deserialize[a]
                atnDict[entID][atn].append(a)
 
       return atnDict 
@@ -200,6 +210,7 @@ class Lookup:
    def __init__(self):
       self.data = {}
       self.back = {}
+      self.deserialize = {}
       self.max = 0
 
    def add(self, name, idx=None, orig=None):
@@ -209,9 +220,11 @@ class Lookup:
 
       assert name not in self.data
       assert idx not in self.back
+      assert name not in self.deserialize
       self.data[name] = idx
       if orig is not None:
-         self.back[idx] = orig
+         self.back[idx] = name
+         self.deserialize[name] = orig
       self.max += 1
 
       return idx
