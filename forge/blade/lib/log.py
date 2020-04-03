@@ -107,19 +107,20 @@ class Logger:
       self.items     = 'reward lifetime value'.split()                              
       self.middleman = middleman                                              
       self.tick      = 0                                                      
-      Test('Logger.txt')
 
                                                                               
    def update(self, lifetime_mean, reward_mean, value_mean,
               lifetime_std, reward_std, value_std):
       data = {}                                                               
-      data['lifetime'] = lifetime_mean
-      data['reward']   = reward_mean
-      data['value']    = value_mean
-      data['lifetime_std']  = lifetime_std
-      data['reward_std']    = reward_std
-      data['value_std']     = value_std
-      data['tick']     = self.tick                                            
+      data['lifetime'] = max(0.0,lifetime_mean)
+      data['lifetimeupper'] = max(0.0,lifetime_std)
+      data['lifetimelower'] = max(0.0,lifetime_std)
+      data[visualizer.Config.XAXIS]     = self.tick                                            
+      # data['reward']   = reward_mean
+      # data['value']    = value_mean
+      # data['lifetime_std']  = lifetime_std
+      # data['reward_std']    = reward_std
+      # data['value_std']     = value_std
                                                                               
       self.tick += 1                                                          
       self.middleman.setData.remote(data)
@@ -158,10 +159,12 @@ class Blob:
 #   Inkwell.step() is called when Quill.step() is called
 #   Inkwell handles the data of quill
 class InkWell:
-   def __init__(self):
+   def __init__(self):#, middleman=None):
       self.util = defaultdict(lambda: defaultdict(Stat))
       self.stat = defaultdict(lambda: defaultdict(Stat))
       # self.middleman = middleman                                              
+      # self.xaxis = 'Training Epochs'
+      # self.x = 0
 
    def summary(self):
       return
@@ -183,16 +186,30 @@ class InkWell:
          if t not in performance:
             performance[t] = TimeQueue()
          performance[t].update(updates)
-         # self.middleman.setData.remote(data)
 
 
+      # TODO
+      # Rewards are passed around in InkWell in 
+      # the form of Lifetime (statistics 
+      # function). Values would be added there as well
+      # likely. You can see that generally, I'm aggregating
+      # summary statistics there. There is also a commented 
+      # out .append(blob) line -- we can inject whatever
+      # data we like into blobs for more detailed visualizations
+      # as needed
       for blobs, nEnt in logs['Realm_Logs']:
          self.stat['Agent']['Population'].update(nEnt)
          for blob in blobs:
             #self.stat['Blobs'].append(blob)
             self.stat['Agent']['Lifetime'].update(blob.lifetime)
+         #    data = {'lifetime': self.stat['Agent']['Lifetime'].val,
+         #            self.xaxis: self.x}
+         #    self.x += 1
+         #    if self.middleman: self.middleman.setData.remote(data)
+
             for tile, count in blob.exploration.items():
                self.stat['Agent'][tile].update(count)
+            
 
    def utilization(self, logs):
       for k, vList in logs.items():
@@ -252,28 +269,29 @@ class InkWell:
 # Quill is an Ascend class, which means it's a remote instance with send/recv functions. It's a data hub, aggregates logs from all other workers
 class Quill(Ascend):
    def __init__(self, config, idx):
-      
+
       super().__init__(config, 0)
-      self.inkwell = InkWell()
       self.config     = config
+      self.middleman = None
+      if self.config.LOG:
+         self.middleman   = visualizer.Middleman.remote()
+         self.logger = Logger(self.middleman)
+         self.vis    = visualizer.BokehServer.remote(self.middleman, config)
+         self.vis.update.remote()
+      elif self.config.LOAD_EXP:
+         self.middleman  = visualizer.Middleman.remote()
+         self.logger     = Logger(self.middleman)
+         self.vis        = visualizer.BokehServer.remote(self.middleman, config)
+         self.vis.update.remote()
+
+
+      self.inkwell = InkWell()
+      
       self.stats      = defaultdict(Stat)
       self.epochs     = 0
       self.rollouts   = 0
       self.updates    = 0
-      Test('Quill.txt', msg=self.config.LOG)
 
-      if self.config.LOG:
-         # IMPORT CONFIG HERE AND SET NEW VARIABLES
-         #   config_dic[member] = vars(self.config)[member]
-         Test('Quill2.txt')
-
-         middleman   = visualizer.Middleman.remote()
-         self.logger = Logger(middleman)
-         # You can't pass to remote it seems, convert to DICT instead
-         # Convert config to dict, since config class can't be 
-         self.market = visualizer.Market(['test1', 'test2'], middleman)
-         self.vis    = visualizer.BokehServer.remote(middleman, config)
-         self.vis.update.remote()
 
    def init(self, trinity):
       self.trinity = trinity
@@ -292,6 +310,17 @@ class Quill(Ascend):
  
       time.sleep(0.1)
       self.inkwell.step(utilization, statistics)
+
+      def mean(lst):
+          return sum(lst)/max(len(lst),1)
+      lifetimes = []
+      for blobs, _ in statistics['Realm_Logs']:
+          for blob in blobs:
+              lifetimes.append(blob.lifetime)
+      if self.config.LOG:
+          self.logger.update(mean(lifetimes), 0, 0, np.std(np.array(lifetimes)), 0, 0)
+          
+
       return self.inkwell.summary()
 
 #Log wrapper and benchmarker
@@ -299,7 +328,6 @@ class Quill(Ascend):
 class Benchmarker:
    def __init__(self, logdir):
       self.benchmarks = {}
-      Test('benchmarker.txt')
 
    def wrap(self, func):
       self.benchmarks[func] = Utils.BenchmarkTimer()

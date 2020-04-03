@@ -29,6 +29,12 @@ from tornado.ioloop import IOLoop
 from forge.blade.systems.visualizer.config import *
 from time import gmtime, strftime
 
+def Test(filename, msg='test'):
+      file = open(filename,"w")
+      print(msg,file=file)
+      file.close()
+
+
 
 class Config():
     LOG         = False                       #Whether to enable data logging
@@ -69,7 +75,7 @@ class MarketVisualizer:
             x           : Name of x axis data
             ylabel      : Name of y axis on plot
         """
-        self.colors = 'blue red green yellow orange purple brown white'.split()
+        self.colors = 'cyan blue red green yellow orange purple brown white'.split()
         self.data        = {}
         self.config = vars(config[0])
 
@@ -91,7 +97,7 @@ class MarketVisualizer:
         self.load        = self.config['LOAD_EXP'] if 'LOAD_EXP' in self.config else Config.LOAD
         self.filename    = self.config['NAME'] if 'NAME' in self.config else Config.NAME
 
-        self.keys        = [self.x]
+        self.keys        = []
 
         # set all scales to be strings instead of ints to match file reading
         if type(self.scales[0]) != str:
@@ -139,14 +145,11 @@ class MarketVisualizer:
 
             self.data = parse.copy()
             self.keys = list(self.data[self.scales[0]].keys())
+
             self.keys.remove(self.x)
+
             self.keys = [k for k in self.keys if k[-5:] != 'upper' and k[-5:] != 'lower']
 
-            data = np.load('lifetime.npy', allow_pickle=True).tolist()
-            self.keys = list(data.keys())
-            self.keys.remove(self.x)
-            self.keys = [k for k in self.keys if k[-5:] != 'upper' and k[-5:] != 'lower']
-            self.data = data
 
         # Set default open scale to leftmost scale
         self.scale = self.scales[0]
@@ -154,7 +157,7 @@ class MarketVisualizer:
     def init(self, doc):
         # Source must only be modified through a stream
         self.source = ColumnDataSource(data=self.data[self.scale])
-        self.colors[0] = 'cyan'
+        # self.colors[0] = 'cyan'
         #self.source = ColumnDataSource(data=self.data[self.scale])
 
         # Enable theming
@@ -172,6 +175,7 @@ class MarketVisualizer:
 
         # Initialize plots
         for i, key in enumerate(self.keys):
+            if key == self.x: continue
             fig.line(
                 source=self.source,
                 x=self.x,
@@ -332,8 +336,8 @@ class BokehServer:
             for key, val in packet.items():
                 # Add to packet
                 self.packet[key] = [self.packet[key]]
-                self.packet[key + 'lower'] = [val - 0.1]
-                self.packet[key + 'upper'] = [val + 0.1]
+                self.packet[key + 'lower'] = [val - 1]
+                self.packet[key + 'upper'] = [val + 1]
 
             # Stream to Bokeh client
             print('Visualizer.stream()')
@@ -369,8 +373,8 @@ class Middleman:
         Args:
            data: To set buffer
         '''
-        file = open("middleman.txt", "a")
-        file.write('setData\n')
+        file = open("setData.txt", "a")
+        file.write('{}\n'.format(data))
         file.close()
         self.data = data.copy()
 
@@ -407,7 +411,6 @@ class Market:
         # update data and send to middle man
         Note: best to update all at once. Current version may cause bugs
         '''
-        print(self.data, file=open('yeet.txt', 'w+'))
         for key, val in self.data.items():
             if key == 'tick':
                 self.data[key] = self.tick

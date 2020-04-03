@@ -46,11 +46,12 @@ def parseArgs(config):
          help='Ray mode (local/default/remote)')
    parser.add_argument('--render', action='store_true', default=False, 
          help='Render env')
-   parser.add_argument('--log', action="store_true",
-         help='Log data on visualizer exit. Default file is timestamp, filename overwrite with --name')
+   parser.add_argument('--log', #default=None,\
+         action="store_true",
+         help='Log data on visualizer exit. Default file is \'log\', filename overwrite with --name')
    parser.add_argument('--name', default='log',
          help='Name of file to save json data to')
-   parser.add_argument('--load-exp', action="store_true",
+   parser.add_argument('--load-exp', action="store_true", default=None,
          help='Loads saved json into visualizer with name specified by --name')
 
    args               = parser.parse_args()
