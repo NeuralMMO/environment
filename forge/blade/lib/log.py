@@ -17,11 +17,6 @@ from copy import deepcopy
 from forge.trinity.ascend import Ascend
 from forge.blade.systems import visualizer
 
-def Test(filename, msg='test'):
-      file = open(filename,"w")
-      print(msg,file=file)
-      file.close()
-
 class TimePacket:
    def __init__(self, x):
       self.time = time.time()
@@ -101,8 +96,8 @@ class Bar(tqdm):
       self.desc = txt
       self.refresh()
 
-# Not in use
 class Logger:                                                                 
+    '''Data management class that communicates with the middle man'''
    def __init__(self, middleman):                                             
       self.items     = 'reward lifetime value'.split()                              
       self.middleman = middleman                                              
@@ -125,6 +120,7 @@ class Logger:
       self.tick += 1                                                          
       self.middleman.setData.remote(data)
 
+# Not in use
 class BlobSummary:
    def __init__(self):
       self.nRollouts = 0
@@ -145,7 +141,7 @@ class BlobSummary:
 
       return self
 
-#Agent logger
+#Class to pass around data
 class Blob:
    def __init__(self, entID, annID, lifetime, exploration): 
       self.exploration = exploration
@@ -159,12 +155,10 @@ class Blob:
 #   Inkwell.step() is called when Quill.step() is called
 #   Inkwell handles the data of quill
 class InkWell:
+    """Class of functions to extract and manage data"""
    def __init__(self):#, middleman=None):
       self.util = defaultdict(lambda: defaultdict(Stat))
       self.stat = defaultdict(lambda: defaultdict(Stat))
-      # self.middleman = middleman                                              
-      # self.xaxis = 'Training Epochs'
-      # self.x = 0
 
    def summary(self):
       return
@@ -202,10 +196,6 @@ class InkWell:
          for blob in blobs:
             #self.stat['Blobs'].append(blob)
             self.stat['Agent']['Lifetime'].update(blob.lifetime)
-         #    data = {'lifetime': self.stat['Agent']['Lifetime'].val,
-         #            self.xaxis: self.x}
-         #    self.x += 1
-         #    if self.middleman: self.middleman.setData.remote(data)
 
             for tile, count in blob.exploration.items():
                self.stat['Agent'][tile].update(count)
@@ -266,10 +256,12 @@ class InkWell:
       return {'value': [blob.value for blob in blobs]}
 
 @ray.remote
-# Quill is an Ascend class, which means it's a remote instance with send/recv functions. It's a data hub, aggregates logs from all other workers
 class Quill(Ascend):
+    """
+    Quill is an Ascend class, which means it's a remote instance with send/recv functions.
+    It's a data hub, aggregates logs from all other workers
+    """
    def __init__(self, config, idx):
-
       super().__init__(config, 0)
       self.config     = config
       self.middleman = None

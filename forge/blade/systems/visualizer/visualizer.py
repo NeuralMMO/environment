@@ -29,14 +29,11 @@ from tornado.ioloop import IOLoop
 from forge.blade.systems.visualizer.config import *
 from time import gmtime, strftime
 
-def Test(filename, msg='test'):
-      file = open(filename,"w")
-      print(msg,file=file)
-      file.close()
-
-
-
 class Config():
+    """ 
+    Default configuration class for the visualizer.
+    Set variables for customizing the chart here.
+    """
     LOG         = False                       #Whether to enable data logging
     LOAD_EXP    = False                       #Whether to load from file
     NAME        = 'log'                       #Name of file to load/log to
@@ -48,40 +45,40 @@ class Config():
     SCALES      = [1, 10, 100, 1000]          #Plot time scale
 
 
-
-def pickle_write(content, name, append=1):
-    'function to open file, pickle dump, then close'
+def pickle_write(content, name: str, append=1):
+    """
+    Write 'content' to file 'name'.
+    Overwrites previous data if 'append'=0
+    """
     f = open(name, "ab") if append else open(name, "wb")
     pickle.dump(content, f)
     f.close()
 
 def pickle_read(name):
-    'function to open file, pickle load, then close'
+    """
+    Return object stored in file 'name'
+    """
     f = open(name, "rb")
     ret = pickle.load(f)
     f.close()
     return ret
 
 class MarketVisualizer:
+    """
+    Visualizes a stream of data with threaded refreshing. 
+    Is called from BokehServer().
+    """
     def __init__(self, config):
-        """Visualizes a stream of data with threaded refreshing. To
-        add items, initialize using 'keys' kwarg or add to packet in
-        stream()
+        """
+        Constructs an empty visualizer, or loads one from a class.
         Args:
-            keys        : List of object names (str) to be displayed on market
-            history_len : How far back to plot data
-            scales      : Scales for visualization
-            title       : Title of graph
-            x           : Name of x axis data
-            ylabel      : Name of y axis on plot
+           config: visualizer.Config object, contains aesthetic variables of visualizer
+
         """
         self.colors = 'cyan blue red green yellow orange purple brown white'.split()
         self.data        = {}
         self.config = vars(config[0])
 
-        # Market stores data in a dictionary of lists
-        # MarketVisualizer stores the data for each view as a dictionary,
-        # inside another dictionary with keys of each scale.
 
         self.history_len = self.config['HISTORY_LEN'] if 'HISTORY_LEN' in self.config else Config.HISTORY_LEN
         self.title       = self.config['TITLE'] if 'TITLE' in self.config else Config.TITLE
@@ -97,11 +94,17 @@ class MarketVisualizer:
         self.load        = self.config['LOAD_EXP'] if 'LOAD_EXP' in self.config else Config.LOAD
         self.filename    = self.config['NAME'] if 'NAME' in self.config else Config.NAME
 
-        self.keys        = []
+        self.keys        = [] # Keys wil be a list of strings
+                              # each string is the name of a line on the graph
+
+        # MarketVisualizer stores the data for each view as a dictionary,
+        # inside another dictionary with keys of each scale.
+        # Example: {'1': {'Line1' : [0,1,2,3]}, '2': {'Line1': [0, 2]}}
 
         # set all scales to be strings instead of ints to match file reading
         if type(self.scales[0]) != str:
             self.scales = [str(s) for s in self.scales]
+            # first two objects to log are the scales and x axis variable
             if self.log:
                 pickle_write(self.scales, self.filename, append=0)
                 pickle_write(self.x, self.filename)
@@ -119,6 +122,7 @@ class MarketVisualizer:
                 # Isn't necessary, but makes code for packet handling nicer
                 self.data[scale][self.x + 'upper'] = []
                 self.data[scale][self.x + 'lower'] = []
+        # load data from file
         else:
             file = open(self.filename, 'rb')
             self.scales = pickle.load(file)
@@ -128,6 +132,7 @@ class MarketVisualizer:
                parse[scale] = {}
             
             # combine data from all packets into relevant spots for scales
+            # continue to run until end of file
             while True:
                try: 
                   packet = pickle.load(file)
@@ -137,6 +142,7 @@ class MarketVisualizer:
                       if packet[self.x][0] % int(scale) != 0:
                           continue
                       for key in packet: 
+                          # pad with 0s before adding new key to graph
                           if key not in parse[scale]:
                               parse[scale][key] = [0] * (packet[self.x][0] // int(scale))
                           parse[scale][key].append(packet[key][0])
@@ -154,7 +160,11 @@ class MarketVisualizer:
         # Set default open scale to leftmost scale
         self.scale = self.scales[0]
 
+
     def init(self, doc):
+        '''
+        Initializes graph
+        '''
         # Source must only be modified through a stream
         self.source = ColumnDataSource(data=self.data[self.scale])
         # self.colors[0] = 'cyan'
@@ -224,13 +234,12 @@ class MarketVisualizer:
         Args:
             packet: dictionary of singleton lists'''
 
-        # Stream items & append data if no new entries
-
+        # Saves data each tick
         if self.log:
            pickle_write(packet, self.filename)
 
+        # Stream items & append data if no new entries
         if packet.keys() == self.data[self.scale].keys():
-
             for scale in self.scales:
                 # Skip over irrelevant scales
                 if packet[self.x][0] % int(scale) != 0:
@@ -270,6 +279,7 @@ class MarketVisualizer:
 
 @ray.remote
 class BokehServer:
+    '''Hosts a Bokeh Graph'''
     def __init__(self, market, *args):
         """ Runs an asynchronous Bokeh data streaming server.
       
@@ -314,17 +324,11 @@ class BokehServer:
     def update(self):
         '''Blocking update call to be run in a separate thread
         Ingests packets from a remote market and streams to Bokeh client'''
-        self.n = 0
         while True:
             # Wait for thread to initialize
             time.sleep(0.05)
             if self.thread is None:
                continue 
-
-            # Get remote market data
-            if ray.get(self.market.getShutdown.remote()):
-                self.market.setData.remote(self.visu.data)
-                sys.exit(0)
 
             packet = ray.get(self.market.getData.remote())
             if packet is None:
@@ -340,7 +344,6 @@ class BokehServer:
                 self.packet[key + 'upper'] = [val + 1]
 
             # Stream to Bokeh client
-            print('Visualizer.stream()')
             self.doc.add_next_tick_callback(partial(self.stream))
             self.tick += 1
 
@@ -378,55 +381,46 @@ class Middleman:
         file.close()
         self.data = data.copy()
 
-    # Notify remotes of visualizer shutdown
-    def setShutdown(self):
-        self.file.close()
-        self.shutdown = 1
-
-    # Retreive shutdown status
-    def getShutdown(self):
-        return self.shutdown
-
-class Market:
-    def __init__(self, items, middleman):
-        '''Dummy market emulator
-        Args: 
-           items     : List of item keys
-           middleman : A Middleman object'''
-        self.middleman = middleman
-        self.items     = items
-
-        self.keys = items
-        # Data contains market history for lowest values
-        self.data = {}
-        self.tick = 0
-
-        self.data['tick'] = 0
-        for i, key in enumerate(self.keys):
-            self.data[key] = 0
-
-    def update(self):
-        '''
-        Updates market data and propagates to Bokeh server
-        # update data and send to middle man
-        Note: best to update all at once. Current version may cause bugs
-        '''
-        for key, val in self.data.items():
-            if key == 'tick':
-                self.data[key] = self.tick
-            else:
-                self.data[key] = val + 0.2*(random() - 0.5)
-
-        self.tick += 1
-
-        # dummy code to inject new items, it's as easy as just
-        # adding new data to the market
-
-        if self.tick % 100 == 0:
-            self.data['new_item'] = 5
-        if self.tick % 130 == 0:
-            self.data['new_item_2'] = 5
-
-        # update if not shutting down visualizer
-        if not ray.get(self.middleman.getShutdown.remote()):
-            self.middleman.setData.remote(self.data)
+# class Market:
+#     def __init__(self, items, middleman):
+#         '''Dummy market emulator
+#         Args: 
+#            items     : List of item keys
+#            middleman : A Middleman object'''
+#         self.middleman = middleman
+#         self.items     = items
+# 
+#         self.keys = items
+#         # Data contains market history for lowest values
+#         self.data = {}
+#         self.tick = 0
+# 
+#         self.data['tick'] = 0
+#         for i, key in enumerate(self.keys):
+#             self.data[key] = 0
+# 
+#     def update(self):
+#         '''
+#         Updates market data and propagates to Bokeh server
+#         # update data and send to middle man
+#         Note: best to update all at once. Current version may cause bugs
+#         '''
+#         for key, val in self.data.items():
+#             if key == 'tick':
+#                 self.data[key] = self.tick
+#             else:
+#                 self.data[key] = val + 0.2*(random() - 0.5)
+# 
+#         self.tick += 1
+# 
+#         # dummy code to inject new items, it's as easy as just
+#         # adding new data to the market
+# 
+#         if self.tick % 100 == 0:
+#             self.data['new_item'] = 5
+#         if self.tick % 130 == 0:
+#             self.data['new_item_2'] = 5
+# 
+#         # update if not shutting down visualizer
+#         if not ray.get(self.middleman.getShutdown.remote()):
+#             self.middleman.setData.remote(self.data)
