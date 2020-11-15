@@ -7,7 +7,7 @@ class Config(core.Config):
    # "current" will resume training custom models
    MODEL = 'current'
    SCRIPTED_BFS = False
-   SCRIPTED_DP = True
+   SCRIPTED_DP  = True
    RENDER = False  # Don't edit this manually; TODO: remove it
 
    # Model dimensions
@@ -27,10 +27,10 @@ class Config(core.Config):
    EVALUATION_HORIZON = 2048
 
    #Agent vision range
-   STIM    = 7
+   STIM    = 4
 
    #Maximum number of observed agents
-   N_AGENT_OBS = 100
+   N_AGENT_OBS = 1
 
    # Whether to share weights across policies
    # The 1.4 baselines use one policy
