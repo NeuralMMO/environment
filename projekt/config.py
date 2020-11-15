@@ -6,8 +6,8 @@ class Config(core.Config):
    # Baselines: recurrent, attentional, convolutional
    # "current" will resume training custom models
    MODEL = 'current'
-   SCRIPTED_BFS = True
-   SCRIPTED_DP = False
+   SCRIPTED_BFS = False
+   SCRIPTED_DP = True
    RENDER = False  # Don't edit this manually; TODO: remove it
 
    # Model dimensions

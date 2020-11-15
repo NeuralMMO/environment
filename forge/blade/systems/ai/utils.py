@@ -5,8 +5,7 @@ from forge.blade.lib.utils import inBounds
 from forge.blade.systems import combat
 from queue import PriorityQueue, Queue
 
-from forge.blade.systems.ai.dynamic_programming import map_to_rewards, \
-   compute_values, max_value_direction_around
+from dynamic_programming import compute_values, max_value_direction_around
 
 
 def validTarget(ent, targ, rng):
@@ -39,9 +38,9 @@ def directionTowards(ent, targ):
 
 def closestTarget(ent, tiles, rng=1):
    sr, sc = ent.base.pos
-   for d in range(rng+1):
-      for r in range(-d, d+1):
-         for e in tiles[sr+r, sc-d].ents.values():
+   for d in range(rng + 1):
+      for r in range(-d, d + 1):
+         for e in tiles[sr + r, sc - d].ents.values():
             if e is not ent and validTarget(ent, e, rng): return e
 
          for e in tiles[sr + r, sc + d].ents.values():
@@ -110,12 +109,12 @@ def forageDP(tiles, entity):
 
    tiles = cropTilesAround((line, column), horizon, tiles)
 
-   reward_matrix = map_to_rewards(tiles, entity)
-   value_matrix = compute_values(reward_matrix)
+   value_matrix = compute_values(tiles, entity)
 
    max_value_line, max_value_column = max_value_direction_around(
-      (min(horizon, len(value_matrix) - 1),
-       min(horizon, len(value_matrix[0]) - 1)), value_matrix)
+      min(horizon, len(value_matrix) - 1),
+      min(horizon, len(value_matrix[0]) - 1),
+      value_matrix)
 
    return max_value_line, max_value_column
 
@@ -128,9 +127,9 @@ def forageBFS(tiles, entity, cutoff=100):
 
    backtrace = {start: None}
 
-   reward    = {start: (entity.resources.food.val, entity.resources.water.val)}
-   best      = -1000 
-   goal      = start
+   reward = {start: (entity.resources.food.val, entity.resources.water.val)}
+   best = -1000
+   goal = start
 
    while not queue.empty():
       cutoff -= 1
@@ -160,10 +159,12 @@ def forageBFS(tiles, entity, cutoff=100):
          water = max(0, water - 1)
 
          if tiles[nxt].state.tex == 'forest':
-            food = min(food + entity.resources.food.max//2, entity.resources.food.max) 
+            food = min(food + entity.resources.food.max // 2,
+                       entity.resources.food.max)
          for pos in adjacentPos(nxt):
             if tiles[pos].state.tex == 'water':
-               water = min(water + entity.resources.water.max//2, entity.resources.water.max) 
+               water = min(water + entity.resources.water.max // 2,
+                           entity.resources.water.max)
                break
 
          reward[nxt] = (food, water)
