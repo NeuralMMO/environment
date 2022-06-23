@@ -170,9 +170,6 @@ class Attack(Node):
       return abs(r - rCent) + abs(c - cCent)
 
    def call(env, entity, style, targ):
-      if not env.config.COMBAT:
-         return
-
       if entity.isPlayer and not env.config.game_system_enabled('Combat'):
          return 
 
