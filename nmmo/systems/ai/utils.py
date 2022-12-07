@@ -5,7 +5,7 @@ import random
 from nmmo.lib.utils import inBounds
 from nmmo.systems import combat
 from nmmo.lib import material
-from queue import PriorityQueue, Queue
+import heapq
 
 from nmmo.systems.ai.dynamic_programming import map_to_rewards, \
    compute_values, max_value_direction_around
@@ -139,8 +139,7 @@ def aStar(tiles, start, goal, cutoff=100):
    if start == goal:
       return (0, 0)
 
-   pq = PriorityQueue()
-   pq.put((0, start))
+   pq = [(0, start)]
 
    backtrace = {}
    cost = {start: 0}
@@ -149,7 +148,7 @@ def aStar(tiles, start, goal, cutoff=100):
    closestHeuristic = l1(start, goal)
    closestCost = closestHeuristic
 
-   while not pq.empty():
+   while pq:
       # Use approximate solution if budget exhausted
       cutoff -= 1
       if cutoff <= 0:
@@ -157,7 +156,7 @@ def aStar(tiles, start, goal, cutoff=100):
             goal = closestPos
          break
 
-      priority, cur = pq.get()
+      priority, cur = heapq.heappop(pq)
 
       if cur == goal:
          break
@@ -181,7 +180,7 @@ def aStar(tiles, start, goal, cutoff=100):
                closestHeuristic = heuristic
                closestCost = priority
 
-            pq.put((priority, nxt))
+            heapq.heappush(pq, (priority, nxt))
             backtrace[nxt] = cur
 
    while goal in backtrace and backtrace[goal] != start:
