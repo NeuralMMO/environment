@@ -76,7 +76,7 @@ class OpenSkillRating:
 
         teams = [[e] for e in list(self.ratings.values())]
         ratings = openskill.rate(teams, rank=ranks)
-        ratings = [openskill.create_rating(team[0]) for team in ratings]
+        ratings = [team[0] for team in ratings]
         for agent, rating in zip(self.ratings, ratings):
             self.ratings[agent] = rating
 
