@@ -33,3 +33,32 @@ class MilestoneLogger(Logger):
 
     self.log(key, val)
     return True
+
+
+# CHECK ME: Is this a good place to put here?
+#   EventCode is used in many places, and I(kywch)'m putting it here
+#   to avoid a circular import, which happened a few times with event_log.py
+class EventCode:
+  # Move
+  EAT_FOOD = 1
+  DRINK_WATER = 2
+
+  # Attack
+  SCORE_HIT = 11
+  SCORE_KILL = 12
+
+  # Item
+  CONSUME_ITEM = 21
+  GIVE_ITEM = 22
+  DESTROY_ITEM = 23
+  HARVEST_ITEM = 24
+
+  # Exchange
+  GIVE_GOLD = 31
+  LIST_ITEM = 32
+  EARN_GOLD = 33
+  BUY_ITEM = 34
+  #SPEND_GOLD = 35 # BUY_ITEM, price has the same info
+
+  # Level up
+  LEVEL_UP = 41

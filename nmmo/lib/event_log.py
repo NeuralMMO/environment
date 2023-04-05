@@ -5,10 +5,9 @@ from copy import deepcopy
 import numpy as np
 
 from nmmo.datastore.serialized import SerializedState
-from nmmo.core.realm import Realm
 from nmmo.entity import Entity
 from nmmo.systems.item import Item
-from nmmo.systems import skill as Skill
+from nmmo.lib.log import EventCode
 
 # pylint: disable=no-member
 EventState = SerializedState.subclass("Event", [
@@ -34,40 +33,21 @@ EventState.Query = SimpleNamespace(
     EventAttr["event"], event_code),
 )
 
-# matching the names to base predicates
-class EventCode:
-  # Move
-  EAT_FOOD = 1
-  DRINK_WATER = 2
+# defining col synoyms for different event types
+ATTACK_COL_MAP = {
+  'combat_style': EventAttr['type'],
+  'damage': EventAttr['number'] }
 
-  # Attack
-  SCORE_HIT = 11
-  SCORE_KILL = 12
-  style_to_int = { Skill.Melee: 1, Skill.Range:2, Skill.Mage:3 }
-  attack_col_map = {
-    'combat_style': EventAttr['type'],
-    'damage': EventAttr['number'] }
+ITEM_COL_MAP = {
+  'item_type': EventAttr['type'],
+  'quantity': EventAttr['number'],
+  'price': EventAttr['gold'] }
 
-  # Item
-  CONSUME_ITEM = 21
-  GIVE_ITEM = 22
-  DESTROY_ITEM = 23
-  PRODUCE_ITEM = 24
-  item_col_map = {
-    'item_type': EventAttr['type'],
-    'quantity': EventAttr['number'],
-    'price': EventAttr['gold'] }
-
-  # Exchange
-  GIVE_GOLD = 31
-  LIST_ITEM = 32
-  EARN_GOLD = 33
-  BUY_ITEM = 34
-  SPEND_GOLD = 35
+LEVEL_COL_MAP = { 'skill': EventAttr['type'] }
 
 
 class EventLogger(EventCode):
-  def __init__(self, realm: Realm):
+  def __init__(self, realm):
     self.realm = realm
     self.config = realm.config
     self.datastore = realm.datastore
@@ -75,10 +55,11 @@ class EventLogger(EventCode):
     self.valid_events = { val: evt for evt, val in EventCode.__dict__.items()
                            if isinstance(val, int) }
 
-    # create a custom attr-col mapping
+    # add synonyms to the attributes
     self.attr_to_col = deepcopy(EventAttr)
-    self.attr_to_col.update(EventCode.attack_col_map)
-    self.attr_to_col.update(EventCode.item_col_map)
+    self.attr_to_col.update(ATTACK_COL_MAP)
+    self.attr_to_col.update(ITEM_COL_MAP)
+    self.attr_to_col.update(LEVEL_COL_MAP)
 
   def reset(self):
     EventState.State.table(self.datastore).reset()
@@ -102,10 +83,11 @@ class EventLogger(EventCode):
       return
 
     if event_code == EventCode.SCORE_HIT:
-      if ('combat_style' in kwargs and kwargs['combat_style'] in EventCode.style_to_int) & \
+      # kwargs['combat_style'] should be Skill.CombatSkill
+      if ('combat_style' in kwargs and kwargs['combat_style'].SKILL_ID in [1, 2, 3]) & \
          ('damage' in kwargs and kwargs['damage'] >= 0):
         log = self._create_event(entity, event_code)
-        log.type.update(EventCode.style_to_int[kwargs['combat_style']])
+        log.type.update(kwargs['combat_style'].SKILL_ID)
         log.number.update(kwargs['damage'])
         return
 
@@ -119,7 +101,7 @@ class EventLogger(EventCode):
         log.level.update(target.attack_level)
         return
 
-    if event_code in [EventCode.CONSUME_ITEM, EventCode.PRODUCE_ITEM]:
+    if event_code in [EventCode.CONSUME_ITEM, EventCode.HARVEST_ITEM]:
       # CHECK ME: item types should be checked. For example,
       #   Only Ration and Poultice can be consumed
       #   Only Ration, Poultice, Scrap, Shaving, Shard can be produced
@@ -142,10 +124,19 @@ class EventLogger(EventCode):
         log.gold.update(kwargs['price'])
         return
 
-    if event_code in [EventCode.EARN_GOLD, EventCode.SPEND_GOLD]:
+    if event_code == EventCode.EARN_GOLD:
       if ('amount' in kwargs and kwargs['amount'] > 0):
         log = self._create_event(entity, event_code)
         log.gold.update(kwargs['amount'])
+        return
+
+    if event_code == EventCode.LEVEL_UP:
+      # kwargs['skill'] should be Skill.Skill
+      if ('skill' in kwargs and kwargs['skill'].SKILL_ID in range(1,9)) & \
+         ('level' in kwargs and kwargs['level'] >= 0):
+        log = self._create_event(entity, event_code)
+        log.type.update(kwargs['skill'].SKILL_ID)
+        log.level.update(kwargs['level'])
         return
 
     # If reached here, then something is wrong
@@ -154,9 +145,9 @@ class EventLogger(EventCode):
 
   def get_data(self, event_code=None, agents: List[int]=None):
     if event_code is None:
-      event_data = EventState.Query.table(self.datastore).astype(np.int16)
+      event_data = EventState.Query.table(self.datastore).astype(np.int32)
     elif event_code in self.valid_events:
-      event_data = EventState.Query.by_event(self.datastore, event_code).astype(np.int16)
+      event_data = EventState.Query.by_event(self.datastore, event_code).astype(np.int32)
     else:
       return None
 

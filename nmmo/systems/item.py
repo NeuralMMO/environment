@@ -7,6 +7,7 @@ from typing import Dict
 
 from nmmo.lib.colors import Tier
 from nmmo.datastore.serialized import SerializedState
+from nmmo.lib.log import EventCode
 
 # pylint: disable=no-member
 ItemState = SerializedState.subclass("Item", [
@@ -381,6 +382,8 @@ class Consumable(Item):
       f"PROF: Consumed {self.level.val} {self.__class__.__name__} "
       f"by Entity level {entity.attack_level}",
       tags={"player_id": entity.ent_id})
+
+    self.realm.event_log.record(EventCode.CONSUME_ITEM, entity, item=self)
 
     self._apply_effects(entity)
     entity.inventory.remove(self)
