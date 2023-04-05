@@ -2,7 +2,7 @@ import unittest
 import logging
 
 # pylint: disable=import-error
-from testhelpers import ScriptedTestTemplate
+from testhelpers import ScriptedTestTemplate, provide_item
 
 from nmmo.io import action
 from nmmo.systems import item as Item
@@ -46,7 +46,7 @@ class TestSellBuy(ScriptedTestTemplate):
     for ent_id in [1, 2]:
       for item_sig in extra_items:
         self.item_sig[ent_id].append(item_sig)
-        self._provide_item(env.realm, ent_id, item_sig[0], item_sig[1], 1)
+        provide_item(env.realm, ent_id, item_sig[0], item_sig[1], 1)
 
     env.obs = env._compute_observations()
 

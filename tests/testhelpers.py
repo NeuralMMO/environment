@@ -10,6 +10,7 @@ from scripted import baselines
 from nmmo.entity.entity import EntityState
 from nmmo.io import action
 from nmmo.systems import item as Item
+from nmmo.core.realm import Realm
 
 # this function can be replaced by assertDictEqual
 # but might be still useful for debugging
@@ -165,6 +166,28 @@ class ScriptedAgentTestEnv(nmmo.Env):
     return actions
 
 
+def change_spawn_pos(realm: Realm, ent_id: int, new_pos):
+  # check if the position is valid
+  assert realm.map.tiles[new_pos].habitable, "Given pos is not habitable."
+  assert realm.entity(ent_id), "No such entity in the realm"
+
+  entity = realm.entity(ent_id)
+  old_pos = entity.pos
+  realm.map.tiles[old_pos].remove_entity(ent_id)
+
+  # set to new pos
+  entity.row.update(new_pos[0])
+  entity.col.update(new_pos[1])
+  entity.spawn_pos = new_pos
+  realm.map.tiles[new_pos].add_entity(entity)
+
+def provide_item(realm: Realm, ent_id: int,
+                 item: Item.Item, level: int, quantity: int):
+  for _ in range(quantity):
+    realm.players[ent_id].inventory.receive(
+      item(realm, level=level))
+
+
 # pylint: disable=invalid-name,protected-access
 class ScriptedTestTemplate(unittest.TestCase):
 
@@ -190,25 +213,6 @@ class ScriptedTestTemplate(unittest.TestCase):
     cls.item_level = [0, 3] # 0 can be used, 3 cannot be used
     cls.item_sig = {}
 
-  def _change_spawn_pos(self, realm, ent_id, new_pos):
-    # check if the position is valid
-    assert realm.map.tiles[new_pos].habitable, "Given pos is not habitable."
-    assert realm.entity(ent_id), "No such entity in the realm"
-
-    entity = realm.entity(ent_id)
-    old_pos = entity.pos
-    realm.map.tiles[old_pos].remove_entity(ent_id)
-
-    # set to new pos
-    entity.row.update(new_pos[0])
-    entity.col.update(new_pos[1])
-    entity.spawn_pos = new_pos
-    realm.map.tiles[new_pos].add_entity(entity)
-
-  def _provide_item(self, realm, ent_id, item, level, quantity):
-    realm.players[ent_id].inventory.receive(
-      item(realm, level=level, quantity=quantity))
-
   def _make_item_sig(self):
     item_sig = {}
     for ent_id, ammo in self.ammo.items():
@@ -233,13 +237,13 @@ class ScriptedTestTemplate(unittest.TestCase):
     for ent_id, items in self.item_sig.items():
       for item_sig in items:
         if item_sig[0] == self.ammo[ent_id]:
-          self._provide_item(env.realm, ent_id, item_sig[0], item_sig[1], self.ammo_quantity)
+          provide_item(env.realm, ent_id, item_sig[0], item_sig[1], self.ammo_quantity)
         else:
-          self._provide_item(env.realm, ent_id, item_sig[0], item_sig[1], 1)
+          provide_item(env.realm, ent_id, item_sig[0], item_sig[1], 1)
 
     # teleport the players, if provided with specific locations
     for ent_id, pos in self.spawn_locs.items():
-      self._change_spawn_pos(env.realm, ent_id, pos)
+      change_spawn_pos(env.realm, ent_id, pos)
 
     env.obs = env._compute_observations()
 
