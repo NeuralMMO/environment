@@ -85,7 +85,7 @@ class Observation:
       return TileState.parse_array(self.tiles[r_cond & c_cond][0])
 
     # return a dummy lava tile at (inf, inf)
-    return TileState.parse_array([np.inf, np.inf, material.Lava.index])    
+    return TileState.parse_array([np.inf, np.inf, material.Lava.index])
 
   # pylint: disable=method-cache-max-size-none
   @lru_cache(maxsize=None)
