@@ -78,9 +78,14 @@ class Observation:
         Vector corresponding to the specified tile
     '''
     agent = self.agent()
-    r_cond = (self.tiles[:,TileState.State.attr_name_to_col["row"]] == agent.row + r_delta)
-    c_cond = (self.tiles[:,TileState.State.attr_name_to_col["col"]] == agent.col + c_delta)
-    return TileState.parse_array(self.tiles[r_cond & c_cond][0])
+    if (0 <= agent.row + r_delta < self.config.MAP_SIZE) & \
+       (0 <= agent.col + c_delta < self.config.MAP_SIZE):
+      r_cond = (self.tiles[:,TileState.State.attr_name_to_col["row"]] == agent.row + r_delta)
+      c_cond = (self.tiles[:,TileState.State.attr_name_to_col["col"]] == agent.col + c_delta)
+      return TileState.parse_array(self.tiles[r_cond & c_cond][0])
+
+    # return a dummy lava tile at (inf, inf)
+    return TileState.parse_array([np.inf, np.inf, material.Lava.index])    
 
   # pylint: disable=method-cache-max-size-none
   @lru_cache(maxsize=None)
