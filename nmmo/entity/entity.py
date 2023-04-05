@@ -291,7 +291,7 @@ class Entity(EntityState):
     # at this point, self is dead
     if source:
       source.history.player_kills += 1
-      self.realm.event_log.record(EventCode.SCORE_KILL, source, target=self)
+      self.realm.event_log.record(EventCode.PLAYER_KILL, source, target=self)
 
     # if self is dead, unlist its items from the market regardless of looting
     if self.config.EXCHANGE_SYSTEM_ENABLED:

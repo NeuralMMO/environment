@@ -91,7 +91,7 @@ class EventLogger(EventCode):
         log.number.update(kwargs['damage'])
         return
 
-    if event_code == EventCode.SCORE_KILL:
+    if event_code == EventCode.PLAYER_KILL:
       if ('target' in kwargs and isinstance(kwargs['target'], Entity)):
         target = kwargs['target']
         log = self._create_event(entity, event_code)

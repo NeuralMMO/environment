@@ -46,7 +46,7 @@ class TestEventLog(unittest.TestCase):
     event_log.record(EventCode.DRINK_WATER, MockEntity(2))
     event_log.record(EventCode.SCORE_HIT, MockEntity(2),
                      combat_style=Skill.Melee, damage=50)
-    event_log.record(EventCode.SCORE_KILL, MockEntity(3),
+    event_log.record(EventCode.PLAYER_KILL, MockEntity(3),
                      target=MockEntity(5, attack_level=5))
 
     mock_realm.tick = 2
@@ -76,7 +76,7 @@ class TestEventLog(unittest.TestCase):
       [ 1,  1, 1, EventCode.EAT_FOOD, 0, 0, 0, 0, 0],
       [ 2,  2, 1, EventCode.DRINK_WATER, 0, 0, 0, 0, 0],
       [ 3,  2, 1, EventCode.SCORE_HIT, 1, 0, 50, 0, 0],
-      [ 4,  3, 1, EventCode.SCORE_KILL, 0, 5, 0, 0, 5],
+      [ 4,  3, 1, EventCode.PLAYER_KILL, 0, 5, 0, 0, 5],
       [ 5,  4, 2, EventCode.CONSUME_ITEM, 16, 8, 1, 0, 0],
       [ 6,  4, 2, EventCode.GIVE_ITEM, 0, 0, 0, 0, 0],
       [ 7,  5, 2, EventCode.DESTROY_ITEM, 0, 0, 0, 0, 0],
