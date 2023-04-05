@@ -7,7 +7,7 @@ from ordered_set import OrderedSet
 
 from nmmo.lib import material
 from nmmo.systems import combat, experience
-
+from nmmo.lib.log import EventCode
 
 ### Infrastructure ###
 class SkillGroup:
@@ -51,15 +51,17 @@ class Skill(abc.ABC):
     return data
 
   def add_xp(self, xp):
-    level     = self.experience_calculator.level_at_exp(self.exp)
     self.exp += xp * self.config.PROGRESSION_BASE_XP_SCALE
+    new_level = int(self.experience_calculator.level_at_exp(self.exp))
 
-    level = self.experience_calculator.level_at_exp(self.exp)
-    self.level.update(int(level))
+    if new_level > self.level.val:
+      self.level.update(new_level)
+      self.realm.event_log.record(EventCode.LEVEL_UP, self.entity,
+                                  skill=self, level=new_level)
 
-    self.realm.log_milestone(f'Level_{self.__class__.__name__}', int(level),
-      f"PROGRESSION: Reached level {level} {self.__class__.__name__}",
-      tags={"player_id": self.entity.ent_id})
+      self.realm.log_milestone(f'Level_{self.__class__.__name__}', new_level,
+        f"PROGRESSION: Reached level {new_level} {self.__class__.__name__}",
+        tags={"player_id": self.entity.ent_id})
 
   def set_experience_by_level(self, level):
     self.exp = self.experience_calculator.level_at_exp(level)
@@ -104,6 +106,7 @@ class HarvestSkill(NonCombatSkill):
 
       if entity.inventory.space:
         entity.inventory.receive(drop)
+        self.realm.event_log.record(EventCode.HARVEST_ITEM, entity, item=drop)
 
   def harvest(self, matl, deplete=True):
     entity = self.entity
@@ -218,16 +221,22 @@ class Skills(Basic, Harvest, Combat):
 
 ### Skills ###
 class Melee(CombatSkill):
+  SKILL_ID = 1
+
   @property
   def level(self):
     return self.entity.melee_level
 
 class Range(CombatSkill):
+  SKILL_ID = 2
+
   @property
   def level(self):
     return self.entity.range_level
 
 class Mage(CombatSkill):
+  SKILL_ID = 3
+
   @property
   def level(self):
     return self.entity.mage_level
@@ -265,6 +274,8 @@ class Water(HarvestSkill):
                       * config.RESOURCE_HARVEST_RESTORE_FRACTION)
     water.increment(restore)
 
+    self.realm.event_log.record(EventCode.DRINK_WATER, self.entity)
+
 
 class Food(HarvestSkill):
   def __init__(self, skill_group):
@@ -287,7 +298,12 @@ class Food(HarvestSkill):
                       * config.RESOURCE_HARVEST_RESTORE_FRACTION)
     food.increment(restore)
 
+    self.realm.event_log.record(EventCode.EAT_FOOD, self.entity)
+
+
 class Fishing(ConsumableSkill):
+  SKILL_ID = 4
+
   @property
   def level(self):
     return self.entity.fishing_level
@@ -296,6 +312,8 @@ class Fishing(ConsumableSkill):
     self.harvest_adjacent(material.Fish)
 
 class Herbalism(ConsumableSkill):
+  SKILL_ID = 5
+
   @property
   def level(self):
     return self.entity.herbalism_level
@@ -304,6 +322,8 @@ class Herbalism(ConsumableSkill):
     self.harvest(material.Herb)
 
 class Prospecting(AmmunitionSkill):
+  SKILL_ID = 6
+
   @property
   def level(self):
     return self.entity.prospecting_level
@@ -312,6 +332,8 @@ class Prospecting(AmmunitionSkill):
     self.harvest(material.Ore)
 
 class Carving(AmmunitionSkill):
+  SKILL_ID = 7
+
   @property
   def level(self):
     return self.entity.carving_level
@@ -320,6 +342,8 @@ class Carving(AmmunitionSkill):
     self.harvest(material.Tree)
 
 class Alchemy(AmmunitionSkill):
+  SKILL_ID = 8
+
   @property
   def level(self):
     return self.entity.alchemy_level

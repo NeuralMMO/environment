@@ -246,7 +246,7 @@ class Scripted(nmmo.Agent):
 
   def sell(self, keep_k: dict, keep_best: set):
     for itm in self.inventory.values():
-      price = int(max(itm.level, len(action.Price.edges)-1))
+      price = int(max(itm.level, 1))
       assert itm.quantity > 0
 
       if itm.equipped or itm.listed_price:
@@ -266,7 +266,7 @@ class Scripted(nmmo.Agent):
 
       self.actions[action.Sell] = {
         action.InventoryItem: self.ob.inventory.index(itm.id), # list(self.ob.inventory.ids).index(itm.id)
-        action.Price: action.Price.edges[price] }
+        action.Price: action.Price.edges[price-1] } # Price starts from 1
 
       return itm
 

@@ -7,6 +7,7 @@ from ordered_set import OrderedSet
 from nmmo.lib import utils
 from nmmo.lib.utils import staticproperty
 from nmmo.systems.item import Item, Stack
+from nmmo.lib.log import EventCode
 
 class NodeType(Enum):
   #Tree edges
@@ -418,6 +419,8 @@ class Destroy(Node):
     entity.inventory.remove(item)
     item.destroy()
 
+    realm.event_log.record(EventCode.DESTROY_ITEM, entity)
+
 class Give(Node):
   priority = 30
 
@@ -468,6 +471,8 @@ class Give(Node):
     entity.inventory.remove(item)
     target.inventory.receive(item)
 
+    realm.event_log.record(EventCode.GIVE_ITEM, entity)
+
 
 class GiveGold(Node):
   priority = 30
@@ -510,6 +515,8 @@ class GiveGold(Node):
 
     entity.gold.decrement(amount)
     target.gold.increment(amount)
+
+    realm.event_log.record(EventCode.GIVE_GOLD, entity)
 
 
 class MarketItem(Node):

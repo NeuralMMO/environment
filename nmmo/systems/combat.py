@@ -3,6 +3,7 @@
 import numpy as np
 
 from nmmo.systems import skill as Skill
+from nmmo.lib.log import EventCode
 
 def level(skills):
   return max(e.level.val for e in skills.skills)
@@ -97,6 +98,9 @@ def attack(realm, player, target, skill_fn):
   if player.is_player:
     equipment_level_offense = player.equipment.total(lambda e: e.level)
     equipment_level_defense = target.equipment.total(lambda e: e.level)
+
+    realm.event_log.record(EventCode.SCORE_HIT, player,
+                           combat_style=skill_type, damage=damage)
 
     realm.log_milestone(f'Damage_{skill_name}', damage,
                         f'COMBAT: Inflicted {damage} {skill_name} damage ' +

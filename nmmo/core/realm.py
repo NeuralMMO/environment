@@ -18,6 +18,7 @@ from nmmo.io.action import Action, Buy
 from nmmo.datastore.numpy_datastore import NumpyDatastore
 from nmmo.systems.exchange import Exchange
 from nmmo.systems.item import Item, ItemState
+from nmmo.lib.event_log import EventLogger, EventState
 
 def prioritized(entities: Dict, merged: Dict):
   """Sort actions into merged according to priority"""
@@ -42,7 +43,7 @@ class Realm:
     config.MAP_GENERATOR(config).generate_all_maps()
 
     self.datastore = NumpyDatastore()
-    for s in [TileState, EntityState, ItemState]:
+    for s in [TileState, EntityState, ItemState, EventState]:
       self.datastore.register_object_type(s._name, s.State.num_attributes)
 
     self.tick = 0
@@ -54,6 +55,7 @@ class Realm:
     self.replay_helper = ReplayHelper.create(self)
     self.render_helper = RenderHelper.create(self)
     self.log_helper = LogHelper.create(self)
+    self.event_log = EventLogger(self)
 
     # Entity handlers
     self.players = PlayerManager(self)
@@ -72,6 +74,7 @@ class Realm:
         idx: Map index to load
     """
     self.log_helper.reset()
+    self.event_log.reset()
     self.map.reset(map_id or np.random.randint(self.config.MAP_N) + 1)
 
     # EntityState and ItemState tables must be empty after players/npcs.reset()

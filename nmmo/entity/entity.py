@@ -8,6 +8,7 @@ from nmmo.core.config import Config
 from nmmo.lib import utils
 from nmmo.datastore.serialized import SerializedState
 from nmmo.systems import inventory
+from nmmo.lib.log import EventCode
 
 # pylint: disable=no-member
 EntityState = SerializedState.subclass(
@@ -290,6 +291,7 @@ class Entity(EntityState):
     # at this point, self is dead
     if source:
       source.history.player_kills += 1
+      self.realm.event_log.record(EventCode.PLAYER_KILL, source, target=self)
 
     # if self is dead, unlist its items from the market regardless of looting
     if self.config.EXCHANGE_SYSTEM_ENABLED:
