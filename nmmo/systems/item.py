@@ -108,7 +108,7 @@ class Item(ItemState):
     realm.items[self.id.val] = self
 
   def destroy(self):
-    del self.realm.items[self.id.val]
+    self.realm.items.pop(self.id.val, None)
     self.datastore_record.delete()
 
   @property
