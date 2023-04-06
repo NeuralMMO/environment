@@ -5,7 +5,6 @@ import logging
 import random
 from tqdm import tqdm
 
-# pylint: disable=import-error
 from tests.testhelpers import ScriptedAgentTestConfig, ScriptedAgentTestEnv
 from tests.testhelpers import observations_are_equal, actions_are_equal
 
