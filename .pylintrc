@@ -7,6 +7,7 @@ disable=W0511, # TODO/FIXME
         C0116, # missing function docstring
         W0221, # arguments differ from overridden method
         C0415, # import outside toplevel
+        E0611, # no name in module
         R0901, # too many ancestors
         R0902, # too many instance attributes
         R0903, # too few public methods
