@@ -1,8 +1,7 @@
 import unittest
 import logging
 
-# pylint: disable=import-error
-from testhelpers import ScriptedTestTemplate, change_spawn_pos, provide_item
+from tests.testhelpers import ScriptedTestTemplate, change_spawn_pos, provide_item
 
 from nmmo.io import action
 from nmmo.systems import item as Item
@@ -14,6 +13,8 @@ RANDOM_SEED = 985
 LOGFILE = 'tests/action/test_destroy_give_gold.log'
 
 class TestDestroyGiveGold(ScriptedTestTemplate):
+  # pylint: disable=protected-access,multiple-statements
+
   @classmethod
   def setUpClass(cls):
     super().setUpClass()
@@ -24,7 +25,7 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
 
     cls.policy = { 1:'Melee', 2:'Range', 3:'Melee', 4:'Range', 5:'Melee', 6:'Range' }
     cls.spawn_locs = { 1:(17,17), 2:(21,21), 3:(17,17), 4:(21,21), 5:(21,21), 6:(17,17) }
-    cls.ammo = { 1:Item.Scrap, 2:Item.Shaving, 3:Item.Scrap, 
+    cls.ammo = { 1:Item.Scrap, 2:Item.Shaving, 3:Item.Scrap,
                  4:Item.Shaving, 5:Item.Scrap, 6:Item.Shaving }
 
     cls.config.LOG_VERBOSE = False
@@ -43,10 +44,10 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
     # this should be marked in the mask too
 
     """ First tick """ # First tick actions: USE (equip) level-0 ammo
-    env.step({ ent_id: { action.Use: { action.InventoryItem: 
+    env.step({ ent_id: { action.Use: { action.InventoryItem:
         env.obs[ent_id].inventory.sig(*self.item_sig[ent_id][0]) } # level-0 ammo
       } for ent_id in self.policy })
-    
+
     # check if the agents have equipped the ammo
     for ent_id in self.policy:
       ent_obs = env.obs[ent_id]
@@ -64,15 +65,15 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
 
     """ Second tick """ # Second tick actions: DESTROY ammo
     actions = {}
-    
+
     for ent_id in self.policy:
       if ent_id in [1, 2]:
         # agent 1 & 2, destroy the level-3 ammos, which are valid
-        actions[ent_id] = { action.Destroy: 
+        actions[ent_id] = { action.Destroy:
           { action.InventoryItem: env.obs[ent_id].inventory.sig(*self.item_sig[ent_id][1]) } }
       else:
         # other agents: destroy the equipped level-0 ammos, which are invalid
-        actions[ent_id] = { action.Destroy: 
+        actions[ent_id] = { action.Destroy:
           { action.InventoryItem: env.obs[ent_id].inventory.sig(*self.item_sig[ent_id][0]) } }
     env.step(actions)
 
@@ -125,7 +126,7 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
     for ent_id, cond in test_cond.items():
       self.assertEqual( cond['valid'],
         env.obs[ent_id].inventory.sig(*cond['item_sig']) is None)
-      
+
       if ent_id == 1: # agent 1 gave ammo stack to agent 3
         tgt_inv = env.obs[cond['tgt_id']].inventory
         inv_idx = tgt_inv.sig(*cond['item_sig'])
@@ -145,15 +146,15 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
     # agent 1: equip the ammo
     ent_id = 1; item_sig = self.item_sig[ent_id][0]
     self.assertTrue(
-      self._check_inv_mask(env.obs[ent_id], action.Use, item_sig)) 
-    actions[ent_id] = { action.Use: { action.InventoryItem: 
+      self._check_inv_mask(env.obs[ent_id], action.Use, item_sig))
+    actions[ent_id] = { action.Use: { action.InventoryItem:
         env.obs[ent_id].inventory.sig(*item_sig) } }
 
     # agent 2: list the ammo for sale
     ent_id = 2; price = 5; item_sig = self.item_sig[ent_id][0]
     self.assertTrue(
-      self._check_inv_mask(env.obs[ent_id], action.Sell, item_sig)) 
-    actions[ent_id] = { action.Sell: { 
+      self._check_inv_mask(env.obs[ent_id], action.Sell, item_sig))
+    actions[ent_id] = { action.Sell: {
         action.InventoryItem: env.obs[ent_id].inventory.sig(*item_sig),
         action.Price: price } }
 
@@ -196,7 +197,7 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
     # DONE
 
   def test_give_full_inventory(self):
-    # cannot give to an agent with the full inventory, 
+    # cannot give to an agent with the full inventory,
     #   but it's possible if the agent has the same ammo stack
     env = self._setup_env(random_seed=RANDOM_SEED)
 
@@ -233,7 +234,7 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
     for ent_id, cond in test_cond.items():
       self.assertEqual( cond['valid'],
         env.obs[ent_id].inventory.sig(*cond['item_sig']) is None)
-      
+
       if ent_id == 3: # successfully gave the ammo stack to agent 1
         tgt_inv = env.obs[cond['tgt_id']].inventory
         inv_idx = tgt_inv.sig(*cond['item_sig'])
@@ -257,7 +258,7 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
 
     # NOTE: the below tests rely on the static execution order from 1 to N
     # agent 1: give gold to agent 3 (valid: the same team, same tile)
-    test_cond[1] = { 'tgt_id': 3, 'gold': 1, 'ent_mask': True, 
+    test_cond[1] = { 'tgt_id': 3, 'gold': 1, 'ent_mask': True,
                      'ent_gold': self.init_gold-1, 'tgt_gold': self.init_gold+1 }
     # agent 2: give gold to agent 4 (valid: the same team, same tile)
     test_cond[2] = { 'tgt_id': 4, 'gold': 100, 'ent_mask': True,
