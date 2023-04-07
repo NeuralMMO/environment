@@ -2,7 +2,7 @@ import unittest
 import logging
 
 # pylint: disable=import-error
-from testhelpers import ScriptedTestTemplate
+from testhelpers import ScriptedTestTemplate, change_spawn_pos, provide_item
 
 from nmmo.io import action
 from nmmo.systems import item as Item
@@ -95,7 +95,7 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
     env = self._setup_env(random_seed=RANDOM_SEED)
 
     # teleport the npc -1 to agent 5's location
-    self._change_spawn_pos(env.realm, -1, self.spawn_locs[5])
+    change_spawn_pos(env.realm, -1, self.spawn_locs[5])
     env.obs = env._compute_observations()
 
     """ First tick actions """
@@ -205,7 +205,7 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
     for ent_id in [1, 2]:
       for item_sig in extra_items:
         self.item_sig[ent_id].append(item_sig)
-        self._provide_item(env.realm, ent_id, item_sig[0], item_sig[1], 1)
+        provide_item(env.realm, ent_id, item_sig[0], item_sig[1], 1)
 
     env.obs = env._compute_observations()
 
@@ -250,7 +250,7 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
     env = self._setup_env(random_seed=RANDOM_SEED)
 
     # teleport the npc -1 to agent 3's location
-    self._change_spawn_pos(env.realm, -1, self.spawn_locs[3])
+    change_spawn_pos(env.realm, -1, self.spawn_locs[3])
     env.obs = env._compute_observations()
 
     test_cond = {}

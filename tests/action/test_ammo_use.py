@@ -2,7 +2,7 @@ import unittest
 import logging
 
 # pylint: disable=import-error
-from testhelpers import ScriptedTestTemplate
+from testhelpers import ScriptedTestTemplate, provide_item
 
 from nmmo.io import action
 from nmmo.systems import item as Item
@@ -96,14 +96,14 @@ class TestAmmoUse(ScriptedTestTemplate):
     # provide extra scrap to range to make its inventory full
     # but level-0 scrap overlaps with the listed item
     ent_id = 2
-    self._provide_item(env.realm, ent_id, Item.Scrap, level=0, quantity=3)
-    self._provide_item(env.realm, ent_id, Item.Scrap, level=1, quantity=3)
+    provide_item(env.realm, ent_id, Item.Scrap, level=0, quantity=3)
+    provide_item(env.realm, ent_id, Item.Scrap, level=1, quantity=3)
 
     # provide extra scrap to mage to make its inventory full
     # there will be no overlapping item
     ent_id = 3
-    self._provide_item(env.realm, ent_id, Item.Scrap, level=5, quantity=3)
-    self._provide_item(env.realm, ent_id, Item.Scrap, level=7, quantity=3)
+    provide_item(env.realm, ent_id, Item.Scrap, level=5, quantity=3)
+    provide_item(env.realm, ent_id, Item.Scrap, level=7, quantity=3)
     env.obs = env._compute_observations()
 
     # First tick actions: SELL level-0 ammo
@@ -166,8 +166,8 @@ class TestAmmoUse(ScriptedTestTemplate):
 
     for ent_id in self.policy:
       # provide extra scrap 
-      self._provide_item(env.realm, ent_id, Item.Scrap, level=0, quantity=extra_ammo)
-      self._provide_item(env.realm, ent_id, Item.Scrap, level=1, quantity=extra_ammo)
+      provide_item(env.realm, ent_id, Item.Scrap, level=0, quantity=extra_ammo)
+      provide_item(env.realm, ent_id, Item.Scrap, level=1, quantity=extra_ammo)
 
     # level up the agent 1 (Melee) to 2
     env.realm.players[1].skills.melee.level.update(2)

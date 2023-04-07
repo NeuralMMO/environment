@@ -81,7 +81,7 @@ class Item(ItemState):
     return Item._item_type_id_to_class[type_id]
 
   def __init__(self, realm, level,
-              capacity=0, quantity=1,
+              capacity=0,
               melee_attack=0, range_attack=0, mage_attack=0,
               melee_defense=0, range_defense=0, mage_defense=0,
               health_restore=0, resource_restore=0):
@@ -96,7 +96,8 @@ class Item(ItemState):
     self.type_id.update(self.ITEM_TYPE_ID)
     self.level.update(level)
     self.capacity.update(capacity)
-    self.quantity.update(quantity)
+    # every item instance is created individually, i.e., quantity=1
+    self.quantity.update(1)
     self.melee_attack.update(melee_attack)
     self.range_attack.update(range_attack)
     self.mage_attack.update(mage_attack)

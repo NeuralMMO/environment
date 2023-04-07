@@ -1,22 +1,20 @@
 import numpy as np
 
 class Fixed():
-  def __init__(self, item, amount=1):
+  def __init__(self, item):
     self.item = item
-    self.amount = amount
 
   def roll(self, realm, level):
-    return [self.item(realm, level, amount=self.amount)]
+    return [self.item(realm, level)]
 
 class Drop:
-  def __init__(self, item, amount, prob):
+  def __init__(self, item, prob):
     self.item = item
-    self.amount = amount
     self.prob = prob
 
   def roll(self, realm, level):
     if np.random.rand() < self.prob:
-      return self.item(realm, level, quantity=self.amount)
+      return self.item(realm, level)
 
     return None
 
@@ -24,8 +22,8 @@ class Standard:
   def __init__(self):
     self.drops = []
 
-  def add(self, item, quant=1, prob=1.0):
-    self.drops += [Drop(item, quant, prob)]
+  def add(self, item, prob=1.0):
+    self.drops += [Drop(item, prob)]
 
   def roll(self, realm, level):
     ret = []
