@@ -1,8 +1,7 @@
 import unittest
 import logging
 
-# pylint: disable=import-error
-from testhelpers import ScriptedTestTemplate, provide_item
+from tests.testhelpers import ScriptedTestTemplate, provide_item
 
 from nmmo.io import action
 from nmmo.systems import item as Item
@@ -13,6 +12,8 @@ RANDOM_SEED = 284
 LOGFILE = 'tests/action/test_ammo_use.log'
 
 class TestAmmoUse(ScriptedTestTemplate):
+  # pylint: disable=protected-access,multiple-statements
+
   @classmethod
   def setUpClass(cls):
     super().setUpClass()
@@ -27,15 +28,15 @@ class TestAmmoUse(ScriptedTestTemplate):
     env = self._setup_env(random_seed=RANDOM_SEED)
 
     # First tick actions: USE (equip) level-0 ammo
-    env.step({ ent_id: { action.Use: 
-        { action.InventoryItem: env.obs[ent_id].inventory.sig(self.ammo[ent_id], 0) }
-      } for ent_id in self.ammo })
+    env.step({ ent_id: { action.Use:
+        { action.InventoryItem: env.obs[ent_id].inventory.sig(ent_ammo, 0) }
+      } for ent_id, ent_ammo in self.ammo.items() })
 
     # check if the agents have equipped the ammo
-    for ent_id in self.ammo:
+    for ent_id, ent_ammo in self.ammo.items():
       gym_obs = env.obs[ent_id].to_gym()
       inventory = env.obs[ent_id].inventory
-      inv_idx = inventory.sig(self.ammo[ent_id], 0)
+      inv_idx = inventory.sig(ent_ammo, 0)
       self.assertEqual(1, # True
         ItemState.parse_array(inventory.values[inv_idx]).equipped)
 
@@ -46,16 +47,16 @@ class TestAmmoUse(ScriptedTestTemplate):
     # Second tick actions: ATTACK other agents using ammo
     #  NOTE that the agents are immortal
     #  NOTE that agents 1 & 3's attack are invalid due to out-of-range
-    env.step({ ent_id: { action.Attack: 
+    env.step({ ent_id: { action.Attack:
         { action.Style: env.realm.players[ent_id].agent.style[0],
           action.Target: (ent_id+1)%3+1 } }
         for ent_id in self.ammo })
 
     # check if the ammos were consumed
     ammo_ids = []
-    for ent_id in self.ammo:
+    for ent_id, ent_ammo in self.ammo.items():
       inventory = env.obs[ent_id].inventory
-      inv_idx = inventory.sig(self.ammo[ent_id], 0)
+      inv_idx = inventory.sig(ent_ammo, 0)
       item_info = ItemState.parse_array(inventory.values[inv_idx])
       if ent_id == 2:
         # only agent 2's attack is valid and consume ammo
@@ -66,7 +67,7 @@ class TestAmmoUse(ScriptedTestTemplate):
 
     # Third tick actions: ATTACK again to use up all the ammo, except agent 3
     #  NOTE that agent 3's attack command is invalid due to out-of-range
-    env.step({ ent_id: { action.Attack: 
+    env.step({ ent_id: { action.Attack:
         { action.Style: env.realm.players[ent_id].agent.style[0],
           action.Target: (ent_id+1)%3+1 } }
         for ent_id in self.ammo })
@@ -74,7 +75,7 @@ class TestAmmoUse(ScriptedTestTemplate):
     # check if the ammos are depleted and the ammo slot is empty
     ent_id = 2
     self.assertTrue(env.obs[ent_id].inventory.len == len(self.item_sig[ent_id]) - 1)
-    self.assertTrue(env.realm.players[ent_id].inventory.equipment.ammunition.item == None)
+    self.assertTrue(env.realm.players[ent_id].inventory.equipment.ammunition.item is None)
 
     for item_id in ammo_ids:
       self.assertTrue(len(ItemState.Query.by_id(env.realm.datastore, item_id)) == 0)
@@ -107,16 +108,16 @@ class TestAmmoUse(ScriptedTestTemplate):
     env.obs = env._compute_observations()
 
     # First tick actions: SELL level-0 ammo
-    env.step({ ent_id: { action.Sell: 
-        { action.InventoryItem: env.obs[ent_id].inventory.sig(self.ammo[ent_id], 0),
+    env.step({ ent_id: { action.Sell:
+        { action.InventoryItem: env.obs[ent_id].inventory.sig(ent_ammo, 0),
           action.Price: sell_price } }
-        for ent_id in self.ammo })
+        for ent_id, ent_ammo in self.ammo.items() })
 
     # check if the ammos were listed
-    for ent_id in self.ammo:
+    for ent_id, ent_ammo in self.ammo.items():
       gym_obs = env.obs[ent_id].to_gym()
       inventory = env.obs[ent_id].inventory
-      inv_idx = inventory.sig(self.ammo[ent_id], 0)
+      inv_idx = inventory.sig(ent_ammo, 0)
       item_info = ItemState.parse_array(inventory.values[inv_idx])
       # ItemState data
       self.assertEqual(sell_price, item_info.listed_price)
@@ -142,14 +143,14 @@ class TestAmmoUse(ScriptedTestTemplate):
       if ent_id == 3: self.assertTrue(sum(mask) == 0)
 
     # Second tick actions: USE ammo, which should NOT happen
-    env.step({ ent_id: { action.Use: 
-        { action.InventoryItem: env.obs[ent_id].inventory.sig(self.ammo[ent_id], 0) }
-      } for ent_id in self.ammo })
+    env.step({ ent_id: { action.Use:
+        { action.InventoryItem: env.obs[ent_id].inventory.sig(ent_ammo, 0) }
+      } for ent_id, ent_ammo in self.ammo.items() })
 
     # check if the agents have equipped the ammo
-    for ent_id in self.ammo:
+    for ent_id, ent_ammo in self.ammo.items():
       inventory = env.obs[ent_id].inventory
-      inv_idx = inventory.sig(self.ammo[ent_id], 0)
+      inv_idx = inventory.sig(ent_ammo, 0)
       self.assertEqual(0, # False
         ItemState.parse_array(inventory.values[inv_idx]).equipped)
 
@@ -162,10 +163,12 @@ class TestAmmoUse(ScriptedTestTemplate):
     scrap_lvl0 = (Item.Scrap, 0)
     scrap_lvl1 = (Item.Scrap, 1)
     scrap_lvl3 = (Item.Scrap, 3)
-    sig_int_tuple = lambda sig: (sig[0].ITEM_TYPE_ID, sig[1])
+
+    def sig_int_tuple(sig):
+      return (sig[0].ITEM_TYPE_ID, sig[1])
 
     for ent_id in self.policy:
-      # provide extra scrap 
+      # provide extra scrap
       provide_item(env.realm, ent_id, Item.Scrap, level=0, quantity=extra_ammo)
       provide_item(env.realm, ent_id, Item.Scrap, level=1, quantity=extra_ammo)
 
@@ -217,7 +220,7 @@ class TestAmmoUse(ScriptedTestTemplate):
     # First tick actions: USE (equip) level-0 ammo
     #   execute only the agent 1's action
     ent_id = 1
-    env.step({ ent_id: { action.Use: 
+    env.step({ ent_id: { action.Use:
         { action.InventoryItem: env.obs[ent_id].inventory.sig(*scrap_lvl0) } }})
 
     # check if the agents have equipped the ammo 0
@@ -228,7 +231,7 @@ class TestAmmoUse(ScriptedTestTemplate):
 
     # Second tick actions: USE (equip) level-1 ammo
     #   this should unequip level-0 then equip level-1 ammo
-    env.step({ ent_id: { action.Use: 
+    env.step({ ent_id: { action.Use:
         { action.InventoryItem: env.obs[ent_id].inventory.sig(*scrap_lvl1) } }})
 
     # check if the agents have equipped the ammo 1
@@ -239,7 +242,7 @@ class TestAmmoUse(ScriptedTestTemplate):
 
     # Third tick actions: USE (equip) level-3 ammo
     #   this should ignore USE action and leave level-1 ammo equipped
-    env.step({ ent_id: { action.Use: 
+    env.step({ ent_id: { action.Use:
         { action.InventoryItem: env.obs[ent_id].inventory.sig(*scrap_lvl3) } }})
 
     # check if the agents have equipped the ammo 1
@@ -267,7 +270,7 @@ class TestAmmoUse(ScriptedTestTemplate):
     """First tick: try to use level-3 ration & poultice"""
     ration_lvl3 = (Item.Ration, 3)
     poultice_lvl3 = (Item.Poultice, 3)
-    
+
     actions = {}
     ent_id = 1; actions[ent_id] = { action.Use:
       { action.InventoryItem: env.obs[ent_id].inventory.sig(*ration_lvl3) } }
@@ -287,7 +290,7 @@ class TestAmmoUse(ScriptedTestTemplate):
       resources = env.realm.players[ent_id].resources
       self.assertEqual( resources.food.val, init_res - res_dec_tick)
       self.assertEqual( resources.water.val, init_res - res_dec_tick)
-    
+
     ent_id = 3 # failed to use the item
     self.assertFalse( env.obs[ent_id].inventory.sig(*poultice_lvl3) is None)
     self.assertEqual( env.realm.players[ent_id].resources.health.val, init_res)
@@ -295,7 +298,7 @@ class TestAmmoUse(ScriptedTestTemplate):
     """Second tick: try to use level-0 ration & poultice"""
     ration_lvl0 = (Item.Ration, 0)
     poultice_lvl0 = (Item.Poultice, 0)
-    
+
     actions = {}
     ent_id = 1; actions[ent_id] = { action.Use:
       { action.InventoryItem: env.obs[ent_id].inventory.sig(*ration_lvl0) } }
@@ -316,7 +319,7 @@ class TestAmmoUse(ScriptedTestTemplate):
       resources = env.realm.players[ent_id].resources
       self.assertEqual( resources.food.val, init_res + restore - 2*res_dec_tick)
       self.assertEqual( resources.water.val, init_res + restore - 2*res_dec_tick)
-    
+
     ent_id = 3 # successfully restored health
     self.assertTrue( env.obs[ent_id].inventory.sig(*poultice_lvl0) is None) # item gone
     self.assertEqual( env.realm.players[ent_id].resources.health.val, init_res + restore)

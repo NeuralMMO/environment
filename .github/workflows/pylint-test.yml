@@ -21,7 +21,7 @@ jobs:
     - name: Running unit tests
       run: pytest
     - name: Analysing the code with pylint
-      run: pylint --rcfile=pylint.cfg --recursive=y nmmo tests
+      run: pylint --recursive=y nmmo tests
     - name: Looking for xcxc, just in case
       run: |
         if grep -r --include='*.py' 'xcxc'; then

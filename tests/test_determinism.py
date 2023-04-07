@@ -5,9 +5,8 @@ import logging
 import random
 from tqdm import tqdm
 
-# pylint: disable=import-error
-from testhelpers import ScriptedAgentTestConfig, ScriptedAgentTestEnv
-from testhelpers import observations_are_equal, actions_are_equal
+from tests.testhelpers import ScriptedAgentTestConfig, ScriptedAgentTestEnv
+from tests.testhelpers import observations_are_equal, actions_are_equal
 
 # 30 seems to be enough to test variety of agent actions
 TEST_HORIZON = 30

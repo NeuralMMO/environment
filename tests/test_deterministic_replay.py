@@ -11,8 +11,8 @@ from typing import Any, Dict
 import numpy as np
 from tqdm import tqdm
 
-# pylint: disable=import-error
-from testhelpers import ScriptedAgentTestConfig, ScriptedAgentTestEnv, observations_are_equal
+from tests.testhelpers import ScriptedAgentTestConfig, ScriptedAgentTestEnv
+from tests.testhelpers import observations_are_equal
 
 import nmmo
 
