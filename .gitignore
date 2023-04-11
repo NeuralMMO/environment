@@ -1,6 +1,8 @@
 # Game maps
 maps/
 *.swp
+runs/*
+wandb/*
 
 # local replay file from tests/test_deterministic_replay.py
 tests/replay_local*.pickle
