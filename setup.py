@@ -29,8 +29,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        'pytest<7',
-        'pytest-pythonpath==0.7.4',
+        'pytest==7.3.0',
         'pytest-benchmark==3.4.1',
         'openskill==4.0.0',
         'fire==0.4.0',
