@@ -46,11 +46,7 @@ class NameComparable(type):
     return hash(self.__name__)
 
   def __eq__(self, other):
-    try:
-      return self.__name__ == other.__name__
-    except:
-        print("Some sphinx bug makes this block doc calls. "
-              "You should not see this in normal NMMO usage")
+    return self.__name__ == other.__name__
 
   def __ne__(self, other):
     return self.__name__ != other.__name__
@@ -76,7 +72,7 @@ def seed():
 def linf(pos1, pos2):
   # pos could be a single (r,c) or a vector of (r,c)s
   diff = np.abs(np.array(pos1) - np.array(pos2))
-  return np.max(diff, axis=len(diff.shape)-1)  
+  return np.max(diff, axis=len(diff.shape)-1)
 
 #Bounds checker
 def in_bounds(r, c, shape, border=0):
