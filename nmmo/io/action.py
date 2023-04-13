@@ -8,6 +8,7 @@ from nmmo.lib import utils
 from nmmo.lib.utils import staticproperty
 from nmmo.systems.item import Item, Stack
 from nmmo.lib.log import EventCode
+import numpy as np
 
 class NodeType(Enum):
   #Tree edges
@@ -170,7 +171,7 @@ class Direction(Node):
 
 # a quick helper function
 def deserialize_fixed_arg(arg, index):
-  if isinstance(index, int):
+  if isinstance(index, (int, np.int64)):
     if index < 0:
       return None # so that the action will be discarded
     val = min(index-1, len(arg.edges)-1)
