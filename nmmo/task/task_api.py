@@ -1,0 +1,96 @@
+from __future__ import annotations
+from typing import Dict, Union, Tuple
+from functools import reduce
+from abc import ABC, abstractmethod
+
+from nmmo.task.predicate import Predicate
+from nmmo.task.group import Group
+from nmmo.task.game_state import GameState
+
+class Task(ABC):
+  def __init__(self, assignee: Group):
+    self._assignee = assignee
+
+  def __call__(self, gs: GameState):
+    return self._rewards(gs)
+
+  @property
+  def assignee(self):
+    return self._assignee
+
+  @abstractmethod
+  def _rewards(self, gs: GameState) -> Tuple[Dict[int, float], Dict[int, Dict]]:
+    """ Returns a mapping from ent_id to rewards and infos for all 
+    entities in assignee
+    """
+    raise NotImplementedError
+
+class PredicateTask(Task, ABC):
+  def __init__(self,
+               assignee: Group,
+               predicate: Predicate):
+    super().__init__(assignee)
+    self._predicate = predicate
+
+  def evaluate(self, gs: GameState) -> float:
+    name = self._predicate.name
+    cache = gs.cache_result
+    if name not in cache:
+      cache[name] = self._predicate(gs)
+    return cache[name]
+
+class Once(PredicateTask):
+  def __init__(self,
+               assignee: Group,
+               predicate: Predicate,
+               reward = 1):
+    super().__init__(assignee, predicate)
+    self._reward = reward
+    self._completed = False
+
+  def _rewards(self, gs: GameState):
+    rewards = {int(ent_id): 0 for ent_id in self._assignee}
+    infos = {int(ent_id): {self._predicate.name: self.evaluate(gs)}
+             for ent_id in self._assignee}
+    if not self._completed and self.evaluate(gs) == 1.0:
+      self._completed = True
+      rewards = {int(ent_id): self._reward for ent_id in self._assignee}
+    return rewards, infos
+
+class Repeat(PredicateTask):
+  def __init__(self,
+               assignee: Group,
+               predicate: Predicate,
+               reward = 1):
+    super().__init__(assignee, predicate)
+    self._reward = reward
+
+  def _rewards(self, gs: GameState):
+    rewards = {int(ent_id): 0 for ent_id in self._assignee}
+    infos = {int(ent_id): {self._predicate.name: self.evaluate(gs)}
+             for ent_id in self._assignee}
+    if self.evaluate(gs) == 1.0:
+      rewards = {int(ent_id): self._reward for ent_id in self._assignee}
+    return rewards, infos
+
+class MultiTask(Task):
+  def __init__(self,
+               *tasks: Union[Tuple[Task, float], Task]):
+    assert len(tasks) > 0
+    self._tasks = [t if isinstance(t, Tuple) else (t,1) for t in tasks]
+    super().__init__(reduce(lambda a,b: a.union(b),
+                            [task[0].assignee for task in self._tasks]))
+
+  def _rewards(self, gs: GameState) -> Dict[int, float]:
+    rewards = {}
+    infos = {}
+    for task, weight in self._tasks:
+      task_reward, task_infos = task(gs)
+      for ent_id, reward in task_reward.items():
+        rewards[ent_id] = rewards.get(ent_id,0) + reward * weight
+      for ent_id, info in task_infos.items():
+        if not ent_id in infos:
+          infos[ent_id] = {}
+        infos[ent_id] = {**infos[ent_id], **info}
+
+    return rewards, infos
