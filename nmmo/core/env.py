@@ -14,6 +14,10 @@ from nmmo.core.tile import Tile
 from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
 from nmmo.core import realm
+from nmmo.task.game_state import GameStateGenerator
+from nmmo.task.task_api import Task, MultiTask, Repeat
+from nmmo.task.predicate.base_predicate import StayAlive
+from nmmo.task.group import Group
 from scripted.baselines import Scripted
 
 
@@ -24,6 +28,7 @@ class Env(ParallelEnv):
   variably sized agent populations, and long time horizons. Usage in conjunction
   with RLlib as demonstrated in the /projekt wrapper is highly recommended.'''
 
+  #pylint: disable=, no-value-for-parameter
   def __init__(self,
     config: Default = nmmo.config.Default(), seed=None):
     self._init_random(seed)
@@ -37,6 +42,14 @@ class Env(ParallelEnv):
     self.possible_agents = list(range(1, config.PLAYER_N + 1))
     self._dead_agents = OrderedSet()
     self.scripted_agents = OrderedSet()
+
+    self.gs_gen: GameStateGenerator = None
+    # Default task: rewards 1 each turn agent is alive
+    self.task: Task = MultiTask(
+      *(Repeat(Group([agent]),
+               StayAlive(Group([agent])),
+               1) for agent in self.possible_agents)
+    )
 
   # pylint: disable=method-cache-max-size-none
   @functools.lru_cache(maxsize=None)
@@ -110,6 +123,10 @@ class Env(ParallelEnv):
   ############################################################################
   # Core API
 
+  def change_task(self, new_task: Task):
+    self.task = new_task
+    self.reset()
+
   # TODO: This doesn't conform to the PettingZoo API
   # pylint: disable=arguments-renamed
   def reset(self, map_id=None, seed=None, options=None):
@@ -144,6 +161,7 @@ class Env(ParallelEnv):
         self.scripted_agents.add(eid)
 
     self.obs = self._compute_observations()
+    self.gs_gen = GameStateGenerator(self.realm, self.config)
 
     return {a: o.to_gym() for a,o in self.obs.items()}
 
@@ -383,19 +401,22 @@ class Env(ParallelEnv):
           entity identified by ent_id.
     '''
     infos = {}
-    rewards = { eid: -1 for eid in dones }
+    game_state = self.gs_gen.generate(self.realm, self.obs)
 
-    for agent_id in agents:
-      infos[agent_id] = {}
-      agent = self.realm.players.get(agent_id)
-      assert agent is not None, f'Agent {agent_id} not found'
+    rewards = {eid: 0 for eid in agents}
+    task_rewards, task_infos = self.task(game_state)
+    for eid, reward in task_rewards.items():
+      rewards[eid] = reward
+    for eid in dones:
+      rewards[eid] = 0
 
-      infos[agent_id] =  {'population': agent.population}
-
-      rewards[agent_id] = 0
+    for eid in agents:
+      infos[eid] = {}
+      infos[eid]['task'] = {}
+      if eid in task_infos:
+        infos[eid]['task'] = task_infos[eid]
 
     return rewards, infos
-
 
   ############################################################################
   # PettingZoo API
