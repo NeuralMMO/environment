@@ -157,9 +157,6 @@ class Config(Template):
   PLAYERS                      = [Agent]
   '''Player classes from which to spawn'''
 
-  TASKS                        = []
-  '''Tasks for which to compute rewards'''
-
   ############################################################################
   ### Emulation Parameters
 
