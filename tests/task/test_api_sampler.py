@@ -2,6 +2,7 @@ import logging
 import unittest
 
 from tests.testhelpers import ScriptedAgentTestConfig
+import numpy as np
 
 import nmmo
 
@@ -116,9 +117,6 @@ class TestTaskAPI(unittest.TestCase):
 
     rand_sampler.sample(max_clauses=4, max_clause_size=3, not_p=0.5)
 
-  # def test_default_sampler(self):
-  #   pass
-
   def test_completed_tasks_in_info(self):
     config = ScriptedAgentTestConfig()
     env = TaskEnv(config)
@@ -155,6 +153,20 @@ class TestTaskAPI(unittest.TestCase):
         self.assertEqual(infos[ent_id]['task'][Success().name], 1)
       else:
         self.assertEqual(infos[ent_id]['task'], {})
+
+  def test_task_embedding(self):
+    env = TaskEnv()
+    obs = env.reset()
+    self.assertEqual(obs[1]['Task'].shape, 
+                     env.observation_space(1)['Task'].shape)
+    
+    task = Repeat(assignee=Group([1,2]),predicate=Success())
+    env.change_task(task,
+                    task_encoding={1:np.array([1,2,3,4])},
+                    embedding_size=4)
+    obs = env.reset()
+    self.assertTrue(all(obs[1]['Task']==np.array([1,2,3,4])))
+    self.assertTrue(all(obs[2]['Task']==np.array([0,0,0,0])))
 
 if __name__ == '__main__':
   unittest.main()

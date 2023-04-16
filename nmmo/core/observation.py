@@ -44,7 +44,8 @@ class Observation:
     tiles,
     entities,
     inventory,
-    market) -> None:
+    market,
+    task) -> None:
 
     self.config = config
     self.agent_id = agent_id
@@ -64,6 +65,11 @@ class Observation:
                              ItemState.State.attr_name_to_col["id"])
     else:
       assert market.size == 0
+
+    self.task = np.zeros(task[1])
+    if agent_id in task[0]:
+      self.task = task[0][agent_id]
+      assert self.task.shape == (task[1],), "Encoded task has incorrect embedding size"
 
   # pylint: disable=method-cache-max-size-none
   @lru_cache(maxsize=None)
@@ -113,6 +119,7 @@ class Observation:
           self.config.PLAYER_N_OBS - self.entities.values.shape[0],
           self.entities.values.shape[1]))
       ]),
+      "Task": self.task
     }
 
     if self.config.ITEM_SYSTEM_ENABLED:

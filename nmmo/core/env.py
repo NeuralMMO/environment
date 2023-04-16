@@ -1,6 +1,6 @@
 import functools
 import random
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from ordered_set import OrderedSet
 
 import gym
@@ -45,11 +45,16 @@ class Env(ParallelEnv):
 
     self.gs_gen: GameStateGenerator = None
     # Default task: rewards 1 each turn agent is alive
-    self.task: Task = MultiTask(
+    self.task: Task = None
+    self._task_encoding = {}
+    self._task_embedding_size = 1
+    t = MultiTask(
       *(Repeat(Group([agent]),
                StayAlive(Group([agent])),
-               1) for agent in self.possible_agents)
-    )
+               1) for agent in self.possible_agents))
+    self.change_task(t,
+                     embedding_size=self._task_embedding_size,
+                     task_encoding=self._task_encoding)
 
   # pylint: disable=method-cache-max-size-none
   @functools.lru_cache(maxsize=None)
@@ -74,7 +79,11 @@ class Env(ParallelEnv):
 
     obs_space = {
       "Tile": box(self.config.MAP_N_OBS, Tile.State.num_attributes),
-      "Entity": box(self.config.PLAYER_N_OBS, Entity.State.num_attributes)
+      "Entity": box(self.config.PLAYER_N_OBS, Entity.State.num_attributes),
+      "Task": gym.spaces.Box(
+          low=-2**20, high=2**20,
+          shape=(self._task_embedding_size,),
+          dtype=np.float32)
     }
 
     if self.config.ITEM_SYSTEM_ENABLED:
@@ -123,9 +132,26 @@ class Env(ParallelEnv):
   ############################################################################
   # Core API
 
-  def change_task(self, new_task: Task):
+  def change_task(self,
+                  new_task: Task,
+                  task_encoding: Optional[Dict[int, np.ndarray]] = None,
+                  embedding_size: int=16,
+                  reset: bool=True):
+    """ Changes the task given to each agent
+
+    Args:
+      new_task: The task to complete and calculate rewards
+      task_encoding: A mapping from eid to encoded task
+      embedding_size: The size of each embedding
+      reset: Resets the environment
+    """
     self.task = new_task
-    self.reset()
+    self._task_encoding = task_encoding
+    if task_encoding is None:
+      self._task_encoding = {}
+    self._task_embedding_size = embedding_size
+    if reset:
+      self.reset()
 
   # TODO: This doesn't conform to the PettingZoo API
   # pylint: disable=arguments-renamed
@@ -348,6 +374,7 @@ class Env(ParallelEnv):
         obs: Dictionary of observations for each agent
         obs[agent_id] = {
           "Entity": [e1, e2, ...],
+          "Task": [encoded_task],
           "Tile": [t1, t2, ...],
           "Inventory": [i1, i2, ...],
           "Market": [m1, m2, ...],
@@ -380,9 +407,12 @@ class Env(ParallelEnv):
 
       inventory = Item.Query.owned_by(self.realm.datastore, agent_id)
 
-      obs[agent_id] = Observation(
-        self.config, agent_id, visible_tiles, visible_entities, inventory, market)
-
+      obs[agent_id] = Observation(self.config,
+                                  agent_id,
+                                  visible_tiles,
+                                  visible_entities,
+                                  inventory, market,
+                                  (self._task_encoding, self._task_embedding_size))
     return obs
 
   def _compute_rewards(self, agents: List[AgentID], dones: Dict[AgentID, bool]):
