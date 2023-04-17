@@ -4,11 +4,13 @@
 from enum import Enum, auto
 from ordered_set import OrderedSet
 
+import numpy as np
+
 from nmmo.lib import utils
 from nmmo.lib.utils import staticproperty
 from nmmo.systems.item import Item, Stack
 from nmmo.lib.log import EventCode
-import numpy as np
+
 
 class NodeType(Enum):
   #Tree edges
