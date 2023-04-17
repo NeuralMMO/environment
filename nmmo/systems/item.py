@@ -5,8 +5,6 @@ import math
 from types import SimpleNamespace
 from typing import Dict
 
-from numpy import real
-
 from nmmo.lib.colors import Tier
 from nmmo.datastore.serialized import SerializedState
 from nmmo.lib.log import EventCode
