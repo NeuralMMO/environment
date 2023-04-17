@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Dict, List, Tuple, MutableMapping
 from dataclasses import dataclass
 from copy import deepcopy
+from abc import ABC, abstractmethod
 
 import numpy as np
 
@@ -50,35 +51,27 @@ class GameState:
     if data_type == 'entity':
       flt_idx = np.in1d(self.entity_data[:, EntityAttr['id']], subject)
       return self.entity_data[flt_idx]
-
     if data_type == 'item':
       flt_idx = np.in1d(self.item_data[:, ItemAttr['owner_id']], subject)
       return self.item_data[flt_idx]
-
     if data_type == 'event':
       flt_idx = np.in1d(self.event_data[:, EventAttr['ent_id']], subject)
       return self.event_data[flt_idx]
-
-    return None
+    raise ValueError("data_type must be in entity, item, event")
 
   def get_subject_view(self, subject: Group):
     return GroupView(self, subject)
 
-class ArrayView:
+# Wrapper around an iterable datastore
+class ArrayView(ABC):
   def __init__(self,
+               mapping,
                name: str,
                gs: GameState,
                subject: Group,
                arr: np.ndarray):
-    assert name in ['item','tile', 'event'] + list(vars(EventCode).keys()), f"Invalid name {name}"
+    self._mapping = mapping
     self._name = name
-    self._mapping = None
-    if name == 'item':
-      self._mapping = ItemAttr
-    elif name == 'tile':
-      self._mapping = TileAttr
-    else: # One of the event mappings
-      self._mapping = EventAttr
     self._gs = gs
     self._subject = subject
     self._arr = arr
@@ -86,23 +79,62 @@ class ArrayView:
   def __len__(self):
     return len(self._arr)
 
+  @abstractmethod
+  def get_attribute(self, attr) -> np.ndarray:
+    raise NotImplementedError
+
   def __getattr__(self, attr) -> np.ndarray:
     k = (self._subject, self._name+'_'+attr)
-    if not k in self._gs.cache_result:
-      if isinstance(self._arr, np.ndarray):
-        if self._name == 'event' and hasattr(EventCode, attr):
-          tmp = self._arr[np.in1d(self._arr[:, EventAttr['event']],
-                                  getattr(EventCode, attr))]
-          self._gs.cache_result[k] = ArrayView(attr,
-                                               self._gs,
-                                               self._subject,
-                                               tmp)
-        else:
-          self._gs.cache_result[k] = self._arr[:, self._mapping[attr]]
-      elif isinstance(self._arr, list):
-        self._gs.cache_result[k] = [o[:, self._mapping[attr]]for o in self._arr]
-    return self._gs.cache_result[k]
+    if k in self._gs.cache_result:
+      return self._gs.cache_result[k]
+    v = object.__getattribute__(self, 'get_attribute')(attr)
+    self._gs.cache_result[k] = v
+    return v
 
+class ItemView(ArrayView):
+  def __init__(self, gs: GameState, subject: Group, arr: np.ndarray):
+    super().__init__(ItemAttr, 'item', gs, subject, arr)
+    self._mapping = ItemAttr
+
+  def get_attribute(self, attr) -> np.ndarray:
+    return self._arr[:, self._mapping[attr]]
+
+class EntityView(ArrayView):
+  def __init__(self, gs: GameState, subject: Group, arr: np.ndarray):
+    super().__init__(EntityAttr, 'entity', gs, subject, arr)
+
+  def get_attribute(self, attr) -> np.ndarray:
+    return self._arr[:, self._mapping[attr]]
+
+class EventView(ArrayView):
+  def __init__(self, gs: GameState, subject: Group, arr: np.ndarray):
+    super().__init__(EventAttr, 'event', gs, subject, arr)
+
+  def get_attribute(self, attr) -> np.ndarray:
+    assert hasattr(EventCode, attr), 'Invalid event code'
+    arr = self._arr[np.in1d(self._arr[:, EventAttr['event']],
+                                          getattr(EventCode, attr))]
+    return EventCodeView(attr, self._gs, self._subject, arr)
+
+class TileView(ArrayView):
+  def __init__(self, gs: GameState, subject: Group, arr: np.ndarray):
+    super().__init__(TileAttr, 'tile', gs, subject, arr)
+
+  def get_attribute(self, attr) -> np.ndarray:
+    return [o[:, self._mapping[attr]]for o in self._arr]
+
+class EventCodeView(ArrayView):
+  def __init__(self,
+               name: str,
+               gs: GameState,
+               subject: Group,
+               arr: np.ndarray):
+    super().__init__(EventAttr, name, gs, subject, arr)
+
+  def get_attribute(self, attr) -> np.ndarray:
+    return self._arr[:, self._mapping[attr]]
+
+# Group
 class GroupObsView:
   def __init__(self, gs: GameState, subject: Group):
     self._gs = gs
@@ -110,8 +142,7 @@ class GroupObsView:
     valid_agents = filter(lambda eid: eid in gs.env_obs,subject.agents)
     self._obs = [gs.env_obs[ent_id] for ent_id in valid_agents]
     self._subject = subject
-
-    self.tile = ArrayView('tile', gs, subject, [o.tiles for o in self._obs])
+    self.tile = TileView(gs, subject, [o.tiles for o in self._obs])
 
   def __getattr__(self, attr):
     return [getattr(o, attr) for o in self._obs]
@@ -124,12 +155,13 @@ class GroupView:
     self._sbj_item = gs.where_in_id('item', subject.agents)
     self._sbj_event = gs.where_in_id('event', subject.agents)
 
-    self.item = ArrayView('item', gs, subject, self._sbj_item)
-    self.event = ArrayView('event', gs, subject, self._sbj_event)
+    self.entity = EntityView(gs, subject, self._sbj_ent)
+    self.item = ItemView(gs, subject, self._sbj_item)
+    self.event = EventView(gs, subject, self._sbj_event)
     self.obs = GroupObsView(gs, subject)
 
   def __getattribute__(self, attr):
-    if attr in ['_gs','_subject','_sbj_ent','_sbj_item', 'item', 'obs']:
+    if attr in ['_gs','_subject','_sbj_ent','_sbj_item','entity','item','event','obs']:
       return object.__getattribute__(self,attr)
 
     # Cached optimization
@@ -139,9 +171,8 @@ class GroupView:
 
     try:
       # Get property
-      v = None
       if attr in EntityAttr.keys():
-        v = self._sbj_ent[:, EntityAttr[attr]]
+        v = getattr(self.entity, attr)
       else:
         v = object.__getattribute__(self, attr)
       self._gs.cache_result[k] = v
@@ -149,11 +180,6 @@ class GroupView:
     except AttributeError:
       # View behavior
       return object.__getattribute__(self._gs,attr)
-
-
-  # TODO(mark)
-    # We can use this to lazily compute computationally intensive
-    # Properties such as grouping information etc
 
 class GameStateGenerator:
   def __init__(self, realm: Realm, config: Config):

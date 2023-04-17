@@ -28,7 +28,7 @@ class Env(ParallelEnv):
   variably sized agent populations, and long time horizons. Usage in conjunction
   with RLlib as demonstrated in the /projekt wrapper is highly recommended.'''
 
-  #pylint: disable=, no-value-for-parameter
+  #pylint: disable=no-value-for-parameter
   def __init__(self,
     config: Default = nmmo.config.Default(), seed=None):
     self._init_random(seed)
@@ -43,7 +43,7 @@ class Env(ParallelEnv):
     self._dead_agents = OrderedSet()
     self.scripted_agents = OrderedSet()
 
-    self.gs_gen: GameStateGenerator = None
+    self._gamestate_generator: GameStateGenerator = None
     # Default task: rewards 1 each turn agent is alive
     self.task: Task = None
     self._task_encoding = {}
@@ -187,7 +187,7 @@ class Env(ParallelEnv):
         self.scripted_agents.add(eid)
 
     self.obs = self._compute_observations()
-    self.gs_gen = GameStateGenerator(self.realm, self.config)
+    self._gamestate_generator = GameStateGenerator(self.realm, self.config)
 
     return {a: o.to_gym() for a,o in self.obs.items()}
 
@@ -431,7 +431,7 @@ class Env(ParallelEnv):
           entity identified by ent_id.
     '''
     infos = {}
-    game_state = self.gs_gen.generate(self.realm, self.obs)
+    game_state = self._gamestate_generator.generate(self.realm, self.obs)
 
     rewards = {eid: 0 for eid in agents}
     task_rewards, task_infos = self.task(game_state)
