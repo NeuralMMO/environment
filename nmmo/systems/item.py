@@ -5,6 +5,8 @@ import math
 from types import SimpleNamespace
 from typing import Dict
 
+from numpy import real
+
 from nmmo.lib.colors import Tier
 from nmmo.datastore.serialized import SerializedState
 from nmmo.lib.log import EventCode
@@ -35,7 +37,7 @@ ItemState = SerializedState.subclass("Item", [
 # TODO: These limits should be defined in the config.
 ItemState.Limits = lambda config: {
   "id": (0, math.inf),
-  "type_id": (0, config.ITEM_N + 1),
+  "type_id": (0, (config.ITEM_N + 1) if config.ITEM_SYSTEM_ENABLED else 0),
   "owner_id": (-math.inf, math.inf),
   "level": (0, 99),
   "capacity": (0, 99),
@@ -395,7 +397,9 @@ class Ration(Consumable):
   ITEM_TYPE_ID = 16
 
   def __init__(self, realm, level, **kwargs):
-    restore = realm.config.PROFESSION_CONSUMABLE_RESTORE(level)
+    restore = 0
+    if realm.config.PROFESSION_SYSTEM_ENABLED:
+      restore = realm.config.PROFESSION_CONSUMABLE_RESTORE(level)
     super().__init__(realm, level, resource_restore=restore, **kwargs)
 
   def _apply_effects(self, entity):
@@ -406,7 +410,9 @@ class Poultice(Consumable):
   ITEM_TYPE_ID = 17
 
   def __init__(self, realm, level, **kwargs):
-    restore = realm.config.PROFESSION_CONSUMABLE_RESTORE(level)
+    restore = 0
+    if realm.config.PROFESSION_SYSTEM_ENABLED:
+      restore = realm.config.PROFESSION_CONSUMABLE_RESTORE(level)
     super().__init__(realm, level, health_restore=restore, **kwargs)
 
   def _apply_effects(self, entity):
