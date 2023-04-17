@@ -6,6 +6,7 @@ class Material:
   tool = None
   table = None
   index = None
+  respawn = 0
 
   def __init__(self, config):
     pass

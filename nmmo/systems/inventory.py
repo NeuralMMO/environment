@@ -97,14 +97,13 @@ class Inventory:
     self.config      = config
 
     self.equipment   = Equipment()
+    self.capacity = 0
 
-    if not config.ITEM_SYSTEM_ENABLED:
-      return
+    if config.ITEM_SYSTEM_ENABLED:
+      self.capacity         = config.ITEM_INVENTORY_CAPACITY
 
-    self.capacity         = config.ITEM_INVENTORY_CAPACITY
-
-    self._item_stacks: Dict[Tuple, Item.Stack] = {}
-    self.items: OrderedSet[Item.Item] = OrderedSet([])
+      self._item_stacks: Dict[Tuple, Item.Stack] = {}
+      self.items: OrderedSet[Item.Item] = OrderedSet([])
 
   @property
   def space(self):

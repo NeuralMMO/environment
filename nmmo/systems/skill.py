@@ -88,6 +88,9 @@ class NonCombatSkill(Skill):
 
 class HarvestSkill(NonCombatSkill):
   def process_drops(self, matl, drop_table):
+    if not self.config.ITEM_SYSTEM_ENABLED:
+      return
+
     entity = self.entity
 
     level = 1
@@ -146,13 +149,15 @@ class HarvestSkill(NonCombatSkill):
 class AmmunitionSkill(HarvestSkill):
   def process_drops(self, matl, drop_table):
     super().process_drops(matl, drop_table)
-    self.add_xp(self.config.PROGRESSION_AMMUNITION_XP_SCALE)
+    if self.config.PROGRESSION_SYSTEM_ENABLED:
+      self.add_xp(self.config.PROGRESSION_AMMUNITION_XP_SCALE)
 
 
 class ConsumableSkill(HarvestSkill):
   def process_drops(self, matl, drop_table):
     super().process_drops(matl, drop_table)
-    self.add_xp(self.config.PROGRESSION_CONSUMABLE_XP_SCALE)
+    if self.config.PROGRESSION_SYSTEM_ENABLED:
+      self.add_xp(self.config.PROGRESSION_CONSUMABLE_XP_SCALE)
 
 
 ### Skill groups ###
@@ -207,11 +212,9 @@ class Combat(SkillGroup):
                 self.mage.level)
 
   def apply_damage(self, style):
-    if not self.config.PROGRESSION_SYSTEM_ENABLED:
-      return
-
-    skill  = self.__dict__[style]
-    skill.add_xp(self.config.PROGRESSION_COMBAT_XP_SCALE)
+    if self.config.PROGRESSION_SYSTEM_ENABLED:
+      skill  = self.__dict__[style]
+      skill.add_xp(self.config.PROGRESSION_COMBAT_XP_SCALE)
 
   def receive_damage(self, dmg):
     pass
