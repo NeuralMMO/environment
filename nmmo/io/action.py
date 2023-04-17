@@ -161,7 +161,7 @@ class Direction(Node):
 
   @staticproperty
   def edges():
-    return [North, South, East, West]
+    return [North, South, East, West, Stay]
 
   def args(stim, entity, config):
     return Direction.edges
@@ -194,6 +194,8 @@ class East(Node):
 class West(Node):
   delta = (0, -1)
 
+class Stay(Node):
+  delta = (0, 0)
 
 class Attack(Node):
   priority = 50
