@@ -9,7 +9,7 @@ import nmmo
 # pylint: disable=import-error, unused-argument
 from nmmo.core.env import Env as TaskEnv
 from nmmo.task import sampler
-from nmmo.task.task_api import Repeat, MultiTask
+from nmmo.task.task_api import Repeat
 from nmmo.task.predicate import Predicate
 from nmmo.task.predicate.core import predicate
 from nmmo.task.group import Group
@@ -125,13 +125,12 @@ class TestTaskAPI(unittest.TestCase):
     team_helper = TeamHelper(range(1, config.PLAYER_N+1), len(config.PLAYERS))
 
     fake_task = FakePredicate(team_helper.left_team(3), Item.Hat, 1, 0.1)
-    task_assignment = MultiTask(
-      (Repeat(assignee=Group([1]), predicate=Success(), reward=1),2),
-      Repeat(assignee=Group([1]), predicate=Failure(), reward=1),
-      Repeat(assignee=Group([1]), predicate=Success(), reward=-1),
-      Repeat(assignee=team_helper.own_team(2), predicate=Success(), reward=1),
-      Repeat(assignee=Group([3]), predicate=fake_task, reward=2)
-    )
+    task_assignment = \
+      [(Repeat(assignee=Group([1]), predicate=Success(), reward=1),2),
+        Repeat(assignee=Group([1]), predicate=Failure(), reward=1),
+        Repeat(assignee=Group([1]), predicate=Success(), reward=-1),
+        Repeat(assignee=team_helper.own_team(2), predicate=Success(), reward=1),
+        Repeat(assignee=Group([3]), predicate=fake_task, reward=2)]
     env.change_task(task_assignment)
     _, _, _, infos = env.step({})
     logging.info(infos)
@@ -160,7 +159,7 @@ class TestTaskAPI(unittest.TestCase):
     self.assertEqual(obs[1]['Task'].shape, 
                      env.observation_space(1)['Task'].shape)
     
-    task = Repeat(assignee=Group([1,2]),predicate=Success())
+    task = [Repeat(assignee=Group([1,2]),predicate=Success())]
     env.change_task(task,
                     task_encoding={1:np.array([1,2,3,4])},
                     embedding_size=4)

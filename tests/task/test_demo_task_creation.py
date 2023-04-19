@@ -10,7 +10,7 @@ from nmmo.task.predicate.base_predicate import AllDead, StayAlive
 from nmmo.task.game_state import GameState
 from nmmo.task.group import Group
 from nmmo.task.utils import TeamHelper
-from nmmo.task.task_api import PredicateTask, MultiTask, Repeat
+from nmmo.task.task_api import PredicateTask, Repeat
 
 class TestDemoTask(unittest.TestCase):
   def test_example_user_task_definition(self):
@@ -50,10 +50,7 @@ class TestDemoTask(unittest.TestCase):
     stay_alive_tasks = [Repeat(agent, StayAlive(agent)) for agent in all_agents]
     custom_task_2 = CompletionChangeTask(team_A, predicate=custom_predicate)
 
-    task = MultiTask(
-       (custom_task_2, 5),
-       *stay_alive_tasks
-    )
+    task = [(custom_task_2, 5)] + stay_alive_tasks
 
     # Test rollout
     env.change_task(task)

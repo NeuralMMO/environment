@@ -15,7 +15,7 @@ from nmmo.lib.log import EventCode
 
 # pylint: disable=import-error
 from nmmo.core.env import Env as TaskEnv
-from nmmo.task.task_api import Repeat, MultiTask
+from nmmo.task.task_api import Repeat
 from nmmo.task.predicate import Predicate
 from nmmo.task.group import Group
 import nmmo.task.predicate.base_predicate as bp
@@ -39,9 +39,7 @@ class TestBasePredicate(unittest.TestCase):
     config.PLAYER_N = NUM_AGENT
     config.IMMORTAL = True
 
-    tasks = MultiTask(
-      *(Repeat(team, tsk, REWARD) for tsk, team in test_tasks)
-    )
+    tasks = [Repeat(team, tsk, REWARD) for tsk, team in test_tasks]
 
     env = TaskEnv(config)
     env.change_task(tasks)

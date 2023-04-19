@@ -1,6 +1,6 @@
 import functools
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union, Tuple
 from ordered_set import OrderedSet
 
 import gym
@@ -15,9 +15,7 @@ from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
 from nmmo.core import realm
 from nmmo.task.game_state import GameStateGenerator
-from nmmo.task.task_api import Task, MultiTask, Repeat
-from nmmo.task.predicate.base_predicate import StayAlive
-from nmmo.task.group import Group
+from nmmo.task.task_api import Task, default_task
 from scripted.baselines import Scripted
 
 class Env(ParallelEnv):
@@ -44,13 +42,10 @@ class Env(ParallelEnv):
 
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
     # Default task: rewards 1 each turn agent is alive
-    self.task: Task = None
+    self.tasks: List[Tuple[Task,float]] = None
     self._task_encoding = {}
     self._task_embedding_size = 1
-    t = MultiTask(
-      *(Repeat(Group([agent]),
-               StayAlive(Group([agent])),
-               1) for agent in self.possible_agents))
+    t = default_task(self.possible_agents)
     self.change_task(t,
                      embedding_size=self._task_embedding_size,
                      task_encoding=self._task_encoding,
@@ -133,7 +128,7 @@ class Env(ParallelEnv):
   # Core API
 
   def change_task(self,
-                  new_task: Task,
+                  new_tasks: List[Union[Tuple[Task, float], Task]],
                   task_encoding: Optional[Dict[int, np.ndarray]] = None,
                   embedding_size: int=16,
                   reset: bool=True,
@@ -148,7 +143,7 @@ class Env(ParallelEnv):
       embedding_size: The size of each embedding
       reset: Resets the environment
     """
-    self.task = new_task
+    self.tasks = [t if isinstance(t, Tuple) else (t,1) for t in new_tasks]
     self._task_encoding = task_encoding
     if task_encoding is None:
       self._task_encoding = {}
@@ -430,21 +425,29 @@ class Env(ParallelEnv):
           The reward for the actions on the previous timestep of the
           entity identified by ent_id.
     '''
-    infos = {}
+
+    # Initialization
     game_state = self._gamestate_generator.generate(self.realm, self.obs)
-
-    rewards = {eid: 0 for eid in agents}
-    task_rewards, task_infos = self.task(game_state)
-    for eid, reward in task_rewards.items():
-      rewards[eid] = reward
-    for eid in dones:
-      rewards[eid] = 0
-
+    infos = {}
     for eid in agents:
       infos[eid] = {}
       infos[eid]['task'] = {}
-      if eid in task_infos:
-        infos[eid]['task'] = task_infos[eid]
+    rewards = {eid: 0 for eid in agents}
+
+    # Compute Rewards and infos
+    for task, weight in self.tasks:
+      task_rewards, task_infos = task(game_state)
+      for eid, reward in task_rewards.items():
+        # Rewards, weighted
+        rewards[eid] = rewards.get(eid,0) + reward * weight
+        # Infos
+        for eid, info in task_infos.items():
+          if eid in infos:
+            infos[eid]['task'] = {**infos[eid]['task'], **info}
+
+    # Remove rewards for dead agents (?)
+    for eid in dones:
+      rewards[eid] = 0
 
     return rewards, infos
 

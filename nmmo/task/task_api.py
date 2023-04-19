@@ -1,9 +1,9 @@
 from __future__ import annotations
-from typing import Dict, Union, Tuple
-from functools import reduce
+from typing import Dict, List, Tuple
 from abc import ABC, abstractmethod
 
 from nmmo.task.predicate import Predicate
+from nmmo.task.predicate.base_predicate import StayAlive
 from nmmo.task.group import Group
 from nmmo.task.game_state import GameState
 
@@ -43,12 +43,15 @@ class Once(PredicateTask):
   def __init__(self,
                assignee: Group,
                predicate: Predicate,
-               reward = 1):
+               reward: float = 1):
     super().__init__(assignee, predicate)
     self._reward = reward
     self._completed = False
 
   def _rewards(self, gs: GameState):
+    '''Each agent in assignee is rewarded self._reward the 
+    first time self._predicate evaluates to true.
+    '''
     rewards = {int(ent_id): 0 for ent_id in self._assignee}
     infos = {int(ent_id): {self._predicate.name: self.evaluate(gs)}
              for ent_id in self._assignee}
@@ -66,6 +69,9 @@ class Repeat(PredicateTask):
     self._reward = reward
 
   def _rewards(self, gs: GameState):
+    '''Each agent in assignee is rewarded self._reward the 
+    whenever self._predicate evaluates to true.
+    '''
     rewards = {int(ent_id): 0 for ent_id in self._assignee}
     infos = {int(ent_id): {self._predicate.name: self.evaluate(gs)}
              for ent_id in self._assignee}
@@ -73,24 +79,9 @@ class Repeat(PredicateTask):
       rewards = {int(ent_id): self._reward for ent_id in self._assignee}
     return rewards, infos
 
-class MultiTask(Task):
-  def __init__(self,
-               *tasks: Union[Tuple[Task, float], Task]):
-    assert len(tasks) > 0
-    self._tasks = [t if isinstance(t, Tuple) else (t,1) for t in tasks]
-    super().__init__(reduce(lambda a,b: a.union(b),
-                            [task[0].assignee for task in self._tasks]))
-
-  def _rewards(self, gs: GameState) -> Dict[int, float]:
-    rewards = {}
-    infos = {}
-    for task, weight in self._tasks:
-      task_reward, task_infos = task(gs)
-      for ent_id, reward in task_reward.items():
-        rewards[ent_id] = rewards.get(ent_id,0) + reward * weight
-      for ent_id, info in task_infos.items():
-        if not ent_id in infos:
-          infos[ent_id] = {}
-        infos[ent_id] = {**infos[ent_id], **info}
-
-    return rewards, infos
+#pylint: disable=no-value-for-parameter
+def default_task(agents) -> List[Tuple[Task, float]]:
+  '''Generates the default reward on env.init
+  '''
+  return [Repeat(Group([agent]), StayAlive(Group([agent])),1)
+          for agent in agents]
