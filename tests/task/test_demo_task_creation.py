@@ -48,7 +48,7 @@ class TestDemoTask(unittest.TestCase):
     custom_predicate = CustomPredicate(subject=team_A, target=team_B)
 
     stay_alive_tasks = [Repeat(agent, StayAlive(agent)) for agent in all_agents]
-    custom_task_2 = CompletionChangeTask(tpyeam_A, predicate=custom_predicate)
+    custom_task_2 = CompletionChangeTask(team_A, predicate=custom_predicate)
 
     task = MultiTask(
        (custom_task_2, 5),

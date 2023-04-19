@@ -20,7 +20,6 @@ from nmmo.task.predicate.base_predicate import StayAlive
 from nmmo.task.group import Group
 from scripted.baselines import Scripted
 
-
 class Env(ParallelEnv):
   '''Environment wrapper for Neural MMO using the Parallel PettingZoo API
 
@@ -43,7 +42,7 @@ class Env(ParallelEnv):
     self._dead_agents = OrderedSet()
     self.scripted_agents = OrderedSet()
 
-    self._gamestate_generator: GameStateGenerator = None
+    self._gamestate_generator = GameStateGenerator(self.realm, self.config)
     # Default task: rewards 1 each turn agent is alive
     self.task: Task = None
     self._task_encoding = {}
@@ -54,7 +53,8 @@ class Env(ParallelEnv):
                1) for agent in self.possible_agents))
     self.change_task(t,
                      embedding_size=self._task_embedding_size,
-                     task_encoding=self._task_encoding)
+                     task_encoding=self._task_encoding,
+                     reset=False)
 
   # pylint: disable=method-cache-max-size-none
   @functools.lru_cache(maxsize=None)
@@ -136,7 +136,10 @@ class Env(ParallelEnv):
                   new_task: Task,
                   task_encoding: Optional[Dict[int, np.ndarray]] = None,
                   embedding_size: int=16,
-                  reset: bool=True):
+                  reset: bool=True,
+                  map_id=None,
+                  seed=None,
+                  options=None):
     """ Changes the task given to each agent
 
     Args:
@@ -151,7 +154,7 @@ class Env(ParallelEnv):
       self._task_encoding = {}
     self._task_embedding_size = embedding_size
     if reset:
-      self.reset()
+      self.reset(map_id=map_id, seed=seed, options=options)
 
   # TODO: This doesn't conform to the PettingZoo API
   # pylint: disable=arguments-renamed
@@ -284,7 +287,6 @@ class Env(ParallelEnv):
           Provided for conformity with PettingZoo
     '''
     assert self.obs is not None, 'step() called before reset'
-
     # Add in scripted agents' actions, if any
     if self.scripted_agents:
       actions = self._compute_scripted_agent_actions(actions)
@@ -292,10 +294,8 @@ class Env(ParallelEnv):
     # Drop invalid actions of BOTH neural and scripted agents
     #   we don't need _deserialize_scripted_actions() anymore
     actions = self._validate_actions(actions)
-
     # Execute actions
     self.realm.step(actions)
-
     dones = {}
     for eid in self.possible_agents:
       if eid not in self.realm.players and eid not in self._dead_agents:

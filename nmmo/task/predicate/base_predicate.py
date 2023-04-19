@@ -11,6 +11,12 @@ from nmmo.lib.material import Material
 from nmmo.lib import utils
 
 @predicate
+def Success(gs: GameState):
+  ''' Returns True. For debugging.
+  '''
+  return True
+
+@predicate
 def TickGE(gs: GameState,
            num_tick: int):
   """True if the current tick is greater than or equal to the specified num_tick.

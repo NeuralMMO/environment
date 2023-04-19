@@ -5,8 +5,6 @@ from enum import Enum, auto
 from ordered_set import OrderedSet
 import numpy as np
 
-import numpy as np
-
 from nmmo.lib import utils
 from nmmo.lib.utils import staticproperty
 from nmmo.systems.item import Item, Stack
@@ -163,7 +161,7 @@ class Direction(Node):
 
   @staticproperty
   def edges():
-    return [North, South, East, West, Stay]
+    return [North, South, East, West]
 
   def args(stim, entity, config):
     return Direction.edges
@@ -196,8 +194,6 @@ class East(Node):
 class West(Node):
   delta = (0, -1)
 
-class Stay(Node):
-  delta = (0, 0)
 
 class Attack(Node):
   priority = 50
