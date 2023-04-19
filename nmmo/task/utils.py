@@ -44,9 +44,12 @@ class TeamHelper:
     pop_id = (self._ent_to_team[ent_id] + 1) % len(self._team_to_ent)
     return Group(self._team_to_ent[pop_id], f"Team.{pop_id}")
 
-  def all(self) -> Group:
+  def all_agents(self) -> Group:
     return Group(list(self._ent_to_team.keys()), "All")
-  
+
+  def all_teams(self) -> List[Group]:
+    return list((Group(v,str(k)) for k,v in self._team_to_ent.items()))
+
   @staticmethod
   def generate_from_config(config):
     return TeamHelper(list(range(1, config.PLAYER_N+1)), len(config.PLAYERS))

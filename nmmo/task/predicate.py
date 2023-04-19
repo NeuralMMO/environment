@@ -14,12 +14,11 @@ class Predicate(ABC):
       self._name = Predicate._make_name(self.__class__.__name__, args, kwargs)
     else:
       self._name = Predicate._make_name(name, args, kwargs)
-
     def is_group(x):
       return isinstance(x, Group)
 
     self._groups: List[Group] = list(filter(is_group, args))
-    self._groups = self._groups + list(filter(is_group, kwargs.items()))
+    self._groups = self._groups + list(filter(is_group, kwargs.values()))
 
   def __call__(self, gs: GameState) -> float:
     for group in self._groups:

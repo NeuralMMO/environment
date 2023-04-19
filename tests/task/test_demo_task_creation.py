@@ -41,7 +41,7 @@ class TestDemoTask(unittest.TestCase):
           return rewards, infos
 
     # Creation of the actual tasks
-    all_agents = team_helper.all()
+    all_agents = team_helper.all_agents()
     team_A = team_helper.own_team(1)
     team_B = team_helper.left_team(1)
     custom_predicate = CustomPredicate(subject=team_A, target=team_B)

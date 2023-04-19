@@ -72,3 +72,21 @@ class Group(Sequence, Set):
 
   def __getattr__(self, attr):
     return self._sd.__getattribute__(attr)
+
+def union(*groups: Group) -> Group:
+  """ Performs a big union over groups
+  """
+  agents = []
+  for group in groups:
+    for agent in group.agents:
+      agents.append(agent)
+  return Group(agents)
+
+def complement(group: Group, universe: Group) -> Group:
+  """ Returns the complement of group in universe
+  """
+  agents = []
+  for agent in universe.agents:
+    if not agent in group:
+      agents.append(agent)
+  return Group(agents)
