@@ -329,16 +329,25 @@ class ScriptedTestTemplate(unittest.TestCase):
         self.assertFalse(self._check_ent_mask(ent_obs, atn, ent_id))
 
         # check if the target is masked as expected
-        self.assertEqual( cond['ent_mask'],
-          self._check_ent_mask(ent_obs, atn, cond['tgt_id']) )
+        self.assertEqual(
+          cond['ent_mask'],
+          self._check_ent_mask(ent_obs, atn, cond['tgt_id']),
+          "ent_id: {}, atn: {}, tgt_id: {}".format(ent_id, atn, cond['tgt_id'])
+        )
 
       if atn in [action.Give]:
-        self.assertEqual( cond['inv_mask'],
-          self._check_inv_mask(ent_obs, atn, cond['item_sig']) )
+        self.assertEqual(
+          cond['inv_mask'],
+          self._check_inv_mask(ent_obs, atn, cond['item_sig']),
+          "ent_id: {}, atn: {}, item_sig: {}".format(ent_id, atn, cond['item_sig'])
+        )
 
       if atn in [action.Buy]:
-        self.assertEqual( cond['mkt_mask'],
-          self._check_mkt_mask(ent_obs, cond['item_id']) )
+        self.assertEqual(
+          cond['mkt_mask'],
+          self._check_mkt_mask(ent_obs, cond['item_id']),
+          "ent_id: {}, atn: {}, item_id: {}".format(ent_id, atn, cond['item_id'])
+        )
 
       # append the actions
       if atn == action.Give:

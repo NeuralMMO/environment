@@ -146,7 +146,4 @@ class SimpleLogHelper(LogHelper):
       for achievement in player.diary.achievements:
         stats["Achievement_{achievement.name}"] = float(achievement.completed)
 
-    # Used for SR
-    stats['PolicyID'] = player.population
-
     return stats

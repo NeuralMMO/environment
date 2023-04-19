@@ -133,9 +133,8 @@ class Counts(Overlay):
       '''Computes a count-based exploration map by painting
       tiles as agents walk over them'''
       for ent_id, agent in self.realm.realm.players.items():
-         pop  = agent.population_id.val
          r, c = agent.pos
-         self.values[r, c][pop] += 1
+         self.values[r, c][ent_id] += 1
 
    def register(self, obs):
       colors    = self.realm.realm.players.palette.colors

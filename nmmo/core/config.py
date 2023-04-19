@@ -388,9 +388,6 @@ class Combat:
   COMBAT_SYSTEM_ENABLED              = True
   '''Game system flag'''
 
-  COMBAT_FRIENDLY_FIRE               = True
-  '''Whether agents with the same population index can hit each other'''
-
   COMBAT_SPAWN_IMMUNITY              = 20
   '''Agents older than this many ticks cannot attack agents younger than this many ticks'''
 
@@ -518,8 +515,8 @@ class Item:
   ITEM_INVENTORY_CAPACITY             = 12
   '''Number of inventory spaces'''
 
-  ITEM_GIVE_TO_FRIENDLY               = True
-  '''Whether agents with the same population index can give gold/item to each other'''
+  ITEM_ALLOW_GIFT               = True
+  '''Whether agents can give gold/item to each other'''
 
   @property
   def INVENTORY_N_OBS(self):
