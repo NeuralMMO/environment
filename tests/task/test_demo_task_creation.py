@@ -4,9 +4,8 @@ from tests.testhelpers import ScriptedAgentTestConfig
 from scripted.baselines import Sleeper
 
 from nmmo.core.env import Env as TaskEnv
-from nmmo.task.predicate.core import predicate
-from nmmo.task.predicate.gold_predicate import HoardGold
-from nmmo.task.predicate.base_predicate import AllDead, StayAlive
+from nmmo.task.predicate import predicate
+from nmmo.task.base_predicates import HoardGold, AllDead, StayAlive
 from nmmo.task.game_state import GameState
 from nmmo.task.group import Group
 from nmmo.task.utils import TeamHelper

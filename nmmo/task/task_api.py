@@ -3,7 +3,7 @@ from typing import Dict, List, Tuple
 from abc import ABC, abstractmethod
 
 from nmmo.task.predicate import Predicate
-from nmmo.task.predicate.base_predicate import StayAlive
+from nmmo.task.base_predicates import StayAlive
 from nmmo.task.group import Group
 from nmmo.task.game_state import GameState
 

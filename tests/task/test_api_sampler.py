@@ -10,8 +10,7 @@ import nmmo
 from nmmo.core.env import Env as TaskEnv
 from nmmo.task import sampler
 from nmmo.task.task_api import Repeat
-from nmmo.task.predicate import Predicate
-from nmmo.task.predicate.core import predicate
+from nmmo.task.predicate import Predicate, predicate
 from nmmo.task.group import Group
 from nmmo.task.utils import TeamHelper
 from nmmo.task.game_state import GameState

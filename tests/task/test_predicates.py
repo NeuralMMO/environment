@@ -18,9 +18,7 @@ from nmmo.core.env import Env as TaskEnv
 from nmmo.task.task_api import Repeat
 from nmmo.task.predicate import Predicate
 from nmmo.task.group import Group
-import nmmo.task.predicate.base_predicate as bp
-import nmmo.task.predicate.item_predicate as ip
-import nmmo.task.predicate.gold_predicate as gp
+import nmmo.task.base_predicates as bp
 
 # use the constant reward of 1 for testing predicates
 REWARD = 1
@@ -371,13 +369,13 @@ class TestBasePredicate(unittest.TestCase):
     # also test NOT InventorySpaceGE
     target_space = 3
     test_tasks = [ # (Predicate, Team), the reward is 1 by default
-      (ip.InventorySpaceGE(Group([1]), target_space), ALL_AGENT), # True -> False
-      (ip.InventorySpaceGE(Group([2,3]), target_space), ALL_AGENT), # True
-      (ip.InventorySpaceGE(Group([1,2,3]), target_space), ALL_AGENT), # True -> False
-      (ip.InventorySpaceGE(Group([1,2,3,4]), target_space+1), ALL_AGENT), # False
-      (~ip.InventorySpaceGE(Group([1]), target_space+1), ALL_AGENT), # True
-      (~ip.InventorySpaceGE(Group([1,2,3]), target_space), ALL_AGENT), # False -> True
-      (~ip.InventorySpaceGE(Group([1,2,3,4]), target_space+1), ALL_AGENT)] # True
+      (bp.InventorySpaceGE(Group([1]), target_space), ALL_AGENT), # True -> False
+      (bp.InventorySpaceGE(Group([2,3]), target_space), ALL_AGENT), # True
+      (bp.InventorySpaceGE(Group([1,2,3]), target_space), ALL_AGENT), # True -> False
+      (bp.InventorySpaceGE(Group([1,2,3,4]), target_space+1), ALL_AGENT), # False
+      (~bp.InventorySpaceGE(Group([1]), target_space+1), ALL_AGENT), # True
+      (~bp.InventorySpaceGE(Group([1,2,3]), target_space), ALL_AGENT), # False -> True
+      (~bp.InventorySpaceGE(Group([1,2,3,4]), target_space+1), ALL_AGENT)] # True
 
     env = self._get_taskenv(test_tasks)
 
@@ -410,14 +408,14 @@ class TestBasePredicate(unittest.TestCase):
     goal_level = 2
     goal_quantity = 3
     test_tasks = [ # (Predicate, Team), the reward is 1 by default
-      (ip.OwnItem(Group([1]), Item.Ration, goal_level, goal_quantity), ALL_AGENT), # False
-      (ip.OwnItem(Group([2]), Item.Ration, goal_level, goal_quantity), ALL_AGENT), # False
-      (ip.OwnItem(Group([1,2]), Item.Ration, goal_level, goal_quantity), ALL_AGENT), # True
-      (ip.OwnItem(Group([3]), Item.Ration, goal_level, goal_quantity), ALL_AGENT), # True
-      (ip.OwnItem(Group([4,5,6]), Item.Ration, goal_level, goal_quantity), ALL_AGENT), # False
-      (ip.EquipItem(Group([4]), Item.Scrap, goal_level, 1), ALL_AGENT), # False
-      (ip.EquipItem(Group([4,5]), Item.Scrap, goal_level, 1), ALL_AGENT), # True
-      (ip.EquipItem(Group([4,5,6]), Item.Scrap, goal_level, 2), ALL_AGENT)] # True
+      (bp.OwnItem(Group([1]), Item.Ration, goal_level, goal_quantity), ALL_AGENT), # False
+      (bp.OwnItem(Group([2]), Item.Ration, goal_level, goal_quantity), ALL_AGENT), # False
+      (bp.OwnItem(Group([1,2]), Item.Ration, goal_level, goal_quantity), ALL_AGENT), # True
+      (bp.OwnItem(Group([3]), Item.Ration, goal_level, goal_quantity), ALL_AGENT), # True
+      (bp.OwnItem(Group([4,5,6]), Item.Ration, goal_level, goal_quantity), ALL_AGENT), # False
+      (bp.EquipItem(Group([4]), Item.Scrap, goal_level, 1), ALL_AGENT), # False
+      (bp.EquipItem(Group([4,5]), Item.Scrap, goal_level, 1), ALL_AGENT), # True
+      (bp.EquipItem(Group([4,5,6]), Item.Scrap, goal_level, 2), ALL_AGENT)] # True
 
     env = self._get_taskenv(test_tasks)
 
@@ -459,12 +457,12 @@ class TestBasePredicate(unittest.TestCase):
   def test_fully_armed(self):
     goal_level = 5
     test_tasks = [ # (Predicate, Team), the reward is 1 by default
-      (ip.FullyArmed(Group([1,2,3]), Skill.Range, goal_level, 1), ALL_AGENT), # False
-      (ip.FullyArmed(Group([3,4]), Skill.Range, goal_level, 1), ALL_AGENT), # True
-      (ip.FullyArmed(Group([4]), Skill.Melee, goal_level, 1), ALL_AGENT), # False
-      (ip.FullyArmed(Group([4,5,6]), Skill.Range, goal_level, 3), ALL_AGENT), # True
-      (ip.FullyArmed(Group([4,5,6]), Skill.Range, goal_level+3, 1), ALL_AGENT), # False
-      (ip.FullyArmed(Group([4,5,6]), Skill.Range, goal_level, 4), ALL_AGENT)] # False
+      (bp.FullyArmed(Group([1,2,3]), Skill.Range, goal_level, 1), ALL_AGENT), # False
+      (bp.FullyArmed(Group([3,4]), Skill.Range, goal_level, 1), ALL_AGENT), # True
+      (bp.FullyArmed(Group([4]), Skill.Melee, goal_level, 1), ALL_AGENT), # False
+      (bp.FullyArmed(Group([4,5,6]), Skill.Range, goal_level, 3), ALL_AGENT), # True
+      (bp.FullyArmed(Group([4,5,6]), Skill.Range, goal_level+3, 1), ALL_AGENT), # False
+      (bp.FullyArmed(Group([4,5,6]), Skill.Range, goal_level, 4), ALL_AGENT)] # False
 
     env = self._get_taskenv(test_tasks)
 
@@ -491,10 +489,10 @@ class TestBasePredicate(unittest.TestCase):
     agent_gold_goal = 10
     team_gold_goal = 30
     test_tasks = [ # (Predicate, Team), the reward is 1 by default
-      (gp.HoardGold(Group([1]), agent_gold_goal), ALL_AGENT), # True
-      (gp.HoardGold(Group([4,5,6]), agent_gold_goal), ALL_AGENT), # False
-      (gp.HoardGold(Group([1,3,5]), team_gold_goal), ALL_AGENT), # True
-      (gp.HoardGold(Group([2,4,6]), team_gold_goal), ALL_AGENT)] # False
+      (bp.HoardGold(Group([1]), agent_gold_goal), ALL_AGENT), # True
+      (bp.HoardGold(Group([4,5,6]), agent_gold_goal), ALL_AGENT), # False
+      (bp.HoardGold(Group([1,3,5]), team_gold_goal), ALL_AGENT), # True
+      (bp.HoardGold(Group([2,4,6]), team_gold_goal), ALL_AGENT)] # False
 
     env = self._get_taskenv(test_tasks)
 
@@ -516,12 +514,12 @@ class TestBasePredicate(unittest.TestCase):
   def test_exchange_gold_predicates(self): # Earn Gold, Spend Gold, Make Profit
     gold_goal = 10
     test_tasks = [
-      (gp.EarnGold(Group([1,2]), gold_goal), ALL_AGENT), # True
-      (gp.EarnGold(Group([2,4]), gold_goal), ALL_AGENT), # False
-      (gp.SpendGold(Group([1]), 5), ALL_AGENT), # False -> True
-      (gp.SpendGold(Group([1]), 6), ALL_AGENT), # False,
-      (gp.MakeProfit(Group([1,2]), 5), ALL_AGENT), # True,
-      (gp.MakeProfit(Group([1]), 5), ALL_AGENT) # True -> False
+      (bp.EarnGold(Group([1,2]), gold_goal), ALL_AGENT), # True
+      (bp.EarnGold(Group([2,4]), gold_goal), ALL_AGENT), # False
+      (bp.SpendGold(Group([1]), 5), ALL_AGENT), # False -> True
+      (bp.SpendGold(Group([1]), 6), ALL_AGENT), # False,
+      (bp.MakeProfit(Group([1,2]), 5), ALL_AGENT), # True,
+      (bp.MakeProfit(Group([1]), 5), ALL_AGENT) # True -> False
     ]
 
     env = self._get_taskenv(test_tasks)
@@ -615,10 +613,10 @@ class TestBasePredicate(unittest.TestCase):
     # DONE
   
   def test_item_event_predicates(self): # Consume, Harvest, List, Buy
-    for predicate, event_type in [(ip.ConsumeItem, 'CONSUME_ITEM'),
-                                  (ip.HarvestItem, 'HARVEST_ITEM'),
-                                  (ip.ListItem, 'LIST_ITEM'),
-                                  (ip.BuyItem, 'BUY_ITEM')]:
+    for predicate, event_type in [(bp.ConsumeItem, 'CONSUME_ITEM'),
+                                  (bp.HarvestItem, 'HARVEST_ITEM'),
+                                  (bp.ListItem, 'LIST_ITEM'),
+                                  (bp.BuyItem, 'BUY_ITEM')]:
       id_ = getattr(EventCode, event_type)
       lvl = random.randint(5,10)
       quantity = random.randint(5,10)
