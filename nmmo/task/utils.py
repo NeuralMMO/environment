@@ -46,3 +46,7 @@ class TeamHelper:
 
   def all(self) -> Group:
     return Group(list(self._ent_to_team.keys()), "All")
+  
+  @staticmethod
+  def generate_from_config(config):
+    return TeamHelper(list(range(1, config.PLAYER_N+1)), len(config.PLAYERS))

@@ -85,7 +85,7 @@ class TestTaskAPI(unittest.TestCase):
     env = nmmo.Env(config)
     env.reset()
 
-    team_helper = TeamHelper(list(range(1, config.PLAYER_N+1)), len(config.PLAYERS))
+    team_helper = TeamHelper.generate_from_config(config)
 
     # agents' population should match team_helper team id
     for ent_id, ent in env.realm.players.items():

@@ -16,7 +16,7 @@ class TestDemoTask(unittest.TestCase):
     config = ScriptedAgentTestConfig()
     config.PLAYERS = [Sleeper]
     env = TaskEnv(config)
-    team_helper = TeamHelper(list(range(1, config.PLAYER_N+1)), len(config.PLAYERS))
+    team_helper = TeamHelper.generate_from_config(config)
 
     # Define Predicate Utilities
     @predicate
