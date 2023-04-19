@@ -283,7 +283,7 @@ class Observation:
     entities_pos = self.entities.values[:, [EntityState.State.attr_name_to_col["row"],
                                             EntityState.State.attr_name_to_col["col"]]]
     same_tile = utils.linf(entities_pos, (agent.row, agent.col)) == 0
-    not_me = (self.entities.ids != self.agent_id)
+    not_me = self.entities.ids != self.agent_id
     player = (self.entities.values[:,EntityState.State.attr_name_to_col["npc_type"]] == 0)
 
     return np.concatenate([
