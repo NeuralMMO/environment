@@ -15,13 +15,11 @@ class TestEntity(unittest.TestCase):
   def test_entity(self):
     realm = MockRealm()
     entity_id = 123
-    population_id = 11
-    entity = Entity(realm, (10,20), entity_id, "name", "color", population_id)
+    entity = Entity(realm, (10,20), entity_id, "name")
 
     self.assertEqual(entity.id.val, entity_id)
     self.assertEqual(entity.row.val, 10)
     self.assertEqual(entity.col.val, 20)
-    self.assertEqual(entity.population_id.val, population_id)
     self.assertEqual(entity.damage.val, 0)
     self.assertEqual(entity.time_alive.val, 0)
     self.assertEqual(entity.freeze.val, 0)
@@ -44,8 +42,7 @@ class TestEntity(unittest.TestCase):
   def test_query_by_ids(self):
     realm = MockRealm()
     entity_id = 123
-    population_id = 11
-    entity = Entity(realm, (10,20), entity_id, "name", "color", population_id)
+    entity = Entity(realm, (10,20), entity_id, "name")
 
     entities = EntityState.Query.by_ids(realm.datastore, [entity_id])
     self.assertEqual(len(entities), 1)

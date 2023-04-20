@@ -4,8 +4,6 @@ class SequentialLoader:
   '''config.PLAYER_LOADER that spreads out agent populations'''
   def __init__(self, config):
     items = config.PLAYERS
-    for idx, itm in enumerate(items):
-      itm.policyID = idx
 
     self.items = items
     self.idx   = -1
@@ -15,28 +13,7 @@ class SequentialLoader:
 
   def __next__(self):
     self.idx = (self.idx + 1) % len(self.items)
-    return self.idx, self.items[self.idx]
-
-class TeamLoader:
-  '''config.PLAYER_LOADER that loads agent populations adjacent'''
-  def __init__(self, config):
-    items = config.PLAYERS
-    self.team_size = config.PLAYER_N // len(items)
-
-    for idx, itm in enumerate(items):
-      itm.policyID = idx
-
-    self.items = items
-    self.idx   = -1
-
-  def __iter__(self):
-    return self
-
-  def __next__(self):
-    self.idx += 1
-    team_idx  = self.idx // self.team_size
-    return team_idx, self.items[team_idx]
-
+    return self.items[self.idx]
 
 def spawn_continuous(config):
   '''Generates spawn positions for new agents

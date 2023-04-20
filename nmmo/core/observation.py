@@ -209,15 +209,11 @@ class Observation:
     else:
       spawn_immunity = np.ones(self.entities.len, dtype=np.int8)
 
-    if not self.config.COMBAT_FRIENDLY_FIRE:
-      population = self.entities.values[:,EntityState.State.attr_name_to_col["population_id"]]
-      no_friendly_fire = population != agent.population_id # this automatically masks self
-    else:
-      # allow friendly fire but no self shooting
-      no_friendly_fire = np.ones(self.entities.len, dtype=np.int8)
-      no_friendly_fire[self.entities.index(agent.id)] = 0 # mask self
+    # allow friendly fire but no self shooting
+    not_me = np.ones(self.entities.len, dtype=np.int8)
+    not_me[self.entities.index(agent.id)] = 0 # mask self
 
-    return np.concatenate([within_range & no_friendly_fire & spawn_immunity,
+    return np.concatenate([within_range & not_me & spawn_immunity,
       np.zeros(self.config.PLAYER_N_OBS - self.entities.len, dtype=np.int8)])
 
   def _make_use_mask(self):
@@ -287,10 +283,11 @@ class Observation:
     entities_pos = self.entities.values[:, [EntityState.State.attr_name_to_col["row"],
                                             EntityState.State.attr_name_to_col["col"]]]
     same_tile = utils.linf(entities_pos, (agent.row, agent.col)) == 0
-    same_team_not_me = (self.entities.ids != agent.id) & (agent.population_id == \
-                self.entities.values[:, EntityState.State.attr_name_to_col["population_id"]])
+    not_me = self.entities.ids != self.agent_id
+    player = (self.entities.values[:,EntityState.State.attr_name_to_col["npc_type"]] == 0)
 
-    return np.concatenate([same_tile & same_team_not_me,
+    return np.concatenate([
+      (same_tile & player & not_me),
       np.zeros(self.config.PLAYER_N_OBS - self.entities.len, dtype=np.int8)])
 
   def _make_give_gold_mask(self):
