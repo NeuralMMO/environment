@@ -332,4 +332,3 @@ class Entity(EntityState):
     mage = self.skills.mage.level.val
 
     return int(max(melee, ranged, mage))
-

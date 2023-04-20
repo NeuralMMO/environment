@@ -136,7 +136,7 @@ class PlayerManager(EntityGroup):
     self.spawned = OrderedSet()
 
   def spawn_individual(self, r, c, idx):
-    pop, agent = next(self.agents)
+    agent = next(self.agents)
     agent      = agent(self.config, idx)
     player     = Player(self.realm, (r, c), agent)
     super().spawn(player)

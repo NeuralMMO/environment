@@ -332,21 +332,21 @@ class ScriptedTestTemplate(unittest.TestCase):
         self.assertEqual(
           cond['ent_mask'],
           self._check_ent_mask(ent_obs, atn, cond['tgt_id']),
-          "ent_id: {}, atn: {}, tgt_id: {}".format(ent_id, atn, cond['tgt_id'])
+          f"ent_id: {ent_id}, atn: {ent_id}, tgt_id: {cond['tgt_id']}"
         )
 
       if atn in [action.Give]:
         self.assertEqual(
           cond['inv_mask'],
           self._check_inv_mask(ent_obs, atn, cond['item_sig']),
-          "ent_id: {}, atn: {}, item_sig: {}".format(ent_id, atn, cond['item_sig'])
+          f"ent_id: {ent_id}, atn: {ent_id}, tgt_id: {cond['item_sig']}"
         )
 
       if atn in [action.Buy]:
         self.assertEqual(
           cond['mkt_mask'],
           self._check_mkt_mask(ent_obs, cond['item_id']),
-          "ent_id: {}, atn: {}, item_id: {}".format(ent_id, atn, cond['item_id'])
+          f"ent_id: {ent_id}, atn: {ent_id}, tgt_id: {cond['item_id']}"
         )
 
       # append the actions

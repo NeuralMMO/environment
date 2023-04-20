@@ -3,7 +3,6 @@ import random
 
 from nmmo.entity import entity
 from nmmo.io import action as Action
-from nmmo.lib.colors import Neon
 from nmmo.systems import combat, droptable
 from nmmo.systems.ai import policy
 from nmmo.systems import item as Item
@@ -46,6 +45,7 @@ class Equipment:
     return packet
 
 
+# pylint: disable=no-member
 class NPC(entity.Entity):
   def __init__(self, realm, pos, iden, name, npc_type):
     super().__init__(realm, pos, iden, name)
