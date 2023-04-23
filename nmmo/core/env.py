@@ -1,5 +1,6 @@
 import functools
 import random
+import copy
 from typing import Any, Dict, List, Optional, Union, Tuple
 from ordered_set import OrderedSet
 
@@ -143,7 +144,7 @@ class Env(ParallelEnv):
       embedding_size: The size of each embedding
       reset: Resets the environment
     """
-    self.tasks = [t if isinstance(t, Tuple) else (t,1) for t in new_tasks]
+    self._tasks = [t if isinstance(t, Tuple) else (t,1) for t in new_tasks]
     self._task_encoding = task_encoding
     if task_encoding is None:
       self._task_encoding = {}
@@ -184,6 +185,7 @@ class Env(ParallelEnv):
       if isinstance(ent.agent, Scripted):
         self.scripted_agents.add(eid)
 
+    self.tasks = copy.deepcopy(self._tasks)
     self.obs = self._compute_observations()
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
 

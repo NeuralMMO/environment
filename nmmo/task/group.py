@@ -59,6 +59,11 @@ class Group(Sequence, Set):
     assert len(self._agents) == 1, "Group is not a singleton"
     return int(self._agents[0])
 
+  def __copy__(self):
+    return self
+  def __deepcopy__(self, memo):
+    return Group(self.agents, self.name)
+
   def description(self) -> Dict:
     return {
       "type": "Group",

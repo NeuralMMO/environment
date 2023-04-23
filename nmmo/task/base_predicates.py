@@ -92,9 +92,11 @@ def DistanceTraveled(gs: GameState,
   """True if the summed l-inf distance between each agent's current pos and spawn pos
         is greater than or equal to the specified _dist.
   """
+  if not any(subject.health > 0):
+    return False
   r = subject.row
   c = subject.col
-  dists = utils.linf(list(zip(r,c)),[gs.spawn_pos[id_] for id_ in subject.agents])
+  dists = utils.linf(list(zip(r,c)),[gs.spawn_pos[id_] for id_ in subject.entity.id])
   return dists.sum() / dist
 
 @predicate
@@ -199,7 +201,9 @@ def EquipItem(gs: GameState,
   equipped = (subject.item.type_id == item.ITEM_TYPE_ID) & \
              (subject.item.level >= level) & \
              (subject.item.equipped > 0)
-  return count(equipped) >= num_agent
+  if num_agent > 0:
+    return count(equipped) / num_agent
+  return 1.0
 
 @predicate
 def FullyArmed(gs: GameState,
@@ -225,8 +229,9 @@ def FullyArmed(gs: GameState,
   type_flt = np.isin(subject.item.type_id,list(item_ids.values()))
   _, equipment_numbers = np.unique(subject.item.owner_id[lvl_flt & type_flt],
                                    return_counts=True)
-
-  return (equipment_numbers >= len(item_ids.items())).sum() >= num_agent
+  if num_agent > 0:
+    return (equipment_numbers >= len(item_ids.items())).sum() / num_agent
+  return 1.0
 
 @predicate
 def ConsumeItem(gs: GameState,
