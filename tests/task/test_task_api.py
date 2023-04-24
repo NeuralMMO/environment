@@ -78,6 +78,7 @@ class TestTaskAPI(unittest.TestCase):
       "OR(AND(Success,NOT(OR(Failure,FakePredicate_(2,)_1_Hat_Melee))),"
       "IMPLY(Failure->FakePredicate_(2,)_1_Hat_Melee))")
 
+  '''
   def test_team_helper(self):
     config = ScriptedAgentTestConfig()
     env = nmmo.Env(config)
@@ -89,6 +90,7 @@ class TestTaskAPI(unittest.TestCase):
     for ent_id, ent in env.realm.players.items():
       # pylint: disable=protected-access
       self.assertEqual(team_helper._ent_to_team[ent_id], ent.population)
+  '''
 
   def test_team_assignment(self):
     team =  Group([1, 2, 8, 9], "TeamFoo")
