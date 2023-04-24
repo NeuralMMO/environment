@@ -44,8 +44,8 @@ class Env(ParallelEnv):
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
     # Default task: rewards 1 each turn agent is alive
     self.tasks: List[Tuple[Task,float]] = None
-    self._task_encoding = {}
-    self._task_embedding_size = 1
+    self._task_encoding = None
+    self._task_embedding_size = -1
     t = default_task(self.possible_agents)
     self.change_task(t,
                      embedding_size=self._task_embedding_size,
@@ -76,10 +76,6 @@ class Env(ParallelEnv):
     obs_space = {
       "Tile": box(self.config.MAP_N_OBS, Tile.State.num_attributes),
       "Entity": box(self.config.PLAYER_N_OBS, Entity.State.num_attributes),
-      "Task": gym.spaces.Box(
-          low=-2**20, high=2**20,
-          shape=(self._task_embedding_size,),
-          dtype=np.float32)
     }
 
     if self.config.ITEM_SYSTEM_ENABLED:
@@ -90,6 +86,12 @@ class Env(ParallelEnv):
 
     if self.config.PROVIDE_ACTION_TARGETS:
       obs_space['ActionTargets'] = self.action_space(None)
+
+    if self._task_encoding:
+      obs_space['Task'] = gym.spaces.Box(
+          low=-2**20, high=2**20,
+          shape=(self._task_embedding_size,),
+          dtype=np.float32)
 
     return gym.spaces.Dict(obs_space)
 
@@ -146,8 +148,6 @@ class Env(ParallelEnv):
     """
     self._tasks = [t if isinstance(t, Tuple) else (t,1) for t in new_tasks]
     self._task_encoding = task_encoding
-    if task_encoding is None:
-      self._task_encoding = {}
     self._task_embedding_size = embedding_size
     if reset:
       self.reset(map_id=map_id, seed=seed, options=options)
@@ -189,7 +189,12 @@ class Env(ParallelEnv):
     self.obs = self._compute_observations()
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
 
-    return {a: o.to_gym() for a,o in self.obs.items()}
+    gym_obs = {}
+    for a, o in self.obs.items():
+      gym_obs[a] = o.to_gym()
+      if self._task_encoding:
+        gym_obs[a]['Task'] = self._encode_goal().get(a,np.zeros(self._task_embedding_size))
+    return gym_obs
 
   def step(self, actions: Dict[int, Dict[str, Dict[str, Any]]]):
     '''Simulates one game tick or timestep
@@ -301,7 +306,11 @@ class Env(ParallelEnv):
 
     # Store the observations, since actions reference them
     self.obs = self._compute_observations()
-    gym_obs = {a: o.to_gym() for a,o in self.obs.items()}
+    gym_obs = {}
+    for a, o in self.obs.items():
+      gym_obs[a] = o.to_gym()
+      if self._task_encoding:
+        gym_obs[a]['Task'] = self._encode_goal()[a]
 
     rewards, infos = self._compute_rewards(self.obs.keys(), dones)
 
@@ -408,9 +417,11 @@ class Env(ParallelEnv):
                                   agent_id,
                                   visible_tiles,
                                   visible_entities,
-                                  inventory, market,
-                                  (self._task_encoding, self._task_embedding_size))
+                                  inventory, market)
     return obs
+
+  def _encode_goal(self):
+    return self._task_encoding
 
   def _compute_rewards(self, agents: List[AgentID], dones: Dict[AgentID, bool]):
     '''Computes the reward for the specified agent

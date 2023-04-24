@@ -8,7 +8,7 @@ import nmmo
 
 # pylint: disable=import-error, unused-argument
 from nmmo.core.env import Env as TaskEnv
-from nmmo.task import sampler
+from nmmo.task import generator
 from nmmo.task.task_api import Repeat
 from nmmo.task.predicate import Predicate, predicate
 from nmmo.task.group import Group
@@ -79,8 +79,6 @@ class TestTaskAPI(unittest.TestCase):
       "IMPLY(Failure->FakePredicate_(2,)_1_Hat_Melee))")
 
   def test_team_helper(self):
-    # TODO(kywch): This test is true now but may change later.
-
     config = ScriptedAgentTestConfig()
     env = nmmo.Env(config)
     env.reset()
@@ -102,19 +100,19 @@ class TestTaskAPI(unittest.TestCase):
     # don't allow member of one-member team
     self.assertEqual(team[2][0].name, team[2].name)
 
-  def test_random_task_sampler(self):
-    rand_sampler = sampler.RandomTaskSampler()
+  def test_random_task_generator(self):
+    rand_generator = generator.RandomTaskGenerator()
 
-    rand_sampler.add_task_spec(Success, [[Group([1]), Group([3])]])
-    rand_sampler.add_task_spec(Failure, [[Group([2]), Group([1,3])]])
-    rand_sampler.add_task_spec(FakePredicate, [
+    rand_generator.add_task_spec(Success, [[Group([1]), Group([3])]])
+    rand_generator.add_task_spec(Failure, [[Group([2]), Group([1,3])]])
+    rand_generator.add_task_spec(FakePredicate, [
       [Group([1]), Group([2]), Group([1,2]), Group([3]), Group([1,3])],
       [Item.Hat, Item.Top, Item.Bottom],
       [1, 5, 10],
       [0.1, 0.2, 0.3, 0.4]
     ])
 
-    rand_sampler.sample(max_clauses=4, max_clause_size=3, not_p=0.5)
+    rand_generator.sample(max_clauses=4, max_clause_size=3, not_p=0.5)
 
   def test_completed_tasks_in_info(self):
     config = ScriptedAgentTestConfig()
@@ -155,9 +153,8 @@ class TestTaskAPI(unittest.TestCase):
   def test_task_embedding(self):
     env = TaskEnv()
     obs = env.reset()
-    self.assertEqual(obs[1]['Task'].shape, 
-                     env.observation_space(1)['Task'].shape)
-    
+    self.assertRaises(KeyError, lambda: obs[1]['Task'])
+
     task = [Repeat(assignee=Group([1,2]),predicate=Success())]
     env.change_task(task,
                     task_encoding={1:np.array([1,2,3,4])},

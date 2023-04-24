@@ -1,5 +1,4 @@
 import unittest
-import copy
 from tests.testhelpers import ScriptedAgentTestConfig
 
 from nmmo.core.env import Env as TaskEnv
@@ -147,24 +146,24 @@ class TestDemoTask(unittest.TestCase):
       all_agents = team_helper.all_agents()
       tasks = []
       for agent in all_agents:
-         pk = [
+         agent_tasks = [
             Once(agent, CountEvent(agent, 'PLAYER_KILL', 1), reward=Tier.EASY),
             Once(agent, CountEvent(agent, 'PLAYER_KILL', 2), reward=Tier.NORMAL),
             Once(agent, CountEvent(agent, 'PLAYER_KILL', 3), reward=Tier.HARD)
          ]
-         tasks = tasks + pk
+         tasks = tasks + agent_tasks
       return tasks
     
     def exploration(team_helper):
       all_agents = team_helper.all_agents()
       tasks = []
       for agent in all_agents:
-         pk = [
+         agent_tasks = [
             Once(agent, DistanceTraveled(agent, 16), reward=Tier.EASY),
             Once(agent, DistanceTraveled(agent, 32), reward=Tier.NORMAL),
             Once(agent, DistanceTraveled(agent, 64), reward=Tier.HARD)
          ]
-         tasks = tasks + pk
+         tasks = tasks + agent_tasks
       return tasks
 
     # Demonstrates custom predicate - return float/boolean
@@ -180,12 +179,12 @@ class TestDemoTask(unittest.TestCase):
       all_agents = team_helper.all_agents()
       tasks = []
       for agent in all_agents:
-         pk = [
+         agent_tasks = [
             Once(agent, EquipmentLevel(agent, 1), reward=Tier.EASY),
             Once(agent, EquipmentLevel(agent, 5), reward=Tier.NORMAL),
             Once(agent, EquipmentLevel(agent, 10), reward=Tier.HARD)
          ]
-         tasks = tasks + pk
+         tasks = tasks + agent_tasks
       return tasks
 
     # Demonstrates custom predicate - return predicate
@@ -198,12 +197,12 @@ class TestDemoTask(unittest.TestCase):
       all_agents = team_helper.all_agents()
       tasks = []
       for agent in all_agents:
-         pk = [
+         agent_tasks = [
             Once(agent, CombatSkill(agent, 2), reward=Tier.EASY),
             Once(agent, CombatSkill(agent, 3), reward=Tier.NORMAL),
             Once(agent, CombatSkill(agent, 4), reward=Tier.HARD)
          ]
-         tasks = tasks + pk
+         tasks = tasks + agent_tasks
       return tasks
 
     def foraging(team_helper):
@@ -218,12 +217,12 @@ class TestDemoTask(unittest.TestCase):
       all_agents = team_helper.all_agents()
       tasks = []
       for agent in all_agents:
-         pk = [
+         agent_tasks = [
             Once(agent, ForageSkill(agent, 2), reward=Tier.EASY),
             Once(agent, ForageSkill(agent, 3), reward=Tier.NORMAL),
             Once(agent, ForageSkill(agent, 4), reward=Tier.HARD)
          ]
-         tasks = tasks + pk
+         tasks = tasks + agent_tasks
       return tasks
 
     # Demonstrate task scenario definition API

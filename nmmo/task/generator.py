@@ -2,7 +2,7 @@ import random
 
 from nmmo.task.predicate import Predicate, AND, NOT, OR
 
-class RandomTaskSampler:
+class RandomTaskGenerator:
   def __init__(self) -> None:
     self._task_specs = []
     self._task_spec_weights = []
