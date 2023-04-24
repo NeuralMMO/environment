@@ -3,11 +3,10 @@ from nmmo.entity import entity
 
 # pylint: disable=no-member
 class Player(entity.Entity):
-  def __init__(self, realm, pos, agent, color, pop):
-    super().__init__(realm, pos, agent.iden, agent.policy, color, pop)
+  def __init__(self, realm, pos, agent):
+    super().__init__(realm, pos, agent.iden, agent.policy)
 
     self.agent    = agent
-    self.pop      = pop
     self.immortal = realm.config.IMMORTAL
 
     # Scripted hooks
@@ -31,7 +30,7 @@ class Player(entity.Entity):
 
   @property
   def serial(self):
-    return self.population_id, self.ent_id
+    return self.ent_id
 
   @property
   def is_player(self) -> bool:
@@ -86,7 +85,6 @@ class Player(entity.Entity):
     data = super().packet()
 
     data['entID']     = self.ent_id
-    data['annID']     = self.population
 
     data['resource']  = self.resources.packet()
     data['skills']    = self.skills.packet()

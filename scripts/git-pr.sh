@@ -29,6 +29,10 @@ git merge origin/$MASTER_BRANCH
 PRE_GIT_CHECK=$(find . -name pre-git-check.sh)
 if test -f "$PRE_GIT_CHECK"; then
   $PRE_GIT_CHECK
+  if [ $? -ne 0 ]; then
+    echo "pre-git-check.sh failed. Exiting."
+    exit 1
+  fi
 else
   echo "Missing pre-git-check.sh. Exiting."
   exit 1

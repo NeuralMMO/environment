@@ -20,11 +20,7 @@ from nmmo.task.task_api import Task, default_task
 from scripted.baselines import Scripted
 
 class Env(ParallelEnv):
-  '''Environment wrapper for Neural MMO using the Parallel PettingZoo API
-
-  Neural MMO provides complex environments featuring structured observations/actions,
-  variably sized agent populations, and long time horizons. Usage in conjunction
-  with RLlib as demonstrated in the /projekt wrapper is highly recommended.'''
+  # Environment wrapper for Neural MMO using the Parallel PettingZoo API
 
   #pylint: disable=no-value-for-parameter
   def __init__(self,
@@ -438,7 +434,6 @@ class Env(ParallelEnv):
           The reward for the actions on the previous timestep of the
           entity identified by ent_id.
     '''
-
     # Initialization
     game_state = self._gamestate_generator.generate(self.realm, self.obs)
     infos = {}

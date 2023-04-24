@@ -132,7 +132,4 @@ class SimpleLogHelper(LogHelper):
 
     stats['Time_Alive'] = player.history.time_alive.val
 
-    # Used for SR
-    stats['PolicyID'] = player.population
-
     return stats

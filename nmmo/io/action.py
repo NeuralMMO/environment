@@ -254,11 +254,6 @@ class Attack(Node):
     if entity.ent_id == target.ent_id:
       return None
 
-    #ADDED: POPULATION IMMUNITY
-    if not config.COMBAT_FRIENDLY_FIRE and entity.is_player \
-       and entity.population_id.val == target.population_id.val:
-      return None
-
     #Can't attack out of range
     if utils.linf(entity.pos, target.pos) > style.attack_range(config):
       return None
@@ -454,10 +449,10 @@ class Give(Node):
     if item.equipped.val or item.listed_price.val:
       return
 
-    if not (config.ITEM_GIVE_TO_FRIENDLY and
-            entity.population_id == target.population_id and        # the same team
+    if not (config.ITEM_ALLOW_GIFT and
             entity.ent_id != target.ent_id and                      # but not self
-            utils.linf(entity.pos, target.pos) == 0):               # the same tile
+            target.is_player and
+            entity.pos == target.pos):               # the same tile
       return
 
     if not target.inventory.space:
@@ -500,10 +495,10 @@ class GiveGold(Node):
     if not (target.is_player and target.alive):
       return
 
-    if not (config.ITEM_GIVE_TO_FRIENDLY and
-            entity.population_id == target.population_id and        # the same team
+    if not (config.ITEM_ALLOW_GIFT and
             entity.ent_id != target.ent_id and                      # but not self
-            utils.linf(entity.pos, target.pos) == 0):               # the same tile
+            target.is_player and
+            entity.pos == target.pos):                              # the same tile
       return
 
     if not isinstance(amount, int):

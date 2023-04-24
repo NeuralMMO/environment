@@ -79,17 +79,17 @@ class Scripted(nmmo.Agent):
 
   def target_weak(self):
     '''Target the nearest agent if it is weak'''
-    if self.closest is None:
-      return False
+    # disabled for now
+    # if self.closest is None:
+    #   return False
 
-    selfLevel  = self.me.level
-    targLevel  = max(self.closest.melee_level, self.closest.range_level, self.closest.mage_level)
-    population = self.closest.population_id
+    # selfLevel  = self.me.level
+    # targLevel  = max(self.closest.melee_level, self.closest.range_level, self.closest.mage_level)
 
-    if population == -1 or targLevel <= selfLevel <= 5 or selfLevel >= targLevel + 3:
-      self.target     = self.closest
-      self.targetID   = self.closestID
-      self.targetDist = self.closestDist
+    # if population == -1 or targLevel <= selfLevel <= 5 or selfLevel >= targLevel + 3:
+    #   self.target     = self.closest
+    #   self.targetID   = self.closestID
+    #   self.targetDist = self.closestDist
 
   def scan_agents(self):
     '''Scan the nearby area for agents'''

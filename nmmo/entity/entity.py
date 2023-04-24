@@ -14,7 +14,7 @@ from nmmo.lib.log import EventCode
 EntityState = SerializedState.subclass(
   "Entity", [
     "id",
-    "population_id",
+    "npc_type", # 1 - passive, 2 - neutral, 3 - aggressive
     "row",
     "col",
 
@@ -48,7 +48,7 @@ EntityState = SerializedState.subclass(
 EntityState.Limits = lambda config: {
   **{
     "id": (-math.inf, math.inf),
-    "population_id": (-3, config.PLAYER_POLICIES-1),
+    "npc_type": (0, 4),
     "row": (0, config.MAP_SIZE-1),
     "col": (0, config.MAP_SIZE-1),
     "damage": (0, math.inf),
@@ -211,7 +211,7 @@ class History:
 
 # pylint: disable=no-member
 class Entity(EntityState):
-  def __init__(self, realm, pos, entity_id, name, color, population_id):
+  def __init__(self, realm, pos, entity_id, name):
     super().__init__(realm.datastore, EntityState.Limits(realm.config))
 
     self.realm = realm
@@ -222,11 +222,9 @@ class Entity(EntityState):
     self.repr = None
 
     self.name = name + str(entity_id)
-    self.color = color
 
     self.row.update(pos[0])
     self.col.update(pos[1])
-    self.population_id.update(population_id)
     self.id.update(entity_id)
 
     self.vision = self.config.PLAYER_VISION_RADIUS
@@ -259,10 +257,6 @@ class Entity(EntityState):
       'name': self.name,
       'level': self.attack_level,
       'item_level': self.item_level.val,
-      'color': self.color.packet(),
-      'population': self.population,
-      # FIXME: Don't know what it does. Previous nmmo entities all returned 1
-      # 'self': self.self.val,
     }
 
     return data
@@ -338,7 +332,3 @@ class Entity(EntityState):
     mage = self.skills.mage.level.val
 
     return int(max(melee, ranged, mage))
-
-  @property
-  def population(self):
-    return self.population_id.val

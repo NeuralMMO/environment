@@ -119,7 +119,7 @@ class Realm:
   }
 
   @property
-  def population(self):
+  def num_players(self):
     """Number of player agents"""
     return len(self.players.entities)
 
