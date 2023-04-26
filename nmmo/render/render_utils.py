@@ -68,8 +68,10 @@ def make_two_tone(ary, norm_std=2, preprocess='norm', invert=False, periods=1):
 def patch_packet(packet, realm):
   for ent_id in packet['player']:
     packet['player'][ent_id]['base']['color'] = Neon.GREEN.packet()
-    packet['player'][ent_id]['base']['population'] = 0 # population -> npc_type
-    packet['player'][ent_id]['base']['self'] = 1 #ent_id in self._realm.players
+    # EntityAttr: population was changed to npc_type
+    packet['player'][ent_id]['base']['population'] = 0
+    # old code: nmmo.Serialized.Entity.Self, no longer being used
+    packet['player'][ent_id]['base']['self'] = 1
 
   npc_colors = {
     1: Neon.YELLOW.packet(), # passive npcs
@@ -79,6 +81,6 @@ def patch_packet(packet, realm):
     npc = realm.npcs.corporeal[ent_id]
     packet['npc'][ent_id]['base']['color'] = npc_colors[int(npc.npc_type.val)]
     packet['npc'][ent_id]['base']['population'] = -int(npc.npc_type.val) # note negative
-    packet['npc'][ent_id]['base']['self'] = 1 #int(npc.alive)
+    packet['npc'][ent_id]['base']['self'] = 1
 
   return packet

@@ -19,8 +19,7 @@ class WebsocketRenderer:
       'wilderness': 0,
       **packet }
 
-    pos, _ = self._client.update(packet)
-    self.overlay_pos = pos
+    self.overlay_pos, _ = self._client.update(packet)
 
 
 class OnlineRenderer(WebsocketRenderer):

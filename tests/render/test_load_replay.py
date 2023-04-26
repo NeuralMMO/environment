@@ -3,6 +3,7 @@
 if __name__ == '__main__':
   import time
 
+  # pylint: disable=import-error
   from nmmo.render.render_client import WebsocketRenderer
   from nmmo.render.packet_manager import SimplePacketManager
 
@@ -16,4 +17,4 @@ if __name__ == '__main__':
   # run the replay
   for packet in replay:
     renderer.render(packet)
-    time.sleep(1.5)
+    time.sleep(1)

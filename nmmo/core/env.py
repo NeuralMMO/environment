@@ -36,7 +36,7 @@ class Env(ParallelEnv):
     self._dead_agents = OrderedSet()
     self.scripted_agents = OrderedSet()
 
-    self.packet_manager = PacketManager.create(config)
+    self.packet_manager = PacketManager.create(self.realm)
 
   # pylint: disable=method-cache-max-size-none
   @functools.lru_cache(maxsize=None)

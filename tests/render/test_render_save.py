@@ -1,13 +1,16 @@
 '''Manual test for render client connectivity'''
 
 if __name__ == '__main__':
+  import time
   import nmmo
+
+  # pylint: disable=import-error
   from nmmo.render.render_client import OnlineRenderer
   from tests.testhelpers import ScriptedAgentTestConfig
 
   TEST_HORIZON = 30
 
-  # config.RENDER option is gone, 
+  # config.RENDER option is gone,
   # RENDER can be done without setting any config
   config = ScriptedAgentTestConfig()
   env = nmmo.Env(config)
@@ -20,6 +23,8 @@ if __name__ == '__main__':
   for tick in range(TEST_HORIZON):
     env.step({})
     renderer.render()
+    time.sleep(1)
 
   # save the packet: this is possible because config.SAVE_REPLAY = True
+  # CHECK ME: would env.save_replay() be better?
   env.packet_manager.save('replay_dev.json', compress=False)

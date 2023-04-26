@@ -2,14 +2,14 @@ import json
 import lzma
 import logging
 
-from .render_utils import np_encoder
+from .render_utils import np_encoder, patch_packet
 
 
 class PacketManager:
   @staticmethod
-  def create(config):
-    if config.SAVE_REPLAY:
-      return SimplePacketManager()
+  def create(realm):
+    if realm.config.SAVE_REPLAY:
+      return SimplePacketManager(realm)
 
     return DummyPacketManager()
 
@@ -26,7 +26,8 @@ class DummyPacketManager(PacketManager):
 
 
 class SimplePacketManager(PacketManager):
-  def __init__(self):
+  def __init__(self, realm=None):
+    self._realm = realm
     self.packets = None
     self.map = None
     self._i = 0
@@ -61,6 +62,10 @@ class SimplePacketManager(PacketManager):
         continue
 
       data[key] = val
+
+    # TODO: patch_packet is a hack. best to remove, if possible
+    if self._realm is not None:
+      data = patch_packet(data, self._realm)
 
     self.packets.append(data)
 
