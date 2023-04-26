@@ -1,4 +1,4 @@
-# pylint: disable=invalid-name
+# pylint: disable-all
 '''Manual test for render client connectivity'''
 
 if __name__ == '__main__':
@@ -9,7 +9,6 @@ if __name__ == '__main__':
   TEST_HORIZON = 30
 
   config = ScriptedAgentTestConfig()
-  config.RENDER = True
   env = nmmo.Env(config)
 
   env.reset()

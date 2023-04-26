@@ -113,6 +113,8 @@ class ScriptedAgentTestConfig(nmmo.config.Small, nmmo.config.AllGameSystems):
   LOG_EVENTS = False
   LOG_VERBOSE = False
 
+  RENDER = True # this just enables packet_manager, not the renderer
+
   SPECIALIZE = True
   PLAYERS = [
     baselines.Fisher, baselines.Herbalist,
