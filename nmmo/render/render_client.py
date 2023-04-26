@@ -11,9 +11,16 @@ class WebsocketRenderer:
   def __init__(self):
     # CHECK ME: It seems the renderer works fine without realm
     self._client = Application(realm=None) # Do we need to pass realm?
+    self.overlay_pos = [256, 256]
 
   def render(self, packet):
-    self._client.update(packet)
+    packet = {
+      'pos': self.overlay_pos,
+      'wilderness': 0,
+      **packet }
+
+    pos, _ = self._client.update(packet)
+    self.overlay_pos = pos
 
 
 class OnlineRenderer(WebsocketRenderer):
@@ -21,11 +28,11 @@ class OnlineRenderer(WebsocketRenderer):
     super().__init__()
     self._realm = env.realm
     self._config = env.config
-    self._packet_manager = env.packet_manager
 
     self.overlay    = None
-    self.overlay_pos = [256, 256]
     self.registry   = OverlayRegistry(env.realm, renderer=self)
+
+    self.packet = None
 
   ############################################################################
   ### Client data
@@ -36,8 +43,6 @@ class OnlineRenderer(WebsocketRenderer):
         packet: A packet of data for the client
     '''
     assert self._realm.tick is not None, 'render before reset'
-    if not self._config.RENDER:
-      return
 
     packet = {
       'config': self._config,
@@ -53,11 +58,11 @@ class OnlineRenderer(WebsocketRenderer):
       packet['overlay'] = self.overlay
       self.overlay = None
 
-    # save the packet for save/replay
-    self._packet_manager.update(packet)
+    # save the packet for investigation
+    self.packet = packet
 
     # pass the packet to renderer
-    pos, cmd = self._client.update(packet)
+    pos, cmd = self._client.update(self.packet)
 
     self.overlay_pos = pos
     self.registry.step(cmd)

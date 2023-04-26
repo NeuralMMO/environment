@@ -113,7 +113,7 @@ class ScriptedAgentTestConfig(nmmo.config.Small, nmmo.config.AllGameSystems):
   LOG_EVENTS = False
   LOG_VERBOSE = False
 
-  RENDER = True # this just enables packet_manager, not the renderer
+  SAVE_REPLAY = True
 
   SPECIALIZE = True
   PLAYERS = [

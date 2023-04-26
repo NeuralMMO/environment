@@ -8,7 +8,7 @@ from .render_utils import np_encoder
 class PacketManager:
   @staticmethod
   def create(config):
-    if config.RENDER or config.SAVE_REPLAY:
+    if config.SAVE_REPLAY:
       return SimplePacketManager()
 
     return DummyPacketManager()

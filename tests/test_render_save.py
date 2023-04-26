@@ -1,4 +1,3 @@
-# pylint: disable-all
 '''Manual test for render client connectivity'''
 
 if __name__ == '__main__':
@@ -8,6 +7,8 @@ if __name__ == '__main__':
 
   TEST_HORIZON = 30
 
+  # config.RENDER option is gone, 
+  # RENDER can be done without setting any config
   config = ScriptedAgentTestConfig()
   env = nmmo.Env(config)
 
@@ -20,5 +21,5 @@ if __name__ == '__main__':
     env.step({})
     renderer.render()
 
-  # save the packet
+  # save the packet: this is possible because config.SAVE_REPLAY = True
   env.packet_manager.save('replay_dev.json', compress=False)

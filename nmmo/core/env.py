@@ -265,6 +265,9 @@ class Env(ParallelEnv):
 
     rewards, infos = self._compute_rewards(self.obs.keys(), dones)
 
+    if self.config.SAVE_REPLAY:
+      self.packet_manager.update(self.realm.packet())
+
     return gym_obs, rewards, dones, infos
 
   def _validate_actions(self, actions: Dict[int, Dict[str, Dict[str, Any]]]):
