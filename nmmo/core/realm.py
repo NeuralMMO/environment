@@ -9,8 +9,6 @@ import numpy as np
 import nmmo
 from nmmo.core.log_helper import LogHelper
 from nmmo.core.map import Map
-from nmmo.core.render_helper import RenderHelper
-from nmmo.core.replay_helper import ReplayHelper
 from nmmo.core.tile import TileState
 from nmmo.entity.entity import EntityState
 from nmmo.entity.entity_manager import NPCManager, PlayerManager
@@ -46,14 +44,12 @@ class Realm:
     for s in [TileState, EntityState, ItemState, EventState]:
       self.datastore.register_object_type(s._name, s.State.num_attributes)
 
-    self.tick = 0
+    self.tick = None # to use as a "reset" checker
     self.exchange = None
 
     # Load the world file
     self.map = Map(config, self)
 
-    self.replay_helper = ReplayHelper.create(self)
-    self.render_helper = RenderHelper.create(self)
     self.log_helper = LogHelper.create(self)
     self.event_log = EventLogger(self)
 
@@ -81,9 +77,8 @@ class Realm:
     self.players.reset()
     self.npcs.reset()
 
-
+    # TODO: track down entity/item leaks
     EntityState.State.table(self.datastore).reset()
-
     assert EntityState.State.table(self.datastore).is_empty(), \
         "EntityState table is not empty"
 
@@ -103,8 +98,6 @@ class Realm:
     # Global item registry
     Item.INSTANCE_ID = 0
     self.items = {}
-
-    self.replay_helper.update()
 
   def packet(self):
     """Client packet"""
@@ -188,8 +181,6 @@ class Realm:
     self.log_helper.update(dead)
 
     self.tick += 1
-
-    self.replay_helper.update()
 
     return dead
 

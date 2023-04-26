@@ -132,9 +132,9 @@ class Resources:
 
   def packet(self):
     data = {}
-    data['health'] = self.health.val
-    data['food'] = self.food.val
-    data['water'] = self.water.val
+    data['health'] = { 'val': self.health.val, 'max': self.config.PLAYER_BASE_HEALTH }
+    data['food'] = { 'val': self.food.val, 'max': self.config.RESOURCE_BASE }
+    data['water'] = { 'val': self.water.val, 'max': self.config.RESOURCE_BASE }
     return data
 
 class Status:
