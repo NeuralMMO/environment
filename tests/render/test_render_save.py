@@ -5,7 +5,7 @@ if __name__ == '__main__':
   import nmmo
 
   # pylint: disable=import-error
-  from nmmo.render.render_client import OnlineRenderer
+  from nmmo.render.render_client import WebsocketRenderer
   from tests.testhelpers import ScriptedAgentTestConfig
 
   TEST_HORIZON = 30
@@ -18,13 +18,12 @@ if __name__ == '__main__':
   env.reset()
 
   # the renderer is external to the env, so need to manually initiate it
-  renderer = OnlineRenderer(env)
+  renderer = WebsocketRenderer(env.realm)
 
   for tick in range(TEST_HORIZON):
     env.step({})
-    renderer.render()
+    renderer.render_realm()
     time.sleep(1)
 
   # save the packet: this is possible because config.SAVE_REPLAY = True
-  # CHECK ME: would env.save_replay() be better?
-  env.packet_manager.save('replay_dev.json', compress=False)
+  env.realm.save_replay('replay_dev.json', compress=False)

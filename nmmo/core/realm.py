@@ -17,6 +17,7 @@ from nmmo.datastore.numpy_datastore import NumpyDatastore
 from nmmo.systems.exchange import Exchange
 from nmmo.systems.item import Item, ItemState
 from nmmo.lib.event_log import EventLogger, EventState
+from nmmo.render.replay_helper import ReplayHelper
 
 def prioritized(entities: Dict, merged: Dict):
   """Sort actions into merged according to priority"""
@@ -60,6 +61,9 @@ class Realm:
     # Global item registry
     self.items = {}
 
+    # Replay helper
+    self._replay_helper = ReplayHelper.create(self)
+
     # Initialize actions
     nmmo.Action.init(config)
 
@@ -71,6 +75,7 @@ class Realm:
     """
     self.log_helper.reset()
     self.event_log.reset()
+    self._replay_helper.reset()
     self.map.reset(map_id or np.random.randint(self.config.MAP_N) + 1)
 
     # EntityState and ItemState tables must be empty after players/npcs.reset()
@@ -179,6 +184,7 @@ class Realm:
     self.map.step()
     self.exchange.step(self.tick)
     self.log_helper.update(dead)
+    self._replay_helper.update()
 
     self.tick += 1
 
@@ -194,3 +200,6 @@ class Realm:
         logging.info("Milestone (Player %d): %s %s %s", tags['player_id'], category, value, message)
       else:
         logging.info("Milestone: %s %s %s", category, value, message)
+
+  def save_replay(self, save_path, compress=True):
+    self._replay_helper.save(save_path, compress)

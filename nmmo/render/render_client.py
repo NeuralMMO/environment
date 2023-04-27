@@ -1,52 +1,40 @@
 from __future__ import annotations
 import numpy as np
 
-from nmmo.render.websocket import Application
+from nmmo.render import websocket
 from nmmo.render.overlay import OverlayRegistry
 from nmmo.render.render_utils import patch_packet
 
 
 # Render is external to the game
 class WebsocketRenderer:
-  def __init__(self):
-    # CHECK ME: It seems the renderer works fine without realm
-    self._client = Application(realm=None) # Do we need to pass realm?
+  def __init__(self, realm=None) -> None:
+    self._client = websocket.Application(realm)
     self.overlay_pos = [256, 256]
 
-  def render(self, packet):
+    self._realm = realm
+
+    self.overlay = None
+    self.registry = OverlayRegistry(realm, renderer=self) if realm else None
+
+    self.packet = None
+
+  def render_packet(self, packet) -> None:
     packet = {
       'pos': self.overlay_pos,
-      'wilderness': 0,
+      'wilderness': 0, # obsolete, but maintained for compatibility
       **packet }
 
     self.overlay_pos, _ = self._client.update(packet)
 
-
-class OnlineRenderer(WebsocketRenderer):
-  def __init__(self, env) -> None:
-    super().__init__()
-    self._realm = env.realm
-    self._config = env.config
-
-    self.overlay    = None
-    self.registry   = OverlayRegistry(env.realm, renderer=self)
-
-    self.packet = None
-
-  ############################################################################
-  ### Client data
-  def render(self) -> None:
-    '''Data packet used by the renderer
-
-    Returns:
-        packet: A packet of data for the client
-    '''
+  def render_realm(self) -> None:
+    assert self._realm is not None, 'This function requires a realm'
     assert self._realm.tick is not None, 'render before reset'
 
     packet = {
-      'config': self._config,
+      'config': self._realm.config,
       'pos': self.overlay_pos,
-      'wilderness': 0, # CHECK ME: what is this? copy pasted from the old version
+      'wilderness': 0,
       **self._realm.packet()
     }
 

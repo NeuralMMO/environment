@@ -5,27 +5,27 @@ import logging
 from .render_utils import np_encoder, patch_packet
 
 
-class PacketManager:
+class ReplayHelper:
   @staticmethod
   def create(realm):
     if realm.config.SAVE_REPLAY:
-      return SimplePacketManager(realm)
+      return ReplayFileHelper(realm)
 
-    return DummyPacketManager()
+    return DummyReplayHelper()
 
 
-class DummyPacketManager(PacketManager):
+class DummyReplayHelper(ReplayHelper):
   def reset(self):
     pass
 
-  def update(self, packet):
+  def update(self):
     pass
 
-  def save(self, save_file):
+  def save(self, save_path, compress):
     pass
 
 
-class SimplePacketManager(PacketManager):
+class ReplayFileHelper(ReplayHelper):
   def __init__(self, realm=None):
     self._realm = realm
     self.packets = None
@@ -52,7 +52,13 @@ class SimplePacketManager(PacketManager):
     self._i += 1
     return packet
 
-  def update(self, packet):
+  def update(self, packet=None):
+    if packet is None:
+      if self._realm is None:
+        return
+      # TODO: patch_packet is a hack. best to remove, if possible
+      packet = patch_packet(self._realm.packet(), self._realm)
+
     data = {}
     for key, val in packet.items():
       if key == 'environment':
@@ -60,12 +66,7 @@ class SimplePacketManager(PacketManager):
         continue
       if key == 'config':
         continue
-
       data[key] = val
-
-    # TODO: patch_packet is a hack. best to remove, if possible
-    if self._realm is not None:
-      data = patch_packet(data, self._realm)
 
     self.packets.append(data)
 
@@ -92,8 +93,8 @@ class SimplePacketManager(PacketManager):
       data = lzma.decompress(data, format=lzma.FORMAT_ALONE)
     data = json.loads(data.decode('utf-8'))
 
-    replay = SimplePacketManager()
-    replay.map = data['map']
-    replay.packets = data['packets']
+    replay_helper = ReplayFileHelper()
+    replay_helper.map = data['map']
+    replay_helper.packets = data['packets']
 
-    return replay
+    return replay_helper

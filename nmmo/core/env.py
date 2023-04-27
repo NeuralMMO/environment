@@ -14,7 +14,6 @@ from nmmo.core.tile import Tile
 from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
 from nmmo.core import realm
-from nmmo.render.packet_manager import PacketManager
 
 from scripted.baselines import Scripted
 
@@ -35,8 +34,6 @@ class Env(ParallelEnv):
     self.possible_agents = list(range(1, config.PLAYER_N + 1))
     self._dead_agents = OrderedSet()
     self.scripted_agents = OrderedSet()
-
-    self.packet_manager = PacketManager.create(self.realm)
 
   # pylint: disable=method-cache-max-size-none
   @functools.lru_cache(maxsize=None)
@@ -137,7 +134,6 @@ class Env(ParallelEnv):
     self._init_random(seed)
     self.realm.reset(map_id)
     self._dead_agents = OrderedSet()
-    self.packet_manager.reset()
 
     # check if there are scripted agents
     for eid, ent in self.realm.players.items():
@@ -264,9 +260,6 @@ class Env(ParallelEnv):
     gym_obs = {a: o.to_gym() for a,o in self.obs.items()}
 
     rewards, infos = self._compute_rewards(self.obs.keys(), dones)
-
-    if self.config.SAVE_REPLAY:
-      self.packet_manager.update(self.realm.packet())
 
     return gym_obs, rewards, dones, infos
 

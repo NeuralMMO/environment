@@ -3,7 +3,7 @@ import numpy as np
 from nmmo.lib.colors import Neon
 from nmmo.systems import combat
 
-from .render_utils import normalize, make_two_tone
+from .render_utils import normalize
 
 # pylint: disable=unused-argument
 class OverlayRegistry:
@@ -22,8 +22,7 @@ class OverlayRegistry:
 
     self.overlays = {
        #'counts':     Counts, # TODO: change population to team
-       'skills':     Skills,
-       'wilderness': Wilderness}
+       'skills':     Skills}
 
   def init(self, *args):
     self.initialized = True
@@ -152,25 +151,3 @@ class Counts(Overlay):
     colorized = colorized * data / count_sum[..., None]
 
     self.renderer.register(colorized)
-
-
-# CHECK ME: this class has multiple problems
-class Wilderness(Overlay):
-  # pylint: disable=attribute-defined-outside-init
-  def init(self):
-    '''Computes the local wilderness level'''
-    data = np.zeros((self.size, self.size))
-    for r in range(self.size):
-      for c in range(self.size):
-        # pylint: disable=no-member
-        # CHECK ME: combat.wilderness is gone, and we put 0 in the packet
-        #   is wilderness still a thing?
-        data[r, c] = combat.wilderness(self.config, (r, c))
-
-    self.wildy = make_two_tone(data, preprocess='clip', invert=True, periods=5)
-
-  def register(self):
-    if not hasattr(self, 'wildy'):
-      self.init()
-
-    self.renderer.register(self.wildy)
