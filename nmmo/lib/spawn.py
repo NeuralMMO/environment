@@ -82,6 +82,7 @@ def spawn_concurrent(config):
   sides += list(zip(inc, highs))
   sides += list(zip(highs, inc[::-1]))
   sides += list(zip(inc[::-1], lows))
+  np.random.shuffle(sides)
 
   # Space across and within teams
   spawn_positions = []

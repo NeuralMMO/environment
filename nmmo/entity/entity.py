@@ -297,7 +297,7 @@ class Entity(EntityState):
       if self.config.ITEM_SYSTEM_ENABLED:
         for item in list(self.inventory.items):
           item.destroy()
-      return True
+      return False
 
     # now, source can loot the dead self
     return False
