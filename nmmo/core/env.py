@@ -57,6 +57,8 @@ class Env(ParallelEnv):
           dtype=np.float32)
 
     obs_space = {
+      "Tick": gym.spaces.Discrete(1),
+      "AgentId": gym.spaces.Discrete(1),
       "Tile": box(self.config.MAP_N_OBS, Tile.State.num_attributes),
       "Entity": box(self.config.PLAYER_N_OBS, Entity.State.num_attributes)
     }
@@ -251,7 +253,10 @@ class Env(ParallelEnv):
 
     dones = {}
     for eid in self.possible_agents:
-      if eid not in self.realm.players and eid not in self._dead_agents:
+      if eid not in self._dead_agents and (
+          eid not in self.realm.players or
+          self.realm.tick >= self.config.HORIZON):
+
         self._dead_agents.add(eid)
         dones[eid] = True
 
@@ -360,7 +365,8 @@ class Env(ParallelEnv):
       inventory = Item.Query.owned_by(self.realm.datastore, agent_id)
 
       obs[agent_id] = Observation(
-        self.config, agent_id, visible_tiles, visible_entities, inventory, market)
+        self.config, self.realm.tick,
+        agent_id, visible_tiles, visible_entities, inventory, market)
 
     return obs
 

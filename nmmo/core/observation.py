@@ -40,6 +40,7 @@ class InventoryObs(BasicObs):
 class Observation:
   def __init__(self,
     config,
+    current_tick: int,
     agent_id: int,
     tiles,
     entities,
@@ -47,6 +48,7 @@ class Observation:
     market) -> None:
 
     self.config = config
+    self.current_tick = current_tick
     self.agent_id = agent_id
 
     self.tiles = tiles[0:config.MAP_N_OBS]
@@ -104,6 +106,8 @@ class Observation:
     '''Convert the observation to a format that can be used by OpenAI Gym'''
 
     gym_obs = {
+      "CurrentTick": np.array([self.current_tick]),
+      "AgentId": np.array([self.agent_id]),
       "Tile": np.vstack([
         self.tiles,
         np.zeros((self.config.MAP_N_OBS - self.tiles.shape[0], self.tiles.shape[1]))
