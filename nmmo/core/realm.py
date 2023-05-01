@@ -203,3 +203,9 @@ class Realm:
 
   def save_replay(self, save_path, compress=True):
     self._replay_helper.save(save_path, compress)
+
+  def get_replay(self):
+    return {
+      'map': self._replay_helper.map,
+      'packets': self._replay_helper.packets 
+    }
