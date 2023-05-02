@@ -96,8 +96,11 @@ def attack(realm, player, target, skill_fn):
   damage  = max(int(damage), 0)
 
   if player.is_player:
-    equipment_level_offense = player.equipment.total(lambda e: e.level)
-    equipment_level_defense = target.equipment.total(lambda e: e.level)
+    equipment_level_offense = 0
+    equipment_level_defense = 0
+    if config.EQUIPMENT_SYSTEM_ENABLED:
+      equipment_level_offense = player.equipment.total(lambda e: e.level)
+      equipment_level_defense = target.equipment.total(lambda e: e.level)
 
     realm.event_log.record(EventCode.SCORE_HIT, player,
                            combat_style=skill_type, damage=damage)
