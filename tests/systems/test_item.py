@@ -3,7 +3,7 @@ import numpy as np
 
 import nmmo
 from nmmo.datastore.numpy_datastore import NumpyDatastore
-from nmmo.systems.item import Hat, ItemState
+from nmmo.systems.item import Hat, Top, ItemState
 
 class MockRealm:
   def __init__(self):
@@ -34,10 +34,19 @@ class TestItem(unittest.TestCase):
     # also test destroy
     ids = [hat_1.id.val, hat_2.id.val]
     hat_1.destroy()
+    # after destroy(), the datastore entry is gone, but the class still exsits
+    self.assertEqual(hat_1.is_void, True)
+    self.assertEqual(hat_2.is_void, False)
+
     hat_2.destroy()
     for item_id in ids:
       self.assertTrue(len(ItemState.Query.by_id(realm.datastore, item_id)) == 0)
     self.assertDictEqual(realm.items, {})
+
+    # create a new item with the hat_1's id, but it must still be void
+    new_top = Top(realm, 3)
+    new_top.id.update(ids[0]) # hat_1's id
+    self.assertEqual(hat_1.is_void, True) # hat_1 is still void
 
   def test_owned_by(self):
     realm = MockRealm()
