@@ -369,7 +369,7 @@ class Use(Node):
     return config.ITEM_SYSTEM_ENABLED
 
   def call(realm, entity, item):
-    if item is None:
+    if item is None or item.is_void:
       return
 
     assert entity.alive, "Dead entity cannot act"
@@ -399,7 +399,7 @@ class Destroy(Node):
     return config.ITEM_SYSTEM_ENABLED
 
   def call(realm, entity, item):
-    if item is None:
+    if item is None or item.is_void:
       return
 
     assert entity.alive, "Dead entity cannot act"
@@ -415,8 +415,6 @@ class Destroy(Node):
     if item.equipped.val: # cannot destroy equipped item
       return
 
-    # inventory.remove() also unlists the item, if it has been listed
-    entity.inventory.remove(item)
     item.destroy()
 
     realm.event_log.record(EventCode.DESTROY_ITEM, entity)
@@ -432,7 +430,7 @@ class Give(Node):
     return config.ITEM_SYSTEM_ENABLED
 
   def call(realm, entity, item, target):
-    if item is None or target is None:
+    if item is None or item.is_void or target is None:
       return
 
     assert entity.alive, "Dead entity cannot act"
@@ -552,7 +550,7 @@ class Buy(Node):
     return config.EXCHANGE_SYSTEM_ENABLED
 
   def call(realm, entity, item):
-    if item is None:
+    if item is None or item.is_void:
       return
 
     assert entity.alive, "Dead entity cannot act"
@@ -593,7 +591,7 @@ class Sell(Node):
     return config.EXCHANGE_SYSTEM_ENABLED
 
   def call(realm, entity, item, price):
-    if item is None or price is None:
+    if item is None or item.is_void or price is None:
       return
 
     assert entity.alive, "Dead entity cannot act"
