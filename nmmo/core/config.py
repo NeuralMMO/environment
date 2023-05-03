@@ -145,9 +145,6 @@ class Config(Template):
     return hasattr(self, name)
 
 
-  RENDER                       = False
-  '''Flag used by render mode'''
-
   SAVE_REPLAY                  = False
   '''Flag used to save replays'''
 

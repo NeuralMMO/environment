@@ -3,7 +3,7 @@ import logging
 from .version import __version__
 
 from .lib import material, spawn
-from .overlay import Overlay, OverlayRegistry
+from .render.overlay import Overlay, OverlayRegistry
 from .io import action
 from .io.action import Action
 from .core import config, agent

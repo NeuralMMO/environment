@@ -18,6 +18,8 @@ from autobahn.twisted.websocket import WebSocketServerFactory, \
     WebSocketServerProtocol
 from autobahn.twisted.resource import WebSocketResource
 
+from .render_utils import np_encoder
+
 class GodswordServerProtocol(WebSocketServerProtocol):
     def __init__(self):
         super().__init__()
@@ -91,8 +93,9 @@ class GodswordServerProtocol(WebSocketServerProtocol):
            packet['overlay'] = data['overlay']
            print('SENDING OVERLAY: ', len(packet['overlay']))
 
-        packet = json.dumps(packet).encode('utf8')
+        packet = json.dumps(packet, default=np_encoder).encode('utf8')
         self.sendMessage(packet, False)
+
 
 class WSServerFactory(WebSocketServerFactory):
     def __init__(self, ip, realm):

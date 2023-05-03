@@ -14,6 +14,7 @@ from nmmo.core.tile import Tile
 from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
 from nmmo.core import realm
+
 from scripted.baselines import Scripted
 
 

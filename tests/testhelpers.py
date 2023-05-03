@@ -113,6 +113,8 @@ class ScriptedAgentTestConfig(nmmo.config.Small, nmmo.config.AllGameSystems):
   LOG_EVENTS = False
   LOG_VERBOSE = False
 
+  SAVE_REPLAY = True
+
   SPECIALIZE = True
   PLAYERS = [
     baselines.Fisher, baselines.Herbalist,
