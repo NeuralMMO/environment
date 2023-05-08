@@ -116,24 +116,6 @@ class Item(ItemState):
     self.datastore_record.delete()
 
   @property
-  def is_void(self):
-    # test if the linked datastore record is deleted
-    item_arr = ItemState.Query.by_id(self.realm.datastore, self.id.val)
-    if len(item_arr) == 0:
-      return True
-
-    # if there is a datastore record, see if it is the same item type
-    item = ItemState.parse_array(item_arr[0])
-    if item.owner_id == self.owner_id.val and \
-       item.type_id == self.ITEM_TYPE_ID and \
-       item.level == self.level.val and \
-       item.quantity == self.quantity.val:
-      return False # valid item
-
-    # the info does not match, perhaps a new entry was created with the same id
-    return True
-
-  @property
   def packet(self):
     return {'item':             self.__class__.__name__,
             'level':            self.level.val,
