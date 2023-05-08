@@ -110,6 +110,8 @@ class Item(ItemState):
     realm.items[self.id.val] = self
 
   def destroy(self):
+    if self.owner_id.val in self.realm.players:
+      self.realm.players[self.owner_id.val].inventory.remove(self)
     self.realm.items.pop(self.id.val, None)
     self.datastore_record.delete()
 
