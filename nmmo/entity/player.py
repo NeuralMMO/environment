@@ -14,9 +14,6 @@ class Player(entity.Entity):
     self.target = None
     self.vision = 7
 
-    # record the latest tick when the player attacked or was attacked
-    self.latest_combat_tick = None
-
     # Logs
     self.buys                     = 0
     self.sells                    = 0
@@ -52,13 +49,6 @@ class Player(entity.Entity):
     # CHECK ME: the initial level is 1 because of Basic skills,
     #   which are harvesting food/water and don't progress
     return max(e.level.val for e in self.skills.skills)
-
-  @property
-  def in_combat(self) -> bool:
-    if not self.config.COMBAT_SYSTEM_ENABLED or self.latest_combat_tick is None:
-      return False
-
-    return (self.realm.tick - self.latest_combat_tick) < self.config.COMBAT_STATUS_DURATION
 
   def apply_damage(self, dmg, style):
     super().apply_damage(dmg, style)

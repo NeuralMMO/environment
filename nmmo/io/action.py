@@ -275,10 +275,10 @@ class Attack(Node):
     if style.freeze and dmg > 0:
       target.status.freeze.update(config.COMBAT_FREEZE_TIME)
 
-    # record the combat tick for both player entities
+    # record the combat tick for both entities
+    # players and npcs both have latest_combat_tick in EntityState
     for ent in [entity, target]:
-      if ent.is_player:
-        ent.latest_combat_tick = realm.tick + 1 # because the tick is about to increment
+      ent.latest_combat_tick.update(realm.tick + 1) # because the tick is about to increment
 
     return dmg
 

@@ -91,9 +91,9 @@ class TestAmmoUse(ScriptedTestTemplate):
         for ent_id in self.ammo })
 
     # agents 1 and 2's latest_combat_tick should be updated
-    self.assertEqual(env.realm.tick, env.realm.players[1].latest_combat_tick)
-    self.assertEqual(env.realm.tick, env.realm.players[2].latest_combat_tick)
-    self.assertEqual(None, env.realm.players[3].latest_combat_tick)
+    self.assertEqual(env.realm.tick, env.realm.players[1].latest_combat_tick.val)
+    self.assertEqual(env.realm.tick, env.realm.players[2].latest_combat_tick.val)
+    self.assertEqual(0, env.realm.players[3].latest_combat_tick.val)
 
     # check if the ammos are depleted and the ammo slot is empty
     ent_id = 2

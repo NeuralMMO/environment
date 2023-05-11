@@ -45,17 +45,22 @@ class Observation:
     tiles,
     entities,
     inventory,
-    market,
-    in_combat: bool) -> None:
+    market) -> None:
 
     self.config = config
     self.current_tick = current_tick
     self.agent_id = agent_id
-    self.agent_in_combat = in_combat
 
     self.tiles = tiles[0:config.MAP_N_OBS]
     self.entities = BasicObs(entities[0:config.PLAYER_N_OBS],
                               EntityState.State.attr_name_to_col["id"])
+
+    if config.COMBAT_SYSTEM_ENABLED:
+      latest_combat_tick = self.agent().latest_combat_tick
+      self.agent_in_combat = False if latest_combat_tick == 0 else \
+        (current_tick - latest_combat_tick) < config.COMBAT_STATUS_DURATION
+    else:
+      self.agent_in_combat = False
 
     if config.ITEM_SYSTEM_ENABLED:
       self.inventory = InventoryObs(inventory[0:config.INVENTORY_N_OBS],

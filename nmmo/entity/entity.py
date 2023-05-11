@@ -24,6 +24,7 @@ EntityState = SerializedState.subclass(
     "freeze",
     "item_level",
     "attacker_id",
+    "latest_combat_tick",
     "message",
 
     # Resources
@@ -56,6 +57,7 @@ EntityState.Limits = lambda config: {
     "freeze": (0, 3),
     "item_level": (0, 5*config.NPC_LEVEL_MAX),
     "attacker_id": (-np.inf, math.inf),
+    "latest_combat_tick": (0, math.inf),
     "health": (0, config.PLAYER_BASE_HEALTH),
   },
   **({
@@ -332,3 +334,11 @@ class Entity(EntityState):
     mage = self.skills.mage.level.val
 
     return int(max(melee, ranged, mage))
+
+  @property
+  def in_combat(self) -> bool:
+    # NOTE: the initial latest_combat_tick is 0, and valid values are greater than 0
+    if not self.config.COMBAT_SYSTEM_ENABLED or self.latest_combat_tick.val == 0:
+      return False
+
+    return (self.realm.tick - self.latest_combat_tick.val) < self.config.COMBAT_STATUS_DURATION
