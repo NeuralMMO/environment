@@ -366,7 +366,8 @@ class Env(ParallelEnv):
 
       obs[agent_id] = Observation(
         self.config, self.realm.tick,
-        agent_id, visible_tiles, visible_entities, inventory, market)
+        agent_id, visible_tiles, visible_entities, inventory, market,
+        agent.in_combat)
 
     return obs
 

@@ -275,6 +275,11 @@ class Attack(Node):
     if style.freeze and dmg > 0:
       target.status.freeze.update(config.COMBAT_FREEZE_TIME)
 
+    # record the combat tick for both player entities
+    for ent in [entity, target]:
+      if ent.is_player:
+        ent.latest_combat_tick = realm.tick + 1 # because the tick is about to increment
+
     return dmg
 
 class Style(Node):
@@ -382,6 +387,9 @@ class Use(Node):
     if item not in entity.inventory:
       return
 
+    if entity.in_combat: # player cannot use item during combat
+      return
+
     # cannot use listed items or items that have higher level
     if item.listed_price.val > 0 or item.level_gt(entity):
       return
@@ -413,6 +421,9 @@ class Destroy(Node):
       return
 
     if item.equipped.val: # cannot destroy equipped item
+      return
+
+    if entity.in_combat: # player cannot destroy item during combat
       return
 
     item.destroy()
@@ -449,6 +460,9 @@ class Give(Node):
 
     # cannot give the equipped or listed item
     if item.equipped.val or item.listed_price.val:
+      return
+
+    if entity.in_combat: # player cannot give item during combat
       return
 
     if not (config.ITEM_ALLOW_GIFT and
@@ -495,6 +509,9 @@ class GiveGold(Node):
       return
 
     if not (target.is_player and target.alive):
+      return
+
+    if entity.in_combat: # player cannot give gold during combat
       return
 
     if not (config.ITEM_ALLOW_GIFT and
@@ -567,6 +584,9 @@ class Buy(Node):
     if entity.ent_id == item.owner_id.val: # cannot buy own item
       return
 
+    if entity.in_combat: # player cannot buy item during combat
+      return
+
     if not entity.inventory.space:
       # buyer inventory is full - see if it has an ammo stack with the same sig
       if isinstance(item, Stack):
@@ -601,11 +621,10 @@ class Sell(Node):
     if not realm.config.EXCHANGE_SYSTEM_ENABLED:
       return
 
-    # TODO(kywch): Find a better way to check this
-    # Should only occur when item is used on same tick
-    # Otherwise should not be possible
-    #   >> Actions on the same item should be checked at env._validate_actions
     if item not in entity.inventory:
+      return
+
+    if entity.in_combat: # player cannot sell item during combat
       return
 
     # cannot sell the equipped or listed item
