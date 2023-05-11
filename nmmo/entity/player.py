@@ -26,6 +26,7 @@ class Player(entity.Entity):
     self.skills = Skills(realm, self)
 
     # Gold: initialize with 1 gold, like the old nmmo
+    # CHECK ME: should the initial amount be in the config?
     if realm.config.EXCHANGE_SYSTEM_ENABLED:
       self.gold.update(1)
 
