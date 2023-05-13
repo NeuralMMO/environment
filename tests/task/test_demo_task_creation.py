@@ -1,21 +1,22 @@
 import unittest
 from tests.testhelpers import ScriptedAgentTestConfig
+from functools import partial
 
-from nmmo.core.env import Env as TaskEnv
+from nmmo.core.env import Env
 from nmmo.lib.log import EventCode
 from nmmo.task.predicate import predicate, OR
-from nmmo.task.base_predicates import HoardGold, AllDead, StayAlive, \
-  CountEvent, DistanceTraveled, AttainSkill, nmmo_skill
+from nmmo.task import base_predicates as p
+from nmmo.task import task_api as t
+from nmmo.task.base_predicates import nmmo_skill
 from nmmo.task.game_state import GameState
 from nmmo.task.group import Group
-from nmmo.task.utils import TeamHelper
-from nmmo.task.task_api import PredicateTask, Once, Repeat
+from nmmo.task.utils import TeamHelper, Scenario
 
 class TestDemoTask(unittest.TestCase):
   # pylint: disable=protected-access,invalid-name
   def test_example_user_task_definition(self):
     config = ScriptedAgentTestConfig()
-    env = TaskEnv(config)
+    env = Env(config)
     team_helper = TeamHelper.generate_from_config(config)
 
     # Define Predicate Utilities
@@ -23,11 +24,11 @@ class TestDemoTask(unittest.TestCase):
     def CustomPredicate(gs: GameState,
                         subject: Group,
                         target: Group):
-        t1 = HoardGold(subject, 10) & AllDead(target)
+        t1 = p.HoardGold(subject, 10) & p.AllDead(target)
         return t1
 
     # Define Task Utilities
-    class CompletionChangeTask(PredicateTask):
+    class CompletionChangeTask(t.PredicateTask):
        def __init__(self, *args, **kwargs):
           super().__init__(*args, **kwargs)
           self._previous = 0
@@ -41,12 +42,12 @@ class TestDemoTask(unittest.TestCase):
           return rewards, infos
 
     # Creation of the actual tasks
-    all_agents = team_helper.all_agents()
+    all_agents = team_helper.all_agents
     team_A = team_helper.own_team(1)
     team_B = team_helper.left_team(1)
     custom_predicate = CustomPredicate(subject=team_A, target=team_B)
 
-    stay_alive_tasks = [Repeat(agent, StayAlive(agent)) for agent in all_agents]
+    stay_alive_tasks = [t.Repeat(agent, p.StayAlive(agent)) for agent in all_agents]
     custom_task_2 = CompletionChangeTask(team_A, predicate=custom_predicate)
 
     tasks = [(custom_task_2, 5)] + stay_alive_tasks
@@ -64,15 +65,15 @@ class TestDemoTask(unittest.TestCase):
     '''
     # Setup 
     config = ScriptedAgentTestConfig()
-    env = TaskEnv(config)
+    env = Env(config)
     team_helper = TeamHelper.generate_from_config(config)
 
     # Task Definition
       # Utility
-    class KillTask(PredicateTask):
+    class KillTask(t.PredicateTask):
       def __init__(self, assignee: Group):
         # Use predicate to easily access game state
-        kill_predicate = CountEvent(assignee, 'PLAYER_KILL', 100)
+        kill_predicate = p.CountEvent(assignee, 'PLAYER_KILL', 100)
         super().__init__(assignee, kill_predicate)
         self._previous = 0
       def _rewards(self, gs: GameState):
@@ -92,7 +93,7 @@ class TestDemoTask(unittest.TestCase):
           return rewards, {}
       # Assigning
     tasks = []
-    all_agents = team_helper.all_agents()
+    all_agents = team_helper.all_agents
     for agent in all_agents:
       tasks.append(KillTask(agent))
 
@@ -139,88 +140,107 @@ class TestDemoTask(unittest.TestCase):
       NORMAL       = 6 / REWARD_SCALE
       HARD         = 11 / REWARD_SCALE
 
-
-
     # Usage of inbuilt predicate
-    def player_kills(team_helper):
-      all_agents = team_helper.all_agents()
-      tasks = []
-      for agent in all_agents:
-         agent_tasks = [
-            Once(agent, CountEvent(agent, 'PLAYER_KILL', 1), reward=Tier.EASY),
-            Once(agent, CountEvent(agent, 'PLAYER_KILL', 2), reward=Tier.NORMAL),
-            Once(agent, CountEvent(agent, 'PLAYER_KILL', 3), reward=Tier.HARD)
-         ]
-         tasks = tasks + agent_tasks
-      return tasks
-    
-    def exploration(team_helper):
-      all_agents = team_helper.all_agents()
-      tasks = []
-      for agent in all_agents:
-         agent_tasks = [
-            Once(agent, DistanceTraveled(agent, 16), reward=Tier.EASY),
-            Once(agent, DistanceTraveled(agent, 32), reward=Tier.NORMAL),
-            Once(agent, DistanceTraveled(agent, 64), reward=Tier.HARD)
-         ]
-         tasks = tasks + agent_tasks
-      return tasks
+    def player_kills(scenario: Scenario):
 
+      scenario.add_tasks_foreach(
+         lambda team: t.Once(assignee=team,
+                             predicate=p.CountEvent(team, 'PLAYER_KILL', 1),
+                             reward=Tier.EASY)
+      )
+      scenario.add_tasks_foreach(
+         lambda team: t.Once(assignee=team,
+                             predicate=p.CountEvent(team, 'PLAYER_KILL', 2),
+                             reward=Tier.NORMAL)
+      )
+      scenario.add_tasks_foreach(
+         lambda team: t.Once(assignee=team,
+                             predicate=p.CountEvent(team, 'PLAYER_KILL', 3),
+                             reward=Tier.HARD)
+      )
+      return scenario.tasks
+
+    def exploration(scenario: Scenario):
+      scenario.add_tasks_foreach(
+        lambda agent: t.Once(agent, p.DistanceTraveled(agent, 16), reward=Tier.EASY),
+        groups='agents'
+      )
+      scenario.add_tasks_foreach(
+        lambda agent: t.Once(agent, p.DistanceTraveled(agent, 32), reward=Tier.NORMAL),
+        groups='agents'
+      )
+      scenario.add_tasks_foreach(
+        lambda agent: t.Once(agent, p.DistanceTraveled(agent, 64), reward=Tier.HARD),
+        groups='agents'
+      )
+      return scenario.tasks
+
+    '''
     # Demonstrates custom predicate - return float/boolean
-    def equipment(team_helper):
-      @predicate
-      def EquipmentLevel(gs: GameState,
-                        subject: Group,
-                        number: int):
-        equipped = (subject.item.equipped>0)
-        levels = subject.item.level[equipped]
-        return levels.sum() >= number
+    @predicate
+    def EquipmentLevel(gs: GameState,
+                      subject: Group,
+                      number: int):
+      equipped = (subject.item.equipped>0)
+      levels = subject.item.level[equipped]
+      return levels.sum() >= number
 
+    TaskGenerator(team_helper).tasks([EquipmentLevel(1), reward=5), EquipmentLevel(5), reward=10])
+
+    def equipment(team_helper):
+      tasks = TaskGenerator(team_helper)
+      for agent in team_helper.all_agents():
+        tasks.generate(EquipmentLevel, agent, args=[1], reward=Tier.EASY)
+        tasks.generate(EquipmentLevel, agent, args=[5], reward=Tier.NORMAL)
+        tasks.generate(EquipmentLevel, agent, args=[10], reward=Tier.HARD)
+      return tasks
+
+    def equipment(team_helper):
       all_agents = team_helper.all_agents()
       tasks = []
       for agent in all_agents:
          agent_tasks = [
-            Once(agent, EquipmentLevel(agent, 1), reward=Tier.EASY),
-            Once(agent, EquipmentLevel(agent, 5), reward=Tier.NORMAL),
-            Once(agent, EquipmentLevel(agent, 10), reward=Tier.HARD)
+            t.Once(agent, EquipmentLevel(agent, 1), reward=Tier.EASY),
+            t.Once(agent, EquipmentLevel(agent, 5), reward=Tier.NORMAL),
+            t.Once(agent, EquipmentLevel(agent, 10), reward=Tier.HARD)
          ]
          tasks = tasks + agent_tasks
       return tasks
 
     # Demonstrates custom predicate - return predicate
+    @predicate
+    def CombatSkill(gs, agent, lvl):
+        return OR(p.AttainSkill(agent, nmmo_skill.Melee, lvl, 1),
+                  p.AttainSkill(agent, nmmo_skill.Range, lvl, 1),
+                  p.AttainSkill(agent, nmmo_skill.Mage, lvl, 1))
     def combat(team_helper):
-      @predicate
-      def CombatSkill(gs, agent, lvl):
-         return OR(AttainSkill(agent, nmmo_skill.Melee, lvl, 1),
-                   AttainSkill(agent, nmmo_skill.Range, lvl, 1),
-                   AttainSkill(agent, nmmo_skill.Mage, lvl, 1))
       all_agents = team_helper.all_agents()
       tasks = []
       for agent in all_agents:
          agent_tasks = [
-            Once(agent, CombatSkill(agent, 2), reward=Tier.EASY),
-            Once(agent, CombatSkill(agent, 3), reward=Tier.NORMAL),
-            Once(agent, CombatSkill(agent, 4), reward=Tier.HARD)
+            t.Once(agent, CombatSkill(agent, 2), reward=Tier.EASY),
+            t.Once(agent, CombatSkill(agent, 3), reward=Tier.NORMAL),
+            t.Once(agent, CombatSkill(agent, 4), reward=Tier.HARD)
          ]
          tasks = tasks + agent_tasks
       return tasks
+    
+    @predicate
+    def ForageSkill(gs, agent, lvl):
+        return OR(p.AttainSkill(agent, nmmo_skill.Fishing, lvl, 1),
+                  p.AttainSkill(agent, nmmo_skill.Herbalism, lvl, 1),
+                  p.AttainSkill(agent, nmmo_skill.Prospecting, lvl, 1),
+                  p.AttainSkill(agent, nmmo_skill.Carving, lvl, 1),
+                  p.AttainSkill(agent, nmmo_skill.Alchemy, lvl, 1))
 
     def foraging(team_helper):
-      @predicate
-      def ForageSkill(gs, agent, lvl):
-         return OR(AttainSkill(agent, nmmo_skill.Fishing, lvl, 1),
-                   AttainSkill(agent, nmmo_skill.Herbalism, lvl, 1),
-                   AttainSkill(agent, nmmo_skill.Prospecting, lvl, 1),
-                   AttainSkill(agent, nmmo_skill.Carving, lvl, 1),
-                   AttainSkill(agent, nmmo_skill.Alchemy, lvl, 1))
-
       all_agents = team_helper.all_agents()
       tasks = []
       for agent in all_agents:
          agent_tasks = [
-            Once(agent, ForageSkill(agent, 2), reward=Tier.EASY),
-            Once(agent, ForageSkill(agent, 3), reward=Tier.NORMAL),
-            Once(agent, ForageSkill(agent, 4), reward=Tier.HARD)
+            t.Once(agent, ForageSkill(agent, 2), reward=Tier.EASY),
+            t.Once(agent, ForageSkill(agent, 3), reward=Tier.NORMAL),
+            t.Once(agent, ForageSkill(agent, 4), reward=Tier.HARD)
          ]
          tasks = tasks + agent_tasks
       return tasks
@@ -231,14 +251,16 @@ class TestDemoTask(unittest.TestCase):
         equipment(team_helper) + \
         combat(team_helper) + \
         foraging(team_helper)
+    '''
 
     # Test rollout
-    scenarios = [player_kills, exploration, equipment, combat, foraging, all_tasks]
-    for scenario in scenarios:
+    # task_generators = [player_kills, exploration, equipment, combat, foraging, all_tasks]
+    task_generators = [player_kills, exploration]
+    for tg in task_generators:
       config = ScriptedAgentTestConfig()
-      env = TaskEnv(config)
-      team_helper = TeamHelper.generate_from_config(config)
-      tasks = scenario(team_helper)
+      env = Env(config)
+      scenario = Scenario(config)
+      tasks = tg(scenario)
       env.change_task(tasks)
       for _ in range(30):
         env.step({})

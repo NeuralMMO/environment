@@ -36,11 +36,10 @@ class FakePredicate(Predicate):
   def _evaluate(self, gs: GameState) -> bool:
     return False
 
-class MockGameState(GameState):
+class MockGameState():
   def __init__(self):
     # pylint: disable=super-init-not-called
-    pass
-
+    self.config = nmmo.config.Default()
 class TestTaskAPI(unittest.TestCase):
 
   def test_operators(self):
@@ -78,20 +77,6 @@ class TestTaskAPI(unittest.TestCase):
       "OR(AND(Success,NOT(OR(Failure,FakePredicate_(2,)_1_Hat_Melee))),"
       "IMPLY(Failure->FakePredicate_(2,)_1_Hat_Melee))")
 
-  '''
-  def test_team_helper(self):
-    config = ScriptedAgentTestConfig()
-    env = nmmo.Env(config)
-    env.reset()
-
-    team_helper = TeamHelper.generate_from_config(config)
-
-    # agents' population should match team_helper team id
-    for ent_id, ent in env.realm.players.items():
-      # pylint: disable=protected-access
-      self.assertEqual(team_helper._ent_to_team[ent_id], ent.population)
-  '''
-
   def test_team_assignment(self):
     team =  Group([1, 2, 8, 9], "TeamFoo")
 
@@ -101,20 +86,6 @@ class TestTaskAPI(unittest.TestCase):
 
     # don't allow member of one-member team
     self.assertEqual(team[2][0].name, team[2].name)
-
-  def test_random_task_generator(self):
-    rand_generator = generator.RandomTaskGenerator()
-
-    rand_generator.add_task_spec(Success, [[Group([1]), Group([3])]])
-    rand_generator.add_task_spec(Failure, [[Group([2]), Group([1,3])]])
-    rand_generator.add_task_spec(FakePredicate, [
-      [Group([1]), Group([2]), Group([1,2]), Group([3]), Group([1,3])],
-      [Item.Hat, Item.Top, Item.Bottom],
-      [1, 5, 10],
-      [0.1, 0.2, 0.3, 0.4]
-    ])
-
-    rand_generator.sample(max_clauses=4, max_clause_size=3, not_p=0.5)
 
   def test_completed_tasks_in_info(self):
     config = ScriptedAgentTestConfig()

@@ -1,15 +1,20 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Dict, List, Union
+import copy
+import inspect
 
 from nmmo.task.game_state import GameState
 from nmmo.task.group import Group
+from nmmo.task.utils import Scenario
+from nmmo.task.constraint import Constraint, InvalidConstraint
 
 class Predicate(ABC):
   ''' A mapping from the state of an episode to a float in the range [0,1]
   where 1 stands for True and 0 for False
   '''
 
-  def __init__(self, *args,name: str=None, **kwargs) -> None:
+  def __init__(self, *args, name: str=None, **kwargs) -> None:
     if name is None:
       self._name = Predicate._make_name(self.__class__.__name__, args, kwargs)
     else:
@@ -19,10 +24,19 @@ class Predicate(ABC):
 
     self._groups: List[Group] = list(filter(is_group, args))
     self._groups = self._groups + list(filter(is_group, kwargs.values()))
+    self._config = None
 
   def __call__(self, gs: GameState) -> float:
+    # Check validity
+    if not self._config == gs.config:
+      self._config = gs.config
+      scenario = Scenario(gs.config)
+      if not self._check(scenario):
+        raise InvalidConstraint()
+    # Update views
     for group in self._groups:
       group.update(gs)
+    # Evaluate
     return max(min(self._evaluate(gs)*1,1.0),0)
 
   @abstractmethod
@@ -64,6 +78,27 @@ class Predicate(ABC):
   def description(self) -> Dict:
     return self._desc("Predicate")
 
+  def sample(self, scenario: Scenario) -> Predicate:
+    """ Returns a concrete instance of this predicate
+    confined within the limits of scenario. 
+
+    Allows each predicate instance to act as a generator
+    for more predicates. Supports partial application.
+    
+    See constraint.py
+    """
+    return copy.deepcopy(self)
+
+  def _check(self, scenario: Scenario) -> bool:
+    """ Checks whether the predicate is valid
+
+    A valid predicate is a predicate that "makes sense" given a scenario
+    ie. Not trying to reach target off the map
+
+    Not the same as satisfiability or a tautology.
+    """
+    return True
+
   def __and__(self, other):
     return AND(self, other)
   def __or__(self, other):
@@ -79,6 +114,7 @@ def predicate(fn) -> Predicate:
   class FunctionPredicate(Predicate):
     def __init__(self, *args, **kwargs) -> None:
       super().__init__(*args, name=fn.__name__, **kwargs)
+      self._signature = inspect.signature(fn)
       self._args = args
       self._kwargs = kwargs
 
@@ -89,6 +125,25 @@ def predicate(fn) -> Predicate:
       if isinstance(result, Predicate):
         return result(gs)
       return result
+
+    def sample(self, scenario: Scenario):
+      nargs = [arg.sample(scenario) if isinstance(arg, Constraint) else arg
+              for arg in self._args]
+      nkwargs = {k : v.sample(scenario) if isinstance(v, Constraint) else v
+                 for k,v in self._kwargs}
+      return FunctionPredicate(nargs, nkwargs)
+
+    def _check(self, scenario: Scenario):
+      for i, param in enumerate(self._signature.parameters.values()):
+        if isinstance(param.default, Constraint):
+          if i == 0:
+            continue
+          if i-1 < len(self._args):
+            if not param.default.check(scenario,self._args[i-1]):
+              return False
+          elif not param.default.check(scenario, self._kwargs[param.name]):
+            return False
+      return True
 
   return FunctionPredicate
 
@@ -102,12 +157,18 @@ class AND(Predicate):
     self._predicates = predicates
 
     # the name is AND(task1,task2,task3)
-    self._name = 'AND(' + ','.join([t.name for t in self._predicates]) + ')'
+    self._name = 'AND(' + ','.join([p.name for p in self._predicates]) + ')'
 
   def _evaluate(self, gs: GameState):
     """True if all _predicates are evaluated to be True.
     """
-    return min(t(gs) for t in self._predicates)
+    return min(p(gs) for p in self._predicates)
+
+  def _check(self, scenario: Scenario) -> bool:
+    return all([p._check(scenario) for p in self._predicates])
+
+  def sample(self, scenario: Scenario):
+    return AND((p.sample(scenario) for p in self._predicates))
 
   @property
   def description(self) -> Dict:
@@ -122,12 +183,18 @@ class OR(Predicate):
     self._predicates = predicates
 
     # the name is OR(task1,task2,task3,...)
-    self._name = 'OR(' + ','.join([t.name for t in self._predicates]) + ')'
+    self._name = 'OR(' + ','.join([p.name for p in self._predicates]) + ')'
 
   def _evaluate(self, gs: GameState):
     """True if any of _predicates is evaluated to be True.
     """
-    return max(t(gs) for t in self._predicates)
+    return max(p(gs) for p in self._predicates)
+
+  def _check(self, scenario: Scenario) -> bool:
+    return all([p._check(scenario) for p in self._predicates])
+  
+  def sample(self, scenario: Scenario):
+    return OR((p.sample(scenario) for p in self._predicates))
 
   @property
   def description(self) -> Dict:
@@ -136,23 +203,29 @@ class OR(Predicate):
     return desc
 
 class NOT(Predicate):
-  def __init__(self, task: Predicate):
+  def __init__(self, p: Predicate):
     super().__init__()
     # pylint: disable=super-init-not-called
-    self._task = task
+    self._p = p
 
     # the name is NOT(task)
-    self._name = f'NOT({self._task.name})'
+    self._name = f'NOT({self._p.name})'
+  
+  def _check(self, scenario: Scenario) -> bool:
+    return self._p._check(scenario)
+  
+  def sample(self, scenario: Scenario):
+    return NOT(self._p.sample(scenario))
 
   def _evaluate(self, gs: GameState):
     """True if _task is evaluated to be False.
     """
-    return 1- self._task(gs)
+    return 1- self._p(gs)
 
   @property
   def description(self) -> Dict:
     desc = self._desc("Negation")
-    desc.update({ 'desc_child': ["NOT", self._task.description] })
+    desc.update({ 'desc_child': ["NOT", self._p.description] })
     return desc
 
 class IMPLY(Predicate):
@@ -163,6 +236,12 @@ class IMPLY(Predicate):
 
     # the name is IMPLY(p->q)
     self._name = f'IMPLY({self._p.name}->{self._q.name})'
+
+  def _check(self, scenario: Scenario) -> bool:
+    return self._p._check(scenario) and self._q._check(scenario)
+
+  def sample(self, scenario: Scenario):
+    return IMPLY(self._p.sample(scenario), self._q.sample(scenario))
 
   def _evaluate(self, gs: GameState):
     """False if _p is true and _q is false.
