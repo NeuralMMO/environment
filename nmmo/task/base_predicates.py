@@ -1,4 +1,5 @@
 #pylint: disable=invalid-name, unused-argument, no-value-for-parameter
+from __future__ import annotations
 import numpy as np
 from numpy import count_nonzero as count
 
@@ -29,7 +30,7 @@ def TickGE(gs: GameState,
 @predicate
 def CanSeeTile(gs: GameState,
                subject: Group           = constraint.TEAM_GROUPS,
-               tile_type: Material      = constraint.MATERIAL_CONSTRAINT):
+               tile_type: type[Material]= constraint.MATERIAL_CONSTRAINT):
   """ True if any agent in subject can see a tile of tile_type
   """
   return any(tile_type.index in t for t in subject.obs.tile.material_id)
@@ -125,7 +126,7 @@ def CountEvent(gs: GameState,
 @predicate
 def ScoreHit(gs: GameState,
              subject: Group                 = constraint.TEAM_GROUPS,
-             combat_style: Skill            = constraint.COMBAT_SKILL_CONSTRAINT,
+             combat_style: type[Skill]      = constraint.COMBAT_SKILL_CONSTRAINT,
              N: int                         = constraint.ScalarConstraint()):
   """True if the number of hits scored in style
   combat_style >= count
@@ -180,7 +181,7 @@ def InventorySpaceGE(gs: GameState,
 @predicate
 def OwnItem(gs: GameState,
             subject: Group                  = constraint.TEAM_GROUPS,
-            item: Item                      = constraint.ITEM_CONSTRAINT,
+            item: type[Item]                = constraint.ITEM_CONSTRAINT,
             level: int                      = constraint.PROGRESSION_CONSTRAINT,
             quantity: int                   = constraint.INVENTORY_CONSTRAINT):
   """True if the number of items owned (_item_type, >= level)
@@ -193,7 +194,7 @@ def OwnItem(gs: GameState,
 @predicate
 def EquipItem(gs: GameState,
               subject: Group                = constraint.TEAM_GROUPS,
-              item: Item                    = constraint.ITEM_CONSTRAINT,
+              item: type[Item]              = constraint.ITEM_CONSTRAINT,
               level: int                    = constraint.PROGRESSION_CONSTRAINT,
               num_agent: int                = constraint.AGENT_NUMBER_CONSTRAINT):
   """True if the number of agents that equip the item (_item_type, >=_level)
@@ -209,7 +210,7 @@ def EquipItem(gs: GameState,
 @predicate
 def FullyArmed(gs: GameState,
                subject: Group               = constraint.TEAM_GROUPS,
-               combat_style: Skill          = constraint.COMBAT_SKILL_CONSTRAINT,
+               combat_style: type[Skill]    = constraint.COMBAT_SKILL_CONSTRAINT,
                level: int                   = constraint.PROGRESSION_CONSTRAINT,
                num_agent: int               = constraint.AGENT_NUMBER_CONSTRAINT):
   """True if the number of fully equipped agents is greater than or equal to _num_agent
@@ -237,7 +238,7 @@ def FullyArmed(gs: GameState,
 @predicate
 def ConsumeItem(gs: GameState,
                 subject: Group              = constraint.TEAM_GROUPS,
-                item: Item                  = constraint.CONSUMABLE_CONSTRAINT,
+                item: type[Item]            = constraint.CONSUMABLE_CONSTRAINT,
                 level: int                  = constraint.PROGRESSION_CONSTRAINT,
                 quantity: int               = constraint.ScalarConstraint()):
   """True if total quantity consumed of item type above level is >= quantity
@@ -249,7 +250,7 @@ def ConsumeItem(gs: GameState,
 @predicate
 def HarvestItem(gs: GameState,
                 subject: Group              = constraint.TEAM_GROUPS,
-                item: Item                  = constraint.ITEM_CONSTRAINT,
+                item: type[Item]            = constraint.ITEM_CONSTRAINT,
                 level: int                  = constraint.PROGRESSION_CONSTRAINT,
                 quantity: int               = constraint.ScalarConstraint()):
   """True if total quantity harvested of item type above level is >= quantity
@@ -261,7 +262,7 @@ def HarvestItem(gs: GameState,
 @predicate
 def ListItem(gs: GameState,
              subject: Group                 = constraint.TEAM_GROUPS,
-             item: Item                     = constraint.ITEM_CONSTRAINT,
+             item: type[Item]               = constraint.ITEM_CONSTRAINT,
              level: int                     = constraint.PROGRESSION_CONSTRAINT,
              quantity: int                  = constraint.ScalarConstraint()):
   """True if total quantity listed of item type above level is >= quantity
@@ -273,7 +274,7 @@ def ListItem(gs: GameState,
 @predicate
 def BuyItem(gs: GameState,
             subject: Group                  = constraint.TEAM_GROUPS,
-            item: Item                      = constraint.ITEM_CONSTRAINT,
+            item: type[Item]                = constraint.ITEM_CONSTRAINT,
             level: int                      = constraint.PROGRESSION_CONSTRAINT,
             quantity: int                   = constraint.ScalarConstraint()):
   """True if total quantity purchased of item type above level is >= quantity

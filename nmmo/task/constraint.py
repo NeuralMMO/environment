@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import random
 from numbers import Number
-from typing import Union, Callable, TYPE_CHECKING
+from typing import Union, Callable
 from abc import ABC, abstractmethod
+
 from nmmo.systems import skill, item
 from nmmo.lib import material
-
-from nmmo.task.utils import Scenario
-if TYPE_CHECKING:
-  from nmmo.task.utils import Scenario
+from nmmo.core.config import Config
+from nmmo.task.team_helper import TeamHelper
 
 
 class InvalidConstraint(Exception):
@@ -24,47 +23,48 @@ class Constraint(ABC):
       systems = []
     self._systems = systems
 
-  def check(self, scenario: Scenario, value):
-    """ Checks value is in bounds given scenario
+  # pylint: disable=unused-argument
+  def check(self, config: Config, value):
+    """ Checks value is in bounds given config
     """
     for system in self._systems:
       try:
-        if not scenario.config.__getattribute__(system):
+        if not getattr(config,system):
           return False
-      except:
+      except AttributeError:
         return False
     return True
 
   @abstractmethod
-  def sample(self, scenario: Scenario):
-    """ Generator to sample valid values given scenario
+  def sample(self, config: Config):
+    """ Generator to sample valid values given config
     """
     raise NotImplementedError
-   
+
 class GroupConstraint(Constraint):
-  """ Ensures that all agents of a group exist in a scenario
+  """ Ensures that all agents of a group exist in a config
   """
   def __init__(self,
-               sample_fn = lambda s: s.team_helper.all_teams,
+               sample_fn = lambda c: TeamHelper.generate_from_config(c).all_teams,
                systems = None):
     """
     Params
-      sample_fn: given a Scenario, return groups to select from
+      sample_fn: given a Config, return groups to select from
       systems: systems required to operate
     """
     super().__init__(systems)
     self._sample_fn = sample_fn
 
-  def check(self, scenario, value):
-    if not super().check(scenario,value):
+  def check(self, config, value):
+    if not super().check(config,value):
       return False
     for agent in value.agents:
-      if agent > scenario.config.PLAYER_N:
+      if agent > config.PLAYER_N:
         return False
     return True
 
-  def sample(self, scenario):
-    return random.choice(self._sample_fn(scenario))
+  def sample(self, config):
+    return random.choice(self._sample_fn(config))
 
 class ScalarConstraint(Constraint):
   def __init__(self,
@@ -83,15 +83,15 @@ class ScalarConstraint(Constraint):
     if self._dtype == int:
       self._dtype = round
 
-  def check(self, scenario, value):
-    if not super().check(scenario,value):
+  def check(self, config, value):
+    if not super().check(config,value):
       return False
-    if self._low(scenario) <= value < self._high(scenario):
+    if self._low(config) <= value < self._high(config):
       return True
     return False
 
-  def sample(self, scenario):
-    l, h = self._low(scenario), self._high(scenario)
+  def sample(self, config):
+    l, h = self._low(config), self._high(config)
     return self._dtype(random.random()*(h-l)+l)
 
 class DiscreteConstraint(Constraint):
@@ -99,17 +99,17 @@ class DiscreteConstraint(Constraint):
     super().__init__(systems)
     self._space = space
 
-  def check(self, scenario: Scenario, value):
-    if not super().check(scenario,value):
+  def check(self, config: Config, value):
+    if not super().check(config,value):
       return False
     return value in self._space
 
-  def sample(self, scenario: Scenario):
+  def sample(self, config: Config):
     return random.choice(self._space)
 
 # Group Constraints
 TEAM_GROUPS = GroupConstraint()
-INDIVIDUAL_GROUPS = GroupConstraint(sample_fn=lambda th: th.all_agents)
+INDIVIDUAL_GROUPS=GroupConstraint(sample_fn=lambda c:TeamHelper.generate_from_config(c).all_agents)
 
 # System Constraints
 MATERIAL_CONSTRAINT = DiscreteConstraint(space=list(material.All.materials),
@@ -146,7 +146,7 @@ ITEM_CONSTRAINT = DiscreteConstraint(space=armour+weapons+tools+ammunition+consu
 CONSUMABLE_CONSTRAINT = DiscreteConstraint(space=consumables,
                                            systems=['ITEM_SYSTEM_ENABLED'])
 # Config Constraints
-COORDINATE_CONSTRAINT = ScalarConstraint(high = lambda s: s.config.MAP_CENTER)
-PROGRESSION_CONSTRAINT = ScalarConstraint(high = lambda s: s.config.PROGRESSION_LEVEL_MAX+1)
-INVENTORY_CONSTRAINT = ScalarConstraint(high=lambda s: s.config.ITEM_INVENTORY_CAPACITY+1)
-AGENT_NUMBER_CONSTRAINT = ScalarConstraint(low = 1, high = lambda s: s.config.PLAYER_N+1)
+COORDINATE_CONSTRAINT = ScalarConstraint(high = lambda c: c.MAP_CENTER)
+PROGRESSION_CONSTRAINT = ScalarConstraint(high = lambda c: c.PROGRESSION_LEVEL_MAX+1)
+INVENTORY_CONSTRAINT = ScalarConstraint(high=lambda c: c.ITEM_INVENTORY_CAPACITY+1)
+AGENT_NUMBER_CONSTRAINT = ScalarConstraint(low = 1, high = lambda c: c.PLAYER_N+1)

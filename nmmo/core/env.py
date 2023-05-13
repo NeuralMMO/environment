@@ -38,6 +38,7 @@ class Env(ParallelEnv):
     self.scripted_agents = OrderedSet()
 
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
+    self.game_state = None
     # Default task: rewards 1 each turn agent is alive
     self.tasks: List[Tuple[Task,float]] = None
     self._task_encoding = None
@@ -435,7 +436,7 @@ class Env(ParallelEnv):
           entity identified by ent_id.
     '''
     # Initialization
-    game_state = self._gamestate_generator.generate(self.realm, self.obs)
+    self.game_state = self._gamestate_generator.generate(self.realm, self.obs)
     infos = {}
     for eid in agents:
       infos[eid] = {}
@@ -444,7 +445,7 @@ class Env(ParallelEnv):
 
     # Compute Rewards and infos
     for task, weight in self.tasks:
-      task_rewards, task_infos = task(game_state)
+      task_rewards, task_infos = task(self.game_state)
       for eid, reward in task_rewards.items():
         # Rewards, weighted
         rewards[eid] = rewards.get(eid,0) + reward * weight

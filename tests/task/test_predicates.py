@@ -58,7 +58,7 @@ class TestBasePredicate(unittest.TestCase):
     for tid, (task, assignee) in enumerate(test_tasks):
       # result is cached when at least one assignee is alive so that the task is evaled
       if set(assignee).intersection(infos):
-        self.assertEqual(env.game_state.cache_result[task.name], tid in true_task)
+        self.assertEqual(int(env.game_state.cache_result[task.name]), tid in true_task)
       for ent_id in infos:
         if ent_id in assignee:
           # the agents that are assigned the task get evaluated for reward

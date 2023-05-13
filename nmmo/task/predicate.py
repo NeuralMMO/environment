@@ -4,9 +4,9 @@ from typing import Dict, List, Union
 import copy
 import inspect
 
+from nmmo.core.config import Config
 from nmmo.task.game_state import GameState
 from nmmo.task.group import Group
-from nmmo.task.utils import Scenario
 from nmmo.task.constraint import Constraint, InvalidConstraint
 
 class Predicate(ABC):
@@ -30,8 +30,8 @@ class Predicate(ABC):
     # Check validity
     if not self._config == gs.config:
       self._config = gs.config
-      scenario = Scenario(gs.config)
-      if not self._check(scenario):
+      cfg = gs.config
+      if not self.check(cfg):
         raise InvalidConstraint()
     # Update views
     for group in self._groups:
@@ -78,21 +78,23 @@ class Predicate(ABC):
   def description(self) -> Dict:
     return self._desc("Predicate")
 
-  def sample(self, scenario: Scenario) -> Predicate:
+  # pylint: disable=unused-argument
+  def sample(self, cfg: Config, **kwargs) -> Predicate:
     """ Returns a concrete instance of this predicate
-    confined within the limits of scenario. 
+    confined within the limits of cfg. 
 
     Allows each predicate instance to act as a generator
     for more predicates. Supports partial application.
-    
+
     See constraint.py
     """
     return copy.deepcopy(self)
 
-  def _check(self, scenario: Scenario) -> bool:
+  # pylint: disable=unused-argument
+  def check(self, cfg: Config) -> bool:
     """ Checks whether the predicate is valid
 
-    A valid predicate is a predicate that "makes sense" given a scenario
+    A valid predicate is a predicate that "makes sense" given a cfg
     ie. Not trying to reach target off the map
 
     Not the same as satisfiability or a tautology.
@@ -126,22 +128,29 @@ def predicate(fn) -> Predicate:
         return result(gs)
       return result
 
-    def sample(self, scenario: Scenario):
-      nargs = [arg.sample(scenario) if isinstance(arg, Constraint) else arg
+    def sample(self, cfg: Config, **overload):
+      nargs = [arg.sample(cfg) if isinstance(arg, Constraint) else arg
               for arg in self._args]
-      nkwargs = {k : v.sample(scenario) if isinstance(v, Constraint) else v
-                 for k,v in self._kwargs}
-      return FunctionPredicate(nargs, nkwargs)
+      nkwargs = {k : v.sample(cfg) if isinstance(v, Constraint) else v
+                 for k,v in self._kwargs.items()}
+      for i, param in enumerate(self._signature.parameters.values()):
+        if i == 0:
+          continue
+        if i-1 < len(nargs):
+          nkwargs[param.name] = nargs[i-1]
+        if param.name in overload:
+          nkwargs[param.name] = overload[param.name]
+      return FunctionPredicate(**nkwargs)
 
-    def _check(self, scenario: Scenario):
+    def check(self, cfg: Config):
       for i, param in enumerate(self._signature.parameters.values()):
         if isinstance(param.default, Constraint):
           if i == 0:
             continue
           if i-1 < len(self._args):
-            if not param.default.check(scenario,self._args[i-1]):
+            if not param.default.check(cfg,self._args[i-1]):
               return False
-          elif not param.default.check(scenario, self._kwargs[param.name]):
+          elif not param.default.check(cfg, self._kwargs[param.name]):
             return False
       return True
 
@@ -164,11 +173,11 @@ class AND(Predicate):
     """
     return min(p(gs) for p in self._predicates)
 
-  def _check(self, scenario: Scenario) -> bool:
-    return all([p._check(scenario) for p in self._predicates])
+  def check(self, cfg: Config) -> bool:
+    return all((p.check(cfg) for p in self._predicates))
 
-  def sample(self, scenario: Scenario):
-    return AND((p.sample(scenario) for p in self._predicates))
+  def sample(self, cfg: Config, **kwargs):
+    return AND((p.sample(cfg, **kwargs) for p in self._predicates))
 
   @property
   def description(self) -> Dict:
@@ -190,11 +199,11 @@ class OR(Predicate):
     """
     return max(p(gs) for p in self._predicates)
 
-  def _check(self, scenario: Scenario) -> bool:
-    return all([p._check(scenario) for p in self._predicates])
-  
-  def sample(self, scenario: Scenario):
-    return OR((p.sample(scenario) for p in self._predicates))
+  def check(self, cfg: Config) -> bool:
+    return all((p.check(cfg) for p in self._predicates))
+
+  def sample(self, cfg: Config, **kwargs):
+    return OR((p.sample(cfg, kwargs) for p in self._predicates))
 
   @property
   def description(self) -> Dict:
@@ -210,12 +219,12 @@ class NOT(Predicate):
 
     # the name is NOT(task)
     self._name = f'NOT({self._p.name})'
-  
-  def _check(self, scenario: Scenario) -> bool:
-    return self._p._check(scenario)
-  
-  def sample(self, scenario: Scenario):
-    return NOT(self._p.sample(scenario))
+
+  def check(self, cfg: Config) -> bool:
+    return self._p.check(cfg)
+
+  def sample(self, cfg: Config, **kwargs):
+    return NOT(self._p.sample(cfg, kwargs))
 
   def _evaluate(self, gs: GameState):
     """True if _task is evaluated to be False.
@@ -237,11 +246,11 @@ class IMPLY(Predicate):
     # the name is IMPLY(p->q)
     self._name = f'IMPLY({self._p.name}->{self._q.name})'
 
-  def _check(self, scenario: Scenario) -> bool:
-    return self._p._check(scenario) and self._q._check(scenario)
+  def check(self, cfg: Config) -> bool:
+    return self._p.check(cfg) and self._q.check(cfg)
 
-  def sample(self, scenario: Scenario):
-    return IMPLY(self._p.sample(scenario), self._q.sample(scenario))
+  def sample(self, cfg: Config, **kwargs):
+    return IMPLY(self._p.sample(cfg, kwargs), self._q.sample(cfg, kwargs))
 
   def _evaluate(self, gs: GameState):
     """False if _p is true and _q is false.

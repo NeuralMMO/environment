@@ -1,18 +1,15 @@
+# pylint: disable=import-error, unused-argument
 import logging
 import unittest
-
 from tests.testhelpers import ScriptedAgentTestConfig
 import numpy as np
 
 import nmmo
-
-# pylint: disable=import-error, unused-argument
 from nmmo.core.env import Env as TaskEnv
-from nmmo.task import generator
 from nmmo.task.task_api import Repeat
 from nmmo.task.predicate import Predicate, predicate
 from nmmo.task.group import Group
-from nmmo.task.utils import TeamHelper
+from nmmo.task.team_helper import TeamHelper
 from nmmo.task.game_state import GameState
 
 from nmmo.systems import item as Item
