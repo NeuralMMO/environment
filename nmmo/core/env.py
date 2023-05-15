@@ -417,6 +417,7 @@ class Env(ParallelEnv):
       inventory = Item.Query.owned_by(self.realm.datastore, agent_id)
 
       obs[agent_id] = Observation(self.config,
+                                  self.realm.tick,
                                   agent_id,
                                   visible_tiles,
                                   visible_entities,

@@ -73,4 +73,4 @@ class Scenario:
 def default_task(agents) -> List[Tuple[Task, float]]:
   '''Generates the default reward on env.init
   '''
-  return [Repeat(StayAlive(Group([agent]),1)) for agent in agents]
+  return [Repeat(StayAlive(Group([agent]))) for agent in agents]
