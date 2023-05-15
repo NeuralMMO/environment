@@ -145,9 +145,6 @@ class Config(Template):
     return hasattr(self, name)
 
 
-  RENDER                       = False
-  '''Flag used by render mode'''
-
   SAVE_REPLAY                  = False
   '''Flag used to save replays'''
 
@@ -387,6 +384,10 @@ class Combat:
 
   COMBAT_SPAWN_IMMUNITY              = 20
   '''Agents older than this many ticks cannot attack agents younger than this many ticks'''
+
+  COMBAT_STATUS_DURATION             = 3
+  '''Combat status lasts for this many ticks after the last combat event.
+     Combat events include both attacking and being attacked.'''
 
   COMBAT_WEAKNESS_MULTIPLIER         = 1.5
   '''Multiplier for super-effective attacks'''

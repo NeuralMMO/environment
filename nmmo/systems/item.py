@@ -1,12 +1,13 @@
 from __future__ import annotations
-from abc import ABC
-import math
 
+import math
+from abc import ABC
 from types import SimpleNamespace
 from typing import Dict
 
-from nmmo.lib.colors import Tier
+
 from nmmo.datastore.serialized import SerializedState
+from nmmo.lib.colors import Tier
 from nmmo.lib.log import EventCode
 
 # pylint: disable=no-member
@@ -109,6 +110,8 @@ class Item(ItemState):
     realm.items[self.id.val] = self
 
   def destroy(self):
+    if self.owner_id.val in self.realm.players:
+      self.realm.players[self.owner_id.val].inventory.remove(self)
     self.realm.items.pop(self.id.val, None)
     self.datastore_record.delete()
 

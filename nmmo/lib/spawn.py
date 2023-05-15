@@ -82,15 +82,20 @@ def spawn_concurrent(config):
   sides += list(zip(inc, highs))
   sides += list(zip(highs, inc[::-1]))
   sides += list(zip(inc[::-1], lows))
+  np.random.shuffle(sides)
 
-  # Space across and within teams
-  spawn_positions = []
-  for idx in range(team_sep//2, len(sides), tiles_per_team+team_sep):
-    for offset in list(range(0,  tiles_per_team, teammate_sep+1)):
-      if len(spawn_positions) >= config.PLAYER_N:
-        continue
+  if team_n > 1:
+    # Space across and within teams
+    spawn_positions = []
+    for idx in range(team_sep//2, len(sides), tiles_per_team+team_sep):
+      for offset in list(range(0,  tiles_per_team, teammate_sep+1)):
+        if len(spawn_positions) >= config.PLAYER_N:
+          continue
 
-      pos = sides[idx + offset]
-      spawn_positions.append(pos)
+        pos = sides[idx + offset]
+        spawn_positions.append(pos)
+  else:
+    # team_n = 1: to fit 128 agents in a small map, ignore spacing and spawn randomly
+    spawn_positions = sides[:config.PLAYER_N]
 
   return spawn_positions

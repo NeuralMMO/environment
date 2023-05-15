@@ -1,5 +1,6 @@
 import unittest
 import logging
+import numpy as np
 
 from tests.testhelpers import ScriptedTestTemplate, provide_item
 
@@ -19,10 +20,16 @@ class TestAmmoUse(ScriptedTestTemplate):
     super().setUpClass()
 
     # config specific to the tests here
-    cls.config.IMMORTAL = True
     cls.config.LOG_VERBOSE = False
     if cls.config.LOG_VERBOSE:
       logging.basicConfig(filename=LOGFILE, level=logging.INFO)
+
+  def _assert_action_targets_zero(self, gym_obs):
+    mask = np.sum(gym_obs['ActionTargets'][action.GiveGold][action.Price]) \
+          + np.sum(gym_obs['ActionTargets'][action.Buy][action.MarketItem])
+    for atn in [action.Use, action.Give, action.Destroy, action.Sell]:
+      mask += np.sum(gym_obs['ActionTargets'][atn][action.InventoryItem])
+    self.assertEqual(mask, 0)
 
   def test_ammo_fire_all(self):
     env = self._setup_env(random_seed=RANDOM_SEED)
@@ -44,13 +51,24 @@ class TestAmmoUse(ScriptedTestTemplate):
       mask = gym_obs['ActionTargets'][action.Sell][action.InventoryItem][:inventory.len] > 0
       self.assertTrue(inventory.id(inv_idx) not in inventory.ids[mask])
 
+      # the agents must not be in combat status
+      self.assertFalse(env.realm.players[ent_id].in_combat)
+
     # Second tick actions: ATTACK other agents using ammo
-    #  NOTE that the agents are immortal
     #  NOTE that agents 1 & 3's attack are invalid due to out-of-range
     env.step({ ent_id: { action.Attack:
         { action.Style: env.realm.players[ent_id].agent.style[0],
           action.Target: (ent_id+1)%3+1 } }
         for ent_id in self.ammo })
+
+    # check combat status: agents 2 (attacker) and 1 (target) are in combat
+    self.assertTrue(env.realm.players[2].in_combat)
+    self.assertTrue(env.realm.players[1].in_combat)
+    self.assertFalse(env.realm.players[3].in_combat)
+
+    # check the action masks are all 0 during combat
+    for ent_id in [1, 2]:
+      self._assert_action_targets_zero(env.obs[ent_id].to_gym())
 
     # check if the ammos were consumed
     ammo_ids = []
@@ -72,6 +90,11 @@ class TestAmmoUse(ScriptedTestTemplate):
           action.Target: (ent_id+1)%3+1 } }
         for ent_id in self.ammo })
 
+    # agents 1 and 2's latest_combat_tick should be updated
+    self.assertEqual(env.realm.tick, env.realm.players[1].latest_combat_tick.val)
+    self.assertEqual(env.realm.tick, env.realm.players[2].latest_combat_tick.val)
+    self.assertEqual(0, env.realm.players[3].latest_combat_tick.val)
+
     # check if the ammos are depleted and the ammo slot is empty
     ent_id = 2
     self.assertTrue(env.obs[ent_id].inventory.len == len(self.item_sig[ent_id]) - 1)
@@ -86,6 +109,13 @@ class TestAmmoUse(ScriptedTestTemplate):
       # agent 3 gathered shaving, so the item count increased
       #self.assertTrue(env.obs[ent_id].inventory.len == len(self.item_sig[ent_id]))
       self.assertTrue(env.realm.players[ent_id].inventory.equipment.ammunition.item is not None)
+
+    # after 3 ticks, combat status should be cleared
+    for _ in range(3):
+      env.step({ 0:0 }) # put dummy actions to prevent generating scripted actions
+
+    for ent_id in [1, 2, 3]:
+      self.assertFalse(env.realm.players[ent_id].in_combat)
 
     # DONE
 

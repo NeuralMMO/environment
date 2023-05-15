@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Dict, Set
+from typing import Dict
 
 import numpy as np
 from ordered_set import OrderedSet
@@ -17,8 +17,8 @@ class EntityGroup(Mapping):
     self.realm = realm
     self.config = realm.config
 
-    self.entities: Dict[int, Entity]  = {}
-    self.dead: Set(int) = {}
+    self.entities: Dict[int, Entity] = {}
+    self.dead: Dict[int, Entity] = {}
 
   def __len__(self):
     return len(self.entities)
@@ -48,7 +48,7 @@ class EntityGroup(Mapping):
       ent.datastore_record.delete()
 
     self.entities = {}
-    self.dead     = {}
+    self.dead = {}
 
   def spawn(self, entity):
     pos, ent_id = entity.pos, entity.id.val

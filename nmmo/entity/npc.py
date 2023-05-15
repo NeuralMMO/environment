@@ -152,7 +152,8 @@ class NPC(entity.Entity):
     data = super().packet()
 
     data['skills']   = self.skills.packet()
-    data['resource'] = {'health': self.resources.health.val}
+    data['resource'] = { 'health': {
+      'val': self.resources.health.val, 'max': self.config.PLAYER_BASE_HEALTH } }
 
     return data
 
