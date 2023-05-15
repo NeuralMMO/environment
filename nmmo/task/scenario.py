@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import copy
 from typing import Callable, Union, Iterable, \
-  Optional, Dict, List
+  Optional, List, Tuple
 from nmmo.core.config import Config
 from nmmo.task.group import Group
 from nmmo.task.team_helper import TeamHelper
-from nmmo.task.task_api import Task, PredicateTask, Once
-from nmmo.task.predicate import Predicate
+from nmmo.task.task_api import Task, Repeat
+from nmmo.task.base_predicates import StayAlive
 
 class Scenario:
   ''' Utility class to aid in defining common tasks
@@ -18,20 +18,14 @@ class Scenario:
     self.config = config
     self._tasks: List[Task] = []
 
-  def add_task(self, task: Union[Task, List[Task]]):
-    if isinstance(task, List):
-      for t in task:
-        self.add_task(t)
-    else:
-      self._tasks.append(task)
+  def add_task(self, task: Task):
+    self._tasks.append(task)
 
   def add_tasks(self,
-                tasks: Union[Predicate,
+                tasks: Union[Task,
                              Iterable[Task],
                              Callable[[Group], Task]],
-                groups: Optional[Union[str,Iterable[Group]]] = 'teams',
-                reward: Optional[type[PredicateTask]] = Once,
-                reward_options: Optional[Dict] = None) -> None:
+                groups: Optional[Union[str,Iterable[Group]]] = 'teams') -> None:
     # pylint: disable=unnecessary-lambda-assignment
     """ Utility function to define symmetric tasks
 
@@ -44,17 +38,11 @@ class Scenario:
           A function taking in a group and return a task.
           The result from applying this function to "groups" is added to 
           the scenario.
-        Predicate: 
-          Mapped to Callable by return an instance of "reward".
-          If exists, overrides the "subject" argument of the predicate subjects in "groups".
+        Task: 
+          Mapped to Callable by overriding subject
 
       groups: 
         Foreach group in groups, add a task.
-
-      reward:
-        The class used to automatically generate tasks from predicates.
-      reward_options:
-        extra arguments passed to reward on construction.
     """
     # Tasks
     if isinstance(tasks, Iterable):
@@ -64,12 +52,8 @@ class Scenario:
 
     # Functional Syntax
       # Tasks
-    if isinstance(tasks, Predicate):
-      if reward_options is None:
-        reward_options = {}
-      task_generator = lambda group: reward(assignee=group,
-                                            predicate=tasks.sample(cfg=self, subject=group),
-                                            **reward_options)
+    if isinstance(tasks, Task):
+      task_generator = lambda group: tasks.sample(config=self.config, subject=group)
     else:
       task_generator = tasks
       # Groups
@@ -85,3 +69,8 @@ class Scenario:
   @property
   def tasks(self) -> List[Task]:
     return self._tasks
+
+def default_task(agents) -> List[Tuple[Task, float]]:
+  '''Generates the default reward on env.init
+  '''
+  return [Repeat(StayAlive(Group([agent]),1)) for agent in agents]

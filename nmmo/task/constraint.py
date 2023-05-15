@@ -10,7 +10,6 @@ from nmmo.lib import material
 from nmmo.core.config import Config
 from nmmo.task.team_helper import TeamHelper
 
-
 class InvalidConstraint(Exception):
   pass
 
@@ -40,6 +39,9 @@ class Constraint(ABC):
     """ Generator to sample valid values given config
     """
     raise NotImplementedError
+
+  def __str__(self):
+    return self.__class__.__name__
 
 class GroupConstraint(Constraint):
   """ Ensures that all agents of a group exist in a config
@@ -80,8 +82,6 @@ class ScalarConstraint(Constraint):
     if isinstance(high, Number):
       self._high = lambda _ : high
     self._dtype = dtype
-    if self._dtype == int:
-      self._dtype = round
 
   def check(self, config, value):
     if not super().check(config,value):

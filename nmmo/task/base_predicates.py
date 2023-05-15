@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 from numpy import count_nonzero as count
 
-from nmmo.task.predicate import OR, predicate
+from nmmo.task.task_api import OR, define_predicate
 from nmmo.task.group import Group
 from nmmo.task.game_state import GameState
 from nmmo.task import constraint
@@ -13,21 +13,23 @@ from nmmo.systems.item import Item
 from nmmo.lib.material import Material
 from nmmo.lib import utils
 
-@predicate
-def Success(gs: GameState):
+@define_predicate
+def Success(gs: GameState,
+            subject: Group):
   ''' Returns True. For debugging.
   '''
   return True
 
-@predicate
+@define_predicate
 def TickGE(gs: GameState,
+           subject: Group               = constraint.TEAM_GROUPS,
            num_tick: int                = constraint.ScalarConstraint()):
   """True if the current tick is greater than or equal to the specified num_tick.
   Is progress counter.
   """
   return gs.current_tick / num_tick
 
-@predicate
+@define_predicate
 def CanSeeTile(gs: GameState,
                subject: Group           = constraint.TEAM_GROUPS,
                tile_type: type[Material]= constraint.MATERIAL_CONSTRAINT):
@@ -35,21 +37,21 @@ def CanSeeTile(gs: GameState,
   """
   return any(tile_type.index in t for t in subject.obs.tile.material_id)
 
-@predicate
+@define_predicate
 def StayAlive(gs: GameState,
               subject: Group            = constraint.TEAM_GROUPS):
   """True if all subjects are alive.
   """
   return count(subject.health > 0) == len(subject)
 
-@predicate
+@define_predicate
 def AllDead(gs: GameState,
             subject: Group              = constraint.TEAM_GROUPS):
   """True if all subjects are dead.
   """
   return 1.0 - count(subject.health) / len(subject)
 
-@predicate
+@define_predicate
 def OccupyTile(gs: GameState,
                subject: Group,
                row: int                  = constraint.COORDINATE_CONSTRAINT,
@@ -58,7 +60,7 @@ def OccupyTile(gs: GameState,
   """
   return np.any((subject.row == row) & (subject.col == col))
 
-@predicate
+@define_predicate
 def AllMembersWithinRange(gs: GameState,
                           subject: Group = constraint.TEAM_GROUPS,
                           dist: int      = constraint.COORDINATE_CONSTRAINT):
@@ -71,7 +73,7 @@ def AllMembersWithinRange(gs: GameState,
     return 1.0
   return dist / current_dist
 
-@predicate
+@define_predicate
 def CanSeeAgent(gs: GameState,
                 subject: Group             = constraint.TEAM_GROUPS,
                 target: int                = constraint.AGENT_NUMBER_CONSTRAINT):
@@ -79,7 +81,7 @@ def CanSeeAgent(gs: GameState,
   """
   return any(target in e.ids for e in subject.obs.entities)
 
-@predicate
+@define_predicate
 def CanSeeGroup(gs: GameState,
                 subject: Group              = constraint.TEAM_GROUPS,
                 target: Group               = constraint.TEAM_GROUPS):
@@ -87,7 +89,7 @@ def CanSeeGroup(gs: GameState,
   """
   return OR(*(CanSeeAgent(subject, agent) for agent in target.agents))
 
-@predicate
+@define_predicate
 def DistanceTraveled(gs: GameState,
                      subject: Group         = constraint.TEAM_GROUPS,
                      dist: int              = constraint.ScalarConstraint()):
@@ -101,7 +103,7 @@ def DistanceTraveled(gs: GameState,
   dists = utils.linf(list(zip(r,c)),[gs.spawn_pos[id_] for id_ in subject.entity.id])
   return dists.sum() / dist
 
-@predicate
+@define_predicate
 def AttainSkill(gs: GameState,
                 subject: Group              = constraint.TEAM_GROUPS,
                 skill: Skill                = constraint.SKILL_CONSTRAINT,
@@ -113,7 +115,7 @@ def AttainSkill(gs: GameState,
   skill_level = getattr(subject,skill.__name__.lower() + '_level')
   return sum(skill_level >= level) / num_agent
 
-@predicate
+@define_predicate
 def CountEvent(gs: GameState,
                subject: Group               = constraint.TEAM_GROUPS,
                event: str                   = constraint.EVENTCODE_CONSTRAINT,
@@ -123,7 +125,7 @@ def CountEvent(gs: GameState,
   """
   return len(getattr(subject.event, event)) / N
 
-@predicate
+@define_predicate
 def ScoreHit(gs: GameState,
              subject: Group                 = constraint.TEAM_GROUPS,
              combat_style: type[Skill]      = constraint.COMBAT_SKILL_CONSTRAINT,
@@ -134,7 +136,7 @@ def ScoreHit(gs: GameState,
   hits = subject.event.SCORE_HIT.combat_style == combat_style.SKILL_ID
   return count(hits) / N
 
-@predicate
+@define_predicate
 def HoardGold(gs: GameState,
               subject: Group                = constraint.TEAM_GROUPS,
               amount: int                   = constraint.ScalarConstraint()):
@@ -142,7 +144,7 @@ def HoardGold(gs: GameState,
   """
   return subject.gold.sum() / amount
 
-@predicate
+@define_predicate
 def EarnGold(gs: GameState,
              subject: Group                 = constraint.TEAM_GROUPS,
              amount: int                    = constraint.ScalarConstraint()):
@@ -150,7 +152,7 @@ def EarnGold(gs: GameState,
   """
   return subject.event.EARN_GOLD.gold.sum() / amount
 
-@predicate
+@define_predicate
 def SpendGold(gs: GameState,
               subject: Group                = constraint.TEAM_GROUPS,
               amount: int                   = constraint.ScalarConstraint()):
@@ -158,7 +160,7 @@ def SpendGold(gs: GameState,
   """
   return subject.event.BUY_ITEM.gold.sum() / amount
 
-@predicate
+@define_predicate
 def MakeProfit(gs: GameState,
               subject: Group                = constraint.TEAM_GROUPS,
               amount: int                   = constraint.ScalarConstraint()):
@@ -168,7 +170,7 @@ def MakeProfit(gs: GameState,
   costs = subject.event.BUY_ITEM.gold.sum()
   return  (profits-costs) / amount
 
-@predicate
+@define_predicate
 def InventorySpaceGE(gs: GameState,
                      subject: Group         = constraint.TEAM_GROUPS,
                      space: int             = constraint.ScalarConstraint()):
@@ -178,7 +180,7 @@ def InventorySpaceGE(gs: GameState,
   max_space = gs.config.ITEM_INVENTORY_CAPACITY
   return all(max_space - inv.len >= space for inv in subject.obs.inventory)
 
-@predicate
+@define_predicate
 def OwnItem(gs: GameState,
             subject: Group                  = constraint.TEAM_GROUPS,
             item: type[Item]                = constraint.ITEM_CONSTRAINT,
@@ -191,7 +193,7 @@ def OwnItem(gs: GameState,
           (subject.item.level >= level)
   return sum(subject.item.quantity[owned]) / quantity
 
-@predicate
+@define_predicate
 def EquipItem(gs: GameState,
               subject: Group                = constraint.TEAM_GROUPS,
               item: type[Item]              = constraint.ITEM_CONSTRAINT,
@@ -207,7 +209,7 @@ def EquipItem(gs: GameState,
     return count(equipped) / num_agent
   return 1.0
 
-@predicate
+@define_predicate
 def FullyArmed(gs: GameState,
                subject: Group               = constraint.TEAM_GROUPS,
                combat_style: type[Skill]    = constraint.COMBAT_SKILL_CONSTRAINT,
@@ -235,7 +237,7 @@ def FullyArmed(gs: GameState,
     return (equipment_numbers >= len(item_ids.items())).sum() / num_agent
   return 1.0
 
-@predicate
+@define_predicate
 def ConsumeItem(gs: GameState,
                 subject: Group              = constraint.TEAM_GROUPS,
                 item: type[Item]            = constraint.CONSUMABLE_CONSTRAINT,
@@ -247,7 +249,7 @@ def ConsumeItem(gs: GameState,
   lvl_flt = subject.event.CONSUME_ITEM.level >= level
   return subject.event.CONSUME_ITEM.number[type_flt & lvl_flt].sum() / quantity
 
-@predicate
+@define_predicate
 def HarvestItem(gs: GameState,
                 subject: Group              = constraint.TEAM_GROUPS,
                 item: type[Item]            = constraint.ITEM_CONSTRAINT,
@@ -259,7 +261,7 @@ def HarvestItem(gs: GameState,
   lvl_flt = subject.event.HARVEST_ITEM.level >= level
   return subject.event.HARVEST_ITEM.number[type_flt & lvl_flt].sum() / quantity
 
-@predicate
+@define_predicate
 def ListItem(gs: GameState,
              subject: Group                 = constraint.TEAM_GROUPS,
              item: type[Item]               = constraint.ITEM_CONSTRAINT,
@@ -271,7 +273,7 @@ def ListItem(gs: GameState,
   lvl_flt = subject.event.LIST_ITEM.level >= level
   return subject.event.LIST_ITEM.number[type_flt & lvl_flt].sum() / quantity
 
-@predicate
+@define_predicate
 def BuyItem(gs: GameState,
             subject: Group                  = constraint.TEAM_GROUPS,
             item: type[Item]                = constraint.ITEM_CONSTRAINT,

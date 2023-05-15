@@ -14,22 +14,28 @@ from nmmo.lib import material as Material
 from nmmo.lib.log import EventCode
 
 # pylint: disable=import-error
-from nmmo.core.env import Env as TaskEnv
-from nmmo.task.task_api import Repeat
-from nmmo.task.predicate import Predicate
+from nmmo.core.env import Env
+from nmmo.task.task_api import Task, Repeat, TaskOperator
 from nmmo.task.group import Group
 import nmmo.task.base_predicates as bp
 
 # use the constant reward of 1 for testing predicates
-REWARD = 1
 NUM_AGENT = 6
 ALL_AGENT = Group(list(range(1, NUM_AGENT+1)), 'All')
+
+class Change(TaskOperator):
+  def __init__(self, task: Task, subject: Group=None):
+    super().__init__(lambda n: n==1, task, subject=subject)
+  def _evaluate(self, gs) -> float:
+    return self._tasks[0](gs)
+  def sample(self, config, **kwargs):
+    return super().sample(config, Change, **kwargs)
 
 class TestBasePredicate(unittest.TestCase):
   # pylint: disable=protected-access,invalid-name
 
   def _get_taskenv(self,
-                   test_tasks: List[Tuple[Predicate, int]],
+                   test_tasks: List[Tuple[Task, Group]],
                    grass_map=False):
 
     config = ScriptedAgentTestConfig()
@@ -37,9 +43,9 @@ class TestBasePredicate(unittest.TestCase):
     config.PLAYER_N = NUM_AGENT
     config.IMMORTAL = True
 
-    tasks = [Repeat(team, tsk, REWARD) for tsk, team in test_tasks]
+    tasks = [Change(tsk, subject=team) for tsk, team in test_tasks]
 
-    env = TaskEnv(config)
+    env = Env(config)
     env.change_task(tasks)
 
     if grass_map:
@@ -62,7 +68,7 @@ class TestBasePredicate(unittest.TestCase):
       for ent_id in infos:
         if ent_id in assignee:
           # the agents that are assigned the task get evaluated for reward
-          self.assertEqual(int(infos[ent_id]['task'][task.name]), int(tid in true_task))
+          self.assertEqual(int(infos[ent_id]['task'][Change(task,assignee).name]), int(tid in true_task))
         else:
           # the agents that are not assigned the task are not evaluated
           self.assertTrue(task.name not in infos[ent_id]['task'])
@@ -73,13 +79,13 @@ class TestBasePredicate(unittest.TestCase):
     predicate, assignee = task[0], task[1]
     for ent_id in infos:
       if ent_id in assignee:
-        self.assertAlmostEqual(infos[ent_id]['task'][predicate.name],value)
+        self.assertAlmostEqual(infos[ent_id]['task'][Change(predicate,assignee).name],value)
 
   def test_tickge_stay_alive_rip(self):
     tick_true = 5
     death_note = [1, 2, 3]
-    test_tasks = [ # (Predicate, Team), the reward is 1 by default
-      (bp.TickGE(tick_true), ALL_AGENT),
+    test_tasks = [ # (Predicate, Team)
+      (bp.TickGE(Group([1]), tick_true), ALL_AGENT),
       (bp.StayAlive(Group([1, 3])), ALL_AGENT),
       (bp.StayAlive(Group([3, 4])), Group([1, 2])),
       (bp.StayAlive(Group([4])), Group([5, 6])),

@@ -16,7 +16,8 @@ from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
 from nmmo.core import realm
 from nmmo.task.game_state import GameStateGenerator
-from nmmo.task.task_api import Task, default_task
+from nmmo.task.task_api import Task
+from nmmo.task.scenario import default_task
 from scripted.baselines import Scripted
 
 class Env(ParallelEnv):
@@ -445,7 +446,7 @@ class Env(ParallelEnv):
 
     # Compute Rewards and infos
     for task, weight in self.tasks:
-      task_rewards, task_infos = task(self.game_state)
+      task_rewards, task_infos = task.compute_rewards(self.game_state)
       for eid, reward in task_rewards.items():
         # Rewards, weighted
         rewards[eid] = rewards.get(eid,0) + reward * weight
