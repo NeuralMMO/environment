@@ -191,7 +191,22 @@ class History:
       data['attack'] = self.attack
 
     # NOTE: the client seems to use actions for visualization
-    #   but produces errors with the new actions. So we disable it for now.
+    #   but produces errors with the new actions. So we comment out these for now
+    # actions = {}
+    # for atn, args in self.actions.items():
+    #   atn_packet = {}
+
+    #   # Avoid recursive player packet
+    #   if atn.__name__ == 'Attack':
+    #     continue
+
+    #   for key, val in args.items():
+    #     if hasattr(val, 'packet'):
+    #       atn_packet[key.__name__] = val.packet
+    #     else:
+    #       atn_packet[key.__name__] = val.__name__
+    #   actions[atn.__name__] = atn_packet
+    # data['actions'] = actions
     data['actions'] = {}
 
     return data
