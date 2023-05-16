@@ -1,14 +1,13 @@
-from pdb import set_trace as T
+# pylint: disable=all
+
+
+import heapq
+from typing import Tuple
+
 import numpy as np
-import random
 
-from nmmo.lib.utils import inBounds
-from nmmo.systems import combat
-from nmmo.lib import material
-from queue import PriorityQueue, Queue
+from nmmo.lib.utils import in_bounds
 
-from nmmo.systems.ai.dynamic_programming import map_to_rewards, \
-   compute_values, max_value_direction_around
 
 def validTarget(ent, targ, rng):
    if targ is None or not targ.alive:
@@ -24,8 +23,8 @@ def validResource(ent, tile, rng):
 
 
 def directionTowards(ent, targ):
-   sr, sc = ent.base.pos
-   tr, tc = targ.base.pos
+   sr, sc = ent.pos
+   tr, tc = targ.pos
 
    if abs(sc - tc) > abs(sr - tr):
       direction = (0, np.sign(tc - sc))
@@ -36,23 +35,24 @@ def directionTowards(ent, targ):
 
 
 def closestTarget(ent, tiles, rng=1):
-   sr, sc = ent.base.pos
+   sr, sc = ent.pos
    for d in range(rng+1):
       for r in range(-d, d+1):
-         for e in tiles[sr+r, sc-d].ents.values():
+         for e in tiles[sr+r, sc-d].entities.values():
             if e is not ent and validTarget(ent, e, rng): return e
 
-         for e in tiles[sr + r, sc + d].ents.values():
+         for e in tiles[sr + r, sc + d].entities.values():
             if e is not ent and validTarget(ent, e, rng): return e
 
-         for e in tiles[sr - d, sc + r].ents.values():
+         for e in tiles[sr - d, sc + r].entities.values():
             if e is not ent and validTarget(ent, e, rng): return e
 
-         for e in tiles[sr + d, sc + r].ents.values():
+         for e in tiles[sr + d, sc + r].entities.values():
             if e is not ent and validTarget(ent, e, rng): return e
 
 def distance(ent, targ):
-   return l1(ent.pos, targ.pos)
+   # used in scripted/behavior.py, attack() to determine attack range
+   return lInfty(ent.pos, targ.pos)
 
 def lInf(ent, targ):
    sr, sc = ent.pos
@@ -65,58 +65,11 @@ def adjacentPos(pos):
    return [(r - 1, c), (r, c - 1), (r + 1, c), (r, c + 1)]
 
 
-def cropTilesAround(position: (int, int), horizon: int, tiles):
+def cropTilesAround(position: Tuple[int, int], horizon: int, tiles):
    line, column = position
 
    return tiles[max(line - horizon, 0): min(line + horizon + 1, len(tiles)),
           max(column - horizon, 0): min(column + horizon + 1, len(tiles[0]))]
-
-
-def inSight(dr, dc, vision):
-    return (
-          dr >= -vision and
-          dc >= -vision and
-          dr <= vision and
-          dc <= vision)
-
-def vacant(tile):
-   from nmmo.io.stimulus.static import Stimulus
-   Tile     = Stimulus.Tile
-   occupied = Observation.attribute(tile, Tile.NEnts)
-   matl     = Observation.attribute(tile, Tile.Index)
-
-   lava    = material.Lava.index
-   water   = material.Water.index
-   grass   = material.Grass.index
-   scrub   = material.Scrub.index
-   forest  = material.Forest.index
-   stone   = material.Stone.index
-   orerock = material.Orerock.index
-
-   return matl in (grass, scrub, forest) and not occupied
-
-def meander(obs):
-   from nmmo.io.stimulus.static import Stimulus
-
-   agent  = obs.agent
-   Entity = Stimulus.Entity
-   Tile   = Stimulus.Tile
-
-   r = Observation.attribute(agent, Entity.R)
-   c = Observation.attribute(agent, Entity.C)
-
-   cands = []
-   if vacant(obs.tile(-1, 0)):
-      cands.append((-1, 0))
-   if vacant(obs.tile(1, 0)):
-      cands.append((1, 0))
-   if vacant(obs.tile(0, -1)):
-      cands.append((0, -1))
-   if vacant(obs.tile(0, 1)):
-      cands.append((0, 1))
-   if not cands:
-      return (-1, 0)
-   return random.choice(cands)
 
 # A* Search
 def l1(start, goal):
@@ -139,8 +92,7 @@ def aStar(tiles, start, goal, cutoff=100):
    if start == goal:
       return (0, 0)
 
-   pq = PriorityQueue()
-   pq.put((0, start))
+   pq = [(0, start)]
 
    backtrace = {}
    cost = {start: 0}
@@ -149,7 +101,7 @@ def aStar(tiles, start, goal, cutoff=100):
    closestHeuristic = l1(start, goal)
    closestCost = closestHeuristic
 
-   while not pq.empty():
+   while pq:
       # Use approximate solution if budget exhausted
       cutoff -= 1
       if cutoff <= 0:
@@ -157,15 +109,13 @@ def aStar(tiles, start, goal, cutoff=100):
             goal = closestPos
          break
 
-      priority, cur = pq.get()
+      priority, cur = heapq.heappop(pq)
 
       if cur == goal:
          break
 
       for nxt in adjacentPos(cur):
-         if not inBounds(*nxt, tiles.shape):
-            continue
-         if tiles[nxt].occupied:
+         if not in_bounds(*nxt, tiles.shape):
             continue
 
          newCost = cost[cur] + 1
@@ -181,7 +131,7 @@ def aStar(tiles, start, goal, cutoff=100):
                closestHeuristic = heuristic
                closestCost = priority
 
-            pq.put((priority, nxt))
+            heapq.heappush(pq, (priority, nxt))
             backtrace[nxt] = cur
 
    while goal in backtrace and backtrace[goal] != start:
@@ -195,7 +145,7 @@ def aStar(tiles, start, goal, cutoff=100):
 
 # Adjacency functions
 def adjacentTiles(tiles, ent):
-   r, c = ent.base.pos
+   r, c = ent.pos
 
 
 def adjacentDeltas():
@@ -216,17 +166,17 @@ def posSum(pos1, pos2):
 
 def adjacentEmptyPos(env, pos):
    return [p for p in adjacentPos(pos)
-           if inBounds(*p, env.size)]
+           if in_bounds(*p, env.size)]
 
 
 def adjacentTiles(env, pos):
    return [env.tiles[p] for p in adjacentPos(pos)
-           if inBounds(*p, env.size)]
+           if in_bounds(*p, env.size)]
 
 
 def adjacentMats(tiles, pos):
    return [type(tiles[p].state) for p in adjacentPos(pos)
-           if inBounds(*p, tiles.shape)]
+           if in_bounds(*p, tiles.shape)]
 
 
 def adjacencyDelMatPairs(env, pos):

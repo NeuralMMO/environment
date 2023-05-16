@@ -1,9 +1,20 @@
+import logging
+
 from .version import __version__
 
-import os
-motd = r'''      ___           ___           ___           ___
-     /__/\         /__/\         /__/\         /  /\      Version {:<8}
-     \  \:\       |  |::\       |  |::\       /  /::\ 
+from .lib import material, spawn
+from .render.overlay import Overlay, OverlayRegistry
+from .io import action
+from .io.action import Action
+from .core import config, agent
+from .core.agent import Agent
+from .core.env import Env
+from .systems.achievement import Task
+from .core.terrain import MapGenerator, Terrain
+
+MOTD = rf'''      ___           ___           ___           ___
+     /__/\         /__/\         /__/\         /  /\      Version {__version__:<8}
+     \  \:\       |  |::\       |  |::\       /  /::\
       \  \:\      |  |:|:\      |  |:|:\     /  /:/\:\    An open source
   _____\__\:\   __|__|:|\:\   __|__|:|\:\   /  /:/  \:\   project originally
  /__/::::::::\ /__/::::| \:\ /__/::::| \:\ /__/:/ \__\:\  founded by Joseph Suarez
@@ -11,28 +22,13 @@ motd = r'''      ___           ___           ___           ___
   \  \:\  ~~~   \  \:\        \  \:\        \  \:\  /:/
    \  \:\        \  \:\        \  \:\        \  \:\/:/    Now developed and
     \  \:\        \  \:\        \  \:\        \  \::/     maintained at MIT in
-     \__\/         \__\/         \__\/         \__\/      Phillip Isola's lab '''.format(__version__)
+     \__\/         \__\/         \__\/         \__\/      Phillip Isola's lab '''
 
-from . import scripting
-from .lib import material, spawn
-from .overlay import Overlay, OverlayRegistry
-from .io import action
-from .io.stimulus import Serialized
-from .io.action import Action
-from .core import config, agent
-from .core.agent import Agent
-from .core.env import Env, Replay
-from . import scripting, emulation, integrations
-from .systems.achievement import Task
-from .core.terrain import MapGenerator, Terrain
-
-__all__ = ['Env', 'config', 'scripting', 'emulation', 'integrations', 'agent', 'Agent', 'MapGenerator', 'Terrain',
-        'Serialized', 'action', 'Action', 'scripting', 'material', 'spawn',
-        'Task', 'Overlay', 'OverlayRegistry', 'Replay']
+__all__ = ['Env', 'config', 'agent', 'Agent', 'MapGenerator', 'Terrain',
+        'action', 'Action', 'material', 'spawn',
+        'Task', 'Overlay', 'OverlayRegistry']
 
 try:
-    import openskill
-    from .lib.rating import OpenSkillRating
-    __all__.append('OpenSkillRating')
-except:
-    print('Warning: OpenSkill not installed. Ignore if you do not need this feature')
+  __all__.append('OpenSkillRating')
+except RuntimeError:
+  logging.error('Warning: OpenSkill not installed. Ignore if you do not need this feature')

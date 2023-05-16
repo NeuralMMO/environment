@@ -1,3 +1,5 @@
+# pylint: disable=all
+
 import heapq, itertools
 import itertools
 

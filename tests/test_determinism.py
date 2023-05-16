@@ -1,47 +1,76 @@
-from pdb import set_trace as T
-import numpy as np
+#from pdb import set_trace as T
+import unittest
+
+import logging
 import random
+from tqdm import tqdm
 
-import nmmo
+from tests.testhelpers import ScriptedAgentTestConfig, ScriptedAgentTestEnv
+from tests.testhelpers import observations_are_equal, actions_are_equal
+
+# 30 seems to be enough to test variety of agent actions
+TEST_HORIZON = 30
+RANDOM_SEED = random.randint(0, 10000)
 
 
-def test_determinism():
-    config = nmmo.config.Default()
-    env1 = nmmo.Env(config, seed=42)
-    env1.reset()
-    for i in range(2):
-        obs1, _, _, _ = env1.step({})
-    
-    config = nmmo.config.Default()
-    env2 = nmmo.Env(config, seed=42)
-    env2.reset()
-    for i in range(2):
-        obs2, _, _, _ = env2.step({})
+class TestDeterminism(unittest.TestCase):
+  @classmethod
+  def setUpClass(cls):
+    cls.horizon = TEST_HORIZON
+    cls.rand_seed = RANDOM_SEED
+    cls.config = ScriptedAgentTestConfig()
+    env = ScriptedAgentTestEnv(cls.config)
 
-    npc1 = env1.realm.npcs.values()
-    npc2 = env2.realm.npcs.values()
+    logging.info('TestDeterminism: Setting up the reference env with seed %s', str(cls.rand_seed))
+    cls.init_obs_src = env.reset(seed=cls.rand_seed)
+    cls.actions_src = []
+    logging.info('TestDeterminism: Running %s ticks', str(cls.horizon))
+    for _ in tqdm(range(cls.horizon)):
+      nxt_obs_src, _, _, _ = env.step({})
+      cls.actions_src.append(env.actions)
+    cls.final_obs_src = nxt_obs_src
+    npcs_src = {}
+    for nid, npc in list(env.realm.npcs.items()):
+      npcs_src[nid] = npc.packet()
+    cls.final_npcs_src = npcs_src
 
-    for n1, n2 in zip(npc1, npc2):
-        assert n1.pos == n2.pos
+    logging.info('TestDeterminism: Setting up the replication env with seed %s', str(cls.rand_seed))
+    cls.init_obs_rep = env.reset(seed=cls.rand_seed)
+    cls.actions_rep = []
+    logging.info('TestDeterminism: Running %s ticks', str(cls.horizon))
+    for _ in tqdm(range(cls.horizon)):
+      nxt_obs_rep, _, _, _ = env.step({})
+      cls.actions_rep.append(env.actions)
+    cls.final_obs_rep = nxt_obs_rep
+    npcs_rep = {}
+    for nid, npc in list(env.realm.npcs.items()):
+      npcs_rep[nid] = npc.packet()
+    cls.final_npcs_rep = npcs_rep
 
-    assert list(obs1.keys()) == list(obs2.keys())
-    keys = list(obs1.keys())
-    for k in keys:
-        ent1 = obs1[k]
-        ent2 = obs2[k]
-        
-        obj = ent1.keys()
-        for o in obj:
-            obj1 = ent1[o]
-            obj2 = ent2[o]
+  def test_func_are_observations_equal(self):
+    self.assertTrue(observations_are_equal(self.init_obs_src, self.init_obs_src))
+    self.assertTrue(observations_are_equal(self.final_obs_src, self.final_obs_src))
+    self.assertTrue(actions_are_equal(self.actions_src[0], self.actions_src[0]))
+    self.assertDictEqual(self.final_npcs_src, self.final_npcs_src)
 
-            attrs = list(obj1)
-            for a in attrs:
-                attr1 = obj1[a]
-                attr2 = obj2[a]
+  def test_compare_initial_observations(self):
+    # assertDictEqual CANNOT replace are_observations_equal
+    self.assertTrue(observations_are_equal(self.init_obs_src, self.init_obs_rep))
+    #self.assertDictEqual(self.init_obs_src, self.init_obs_rep)
 
-                if np.sum(attr1 != attr2) > 0:
-                    T()
-                assert np.sum(attr1 != attr2) == 0
+  def test_compare_actions(self):
+    self.assertEqual(len(self.actions_src), len(self.actions_rep))
+    for t, action_src in enumerate(self.actions_src):
+      self.assertTrue(actions_are_equal(action_src, self.actions_rep[t]))
 
-test_determinism()
+  def test_compare_final_observations(self):
+    # assertDictEqual CANNOT replace are_observations_equal
+    self.assertTrue(observations_are_equal(self.final_obs_src, self.final_obs_rep))
+    #self.assertDictEqual(self.final_obs_src, self.final_obs_rep)
+
+  def test_compare_final_npcs(self)        :
+    self.assertDictEqual(self.final_npcs_src, self.final_npcs_rep)
+
+
+if __name__ == '__main__':
+  unittest.main()

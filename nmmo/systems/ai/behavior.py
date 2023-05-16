@@ -1,8 +1,9 @@
-from pdb import set_trace as T
+# pylint: disable=all
+
 import numpy as np
 
 import nmmo
-from nmmo.systems.ai import move, attack, utils
+from nmmo.systems.ai import move, utils
 
 def update(entity):
    '''Update validity of tracked entities'''
@@ -20,7 +21,7 @@ def update(entity):
       entity.food = None
    if not utils.validResource(entity, entity.water, entity.vision):
       entity.water = None
-      
+
 def pathfind(realm, actions, entity, target):
    actions[nmmo.action.Move]   = {nmmo.action.Direction: move.pathfind(realm.map.tiles, entity, target)}
 
@@ -40,26 +41,6 @@ def explore(realm, actions, entity):
    tile = realm.map.tiles[rr, cc]
    pathfind(realm, actions, entity, tile)
 
-def explore(config, ob, actions, spawnR, spawnC):
-   vision = config.NSTIM
-   sz     = config.TERRAIN_SIZE
-   Entity = nmmo.Serialized.Entity
-   Tile   = nmmo.Serialized.Tile
-
-   agent  = ob.agent
-   r      = utils.Observation.attribute(agent, Entity.R)
-   c      = utils.Observation.attribute(agent, Entity.C)
-
-   centR, centC   = sz//2, sz//2
-
-   vR, vC = centR-spawnR, centC-spawnC
-
-   mmag = max(abs(vR), abs(vC))
-   rr   = int(np.round(vision*vR/mmag))
-   cc   = int(np.round(vision*vC/mmag))
-
-   pathfind(config, ob, actions, rr, cc)
-
 def meander(realm, actions, entity):
    actions[nmmo.action.Move] = {nmmo.action.Direction: move.habitable(realm.map.tiles, entity)}
 
@@ -72,7 +53,7 @@ def hunt(realm, actions, entity):
 
    direction = None
    if distance == 0:
-      direction = move.random()
+      direction = move.random_direction()
    elif distance > 1:
       direction = move.pathfind(realm.map.tiles, entity, entity.target)
 
@@ -83,7 +64,7 @@ def hunt(realm, actions, entity):
 
 def attack(realm, actions, entity):
    distance = utils.lInfty(entity.pos, entity.target.pos)
-   if distance > entity.skills.style.attackRange(realm.config):
+   if distance > entity.skills.style.attack_range(realm.config):
       return
 
    actions[nmmo.action.Attack] = {

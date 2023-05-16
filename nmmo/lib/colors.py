@@ -1,8 +1,9 @@
+# pylint: disable=all
+
 #Various Enums used for handling materials, entity types, etc.
 #Data texture pairs are used for enums that require textures.
 #These textures are filled in by the Render class at run time.
 
-from pdb import set_trace as T
 import numpy as np
 import colorsys
 
@@ -58,7 +59,7 @@ class Tier:
    GOLD     = Color('GOLD', '#ffae00')
    PLATINUM = Color('PLATINUM', '#cd75ff')
    DIAMOND  = Color('DIAMOND', '#00bbbb')
-   
+
 class Swatch:
    def colors():
       '''Return list of swatch colors'''
@@ -66,7 +67,7 @@ class Swatch:
 
    def rand():
       '''Return random swatch color'''
-      all_colors = colors()
+      all_colors = Swatch.colors()
       randInd = np.random.randint(0, len(all_colors))
       return all_colors[randInd]
 
@@ -87,7 +88,7 @@ class Neon(Swatch):
    FUCHSIA  = Color('FUCHSIA', '#ff0080')
    SPRING   = Color('SPRING', '#80ff80')
    SKY      = Color('SKY', '#0080ff')
- 
+
    WHITE    = Color('WHITE', '#ffffff')
    GRAY     = Color('GRAY', '#666666')
    BLACK    = Color('BLACK', '#000000')

@@ -1,253 +1,344 @@
-from pdb import set_trace as T
+
+import math
+from types import SimpleNamespace
+
 import numpy as np
 
-import nmmo
-from nmmo.systems import skill, droptable, combat, equipment, inventory
-from nmmo.lib import material, utils
+from nmmo.core.config import Config
+from nmmo.datastore.serialized import SerializedState
+from nmmo.systems import inventory
+from nmmo.lib.log import EventCode
+
+# pylint: disable=no-member
+EntityState = SerializedState.subclass(
+  "Entity", [
+    "id",
+    "npc_type", # 1 - passive, 2 - neutral, 3 - aggressive
+    "row",
+    "col",
+
+    # Status
+    "damage",
+    "time_alive",
+    "freeze",
+    "item_level",
+    "attacker_id",
+    "latest_combat_tick",
+    "message",
+
+    # Resources
+    "gold",
+    "health",
+    "food",
+    "water",
+
+    # Combat
+    "melee_level",
+    "range_level",
+    "mage_level",
+
+    # Skills
+    "fishing_level",
+    "herbalism_level",
+    "prospecting_level",
+    "carving_level",
+    "alchemy_level",
+  ])
+
+EntityState.Limits = lambda config: {
+  **{
+    "id": (-math.inf, math.inf),
+    "npc_type": (0, 4),
+    "row": (0, config.MAP_SIZE-1),
+    "col": (0, config.MAP_SIZE-1),
+    "damage": (0, math.inf),
+    "time_alive": (0, math.inf),
+    "freeze": (0, 3),
+    "item_level": (0, 5*config.NPC_LEVEL_MAX),
+    "attacker_id": (-np.inf, math.inf),
+    "latest_combat_tick": (0, math.inf),
+    "health": (0, config.PLAYER_BASE_HEALTH),
+  },
+  **({
+    "message": (0, config.COMMUNICATION_NUM_TOKENS),
+  } if config.COMMUNICATION_SYSTEM_ENABLED else {}),
+  **({
+    "gold": (0, math.inf),
+    "food": (0, config.RESOURCE_BASE),
+    "water": (0, config.RESOURCE_BASE),
+  } if config.RESOURCE_SYSTEM_ENABLED else {}),
+  **({
+    "melee_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "range_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "mage_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "fishing_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "herbalism_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "prospecting_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "carving_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "alchemy_level": (0, config.PROGRESSION_LEVEL_MAX),
+  } if config.PROGRESSION_SYSTEM_ENABLED else {}),
+}
+
+EntityState.Query = SimpleNamespace(
+  # Whole table
+  table=lambda ds: ds.table("Entity").where_neq(
+    EntityState.State.attr_name_to_col["id"], 0),
+
+  # Single entity
+  by_id=lambda ds, id: ds.table("Entity").where_eq(
+    EntityState.State.attr_name_to_col["id"], id)[0],
+
+  # Multiple entities
+  by_ids=lambda ds, ids: ds.table("Entity").where_in(
+    EntityState.State.attr_name_to_col["id"], ids),
+
+  # Entities in a radius
+  window=lambda ds, r, c, radius: ds.table("Entity").window(
+    EntityState.State.attr_name_to_col["row"],
+    EntityState.State.attr_name_to_col["col"],
+    r, c, radius),
+)
 
 class Resources:
-   def __init__(self, ent):
-      self.health = nmmo.Serialized.Entity.Health(ent.dataframe, ent.entID)
-      self.water  = nmmo.Serialized.Entity.Water( ent.dataframe, ent.entID)
-      self.food   = nmmo.Serialized.Entity.Food(  ent.dataframe, ent.entID)
+  def __init__(self, ent, config):
+    self.config = config
+    self.health = ent.health
+    self.water = ent.water
+    self.food = ent.food
 
-   def update(self, realm, entity, actions):
-      config = realm.config
+    self.health.update(config.PLAYER_BASE_HEALTH)
+    if config.RESOURCE_SYSTEM_ENABLED:
+      self.water.update(config.RESOURCE_BASE)
+      self.food.update(config.RESOURCE_BASE)
 
-      if not config.RESOURCE_SYSTEM_ENABLED:
-         return
+  def update(self):
+    if not self.config.RESOURCE_SYSTEM_ENABLED:
+      return
 
-      self.water.max = config.RESOURCE_BASE
-      self.food.max  = config.RESOURCE_BASE
+    regen = self.config.RESOURCE_HEALTH_RESTORE_FRACTION
+    thresh = self.config.RESOURCE_HEALTH_REGEN_THRESHOLD
 
-      regen  = config.RESOURCE_HEALTH_RESTORE_FRACTION
-      thresh = config.RESOURCE_HEALTH_REGEN_THRESHOLD
+    food_thresh = self.food > thresh * self.config.RESOURCE_BASE
+    water_thresh = self.water > thresh * self.config.RESOURCE_BASE
 
-      food_thresh  = self.food  > thresh * config.RESOURCE_BASE
-      water_thresh = self.water > thresh * config.RESOURCE_BASE
+    if food_thresh and water_thresh:
+      restore = np.floor(self.health.max * regen)
+      self.health.increment(restore)
 
-      if food_thresh and water_thresh:
-          restore = np.floor(self.health.max * regen)
-          self.health.increment(restore)
+    if self.food.empty:
+      self.health.decrement(self.config.RESOURCE_STARVATION_RATE)
 
-      if self.food.empty:
-          self.health.decrement(config.RESOURCE_STARVATION_RATE)
+    if self.water.empty:
+      self.health.decrement(self.config.RESOURCE_DEHYDRATION_RATE)
 
-      if self.water.empty:
-          self.health.decrement(config.RESOURCE_DEHYDRATION_RATE)
-
-   def packet(self):
-      data = {}
-      data['health'] = self.health.packet()
-      data['food']   = self.food.packet()
-      data['water']  = self.water.packet()
-      return data
+  def packet(self):
+    data = {}
+    data['health'] = { 'val': self.health.val, 'max': self.config.PLAYER_BASE_HEALTH }
+    data['food'] = { 'val': self.food.val, 'max': self.config.RESOURCE_BASE }
+    data['water'] = { 'val': self.water.val, 'max': self.config.RESOURCE_BASE }
+    return data
 
 class Status:
-   def __init__(self, ent):
-      self.config = ent.config
-      self.freeze = nmmo.Serialized.Entity.Freeze(ent.dataframe, ent.entID)
+  def __init__(self, ent):
+    self.freeze = ent.freeze
 
-   def update(self, realm, entity, actions):
-      self.freeze.decrement()
+  def update(self):
+    if self.freeze.val > 0:
+      self.freeze.decrement(1)
 
-   def packet(self):
-      data = {}
-      data['freeze'] = self.freeze.val
-      return data
+  def packet(self):
+    data = {}
+    data['freeze'] = self.freeze.val
+    return data
 
+
+# NOTE: History.packet() is actively used in visulazing attacks
 class History:
-   def __init__(self, ent):
-      self.actions = {}
-      self.attack  = None
-  
-      self.origPos     = ent.pos
-      self.exploration = 0
-      self.playerKills = 0
+  def __init__(self, ent):
+    self.actions = {}
+    self.attack = None
 
-      self.damage_received = 0
-      self.damage_inflicted = 0
+    self.starting_position = ent.pos
+    self.exploration = 0
+    self.player_kills = 0
 
-      self.damage    = nmmo.Serialized.Entity.Damage(   ent.dataframe, ent.entID)
-      self.timeAlive = nmmo.Serialized.Entity.TimeAlive(ent.dataframe, ent.entID)
+    self.damage_received = 0
+    self.damage_inflicted = 0
 
-      self.lastPos = None
+    self.damage = ent.damage
+    self.time_alive = ent.time_alive
 
-   def update(self, realm, entity, actions):
-      self.attack  = None
-      self.damage.update(0)
+    self.last_pos = None
 
-      self.actions = {}
-      if entity.entID in actions:
-          self.actions = actions[entity.entID]
- 
-      exploration      = utils.linf(entity.pos, self.origPos)
-      self.exploration = max(exploration, self.exploration)
+  def update(self, entity, actions):
+    self.attack = None
+    self.damage.update(0)
 
-      self.timeAlive.increment()
+    self.actions = {}
+    if entity.ent_id in actions:
+      self.actions = actions[entity.ent_id]
 
-   def packet(self):
-      data = {}
-      data['damage']    = self.damage.val
-      data['timeAlive'] = self.timeAlive.val
-      data['damage_inflicted'] = self.damage_inflicted
-      data['damage_received'] = self.damage_received
+    self.time_alive.increment()
 
-      if self.attack is not None:
-         data['attack'] = self.attack
+  def packet(self):
+    data = {}
+    data['damage'] = self.damage.val
+    data['timeAlive'] = self.time_alive.val
+    data['damage_inflicted'] = self.damage_inflicted
+    data['damage_received'] = self.damage_received
 
-      actions = {}
-      for atn, args in self.actions.items():
-         atn_packet = {}
+    if self.attack is not None:
+      data['attack'] = self.attack
 
-         #Avoid recursive player packet
-         if atn.__name__ == 'Attack':
-             continue
+    # NOTE: the client seems to use actions for visualization
+    #   but produces errors with the new actions. So we comment out these for now
+    # actions = {}
+    # for atn, args in self.actions.items():
+    #   atn_packet = {}
 
-         for key, val in args.items():
-            if hasattr(val, 'packet'):
-               atn_packet[key.__name__] = val.packet
-            else:
-               atn_packet[key.__name__] = val.__name__
-         actions[atn.__name__] = atn_packet
-      data['actions'] = actions
+    #   # Avoid recursive player packet
+    #   if atn.__name__ == 'Attack':
+    #     continue
 
-      return data
+    #   for key, val in args.items():
+    #     if hasattr(val, 'packet'):
+    #       atn_packet[key.__name__] = val.packet
+    #     else:
+    #       atn_packet[key.__name__] = val.__name__
+    #   actions[atn.__name__] = atn_packet
+    # data['actions'] = actions
+    data['actions'] = {}
 
-class Base:
-   def __init__(self, ent, pos, iden, name, color, pop):
-      self.name  = name + str(iden)
-      self.color = color
-      r, c       = pos
+    return data
 
-      self.r          = nmmo.Serialized.Entity.R(ent.dataframe, ent.entID, r)
-      self.c          = nmmo.Serialized.Entity.C(ent.dataframe, ent.entID, c)
+# pylint: disable=no-member
+class Entity(EntityState):
+  def __init__(self, realm, pos, entity_id, name):
+    super().__init__(realm.datastore, EntityState.Limits(realm.config))
 
-      self.population = nmmo.Serialized.Entity.Population(ent.dataframe, ent.entID, pop)
-      self.self       = nmmo.Serialized.Entity.Self(      ent.dataframe, ent.entID, 1)
-      self.identity   = nmmo.Serialized.Entity.ID(        ent.dataframe, ent.entID, ent.entID)
-      self.level      = nmmo.Serialized.Entity.Level(     ent.dataframe, ent.entID, 3)
-      self.item_level = nmmo.Serialized.Entity.ItemLevel( ent.dataframe, ent.entID, 0)
-      self.gold       = nmmo.Serialized.Entity.Gold(      ent.dataframe, ent.entID, 0)
-      self.comm       = nmmo.Serialized.Entity.Comm(      ent.dataframe, ent.entID, 0)
+    self.realm = realm
+    self.config: Config = realm.config
 
-      ent.dataframe.init(nmmo.Serialized.Entity, ent.entID, (r, c))
+    self.policy = name
+    self.entity_id = entity_id
+    self.repr = None
 
-   def update(self, realm, entity, actions):
-      self.level.update(combat.level(entity.skills))
+    self.name = name + str(entity_id)
 
-      if realm.config.EQUIPMENT_SYSTEM_ENABLED:
-         self.item_level.update(entity.equipment.total(lambda e: e.level))
+    self.row.update(pos[0])
+    self.col.update(pos[1])
+    self.id.update(entity_id)
 
-      if realm.config.EXCHANGE_SYSTEM_ENABLED:
-         self.gold.update(entity.inventory.gold.quantity.val)
+    self.vision = self.config.PLAYER_VISION_RADIUS
 
-   @property
-   def pos(self):
-      return self.r.val, self.c.val
+    self.attacker = None
+    self.target = None
+    self.closest = None
+    self.spawn_pos = pos
 
-   def packet(self):
-      data = {}
+    # Submodules
+    self.status = Status(self)
+    self.history = History(self)
+    self.resources = Resources(self, self.config)
+    self.inventory = inventory.Inventory(realm, self)
 
-      data['r']          = self.r.val
-      data['c']          = self.c.val
-      data['name']       = self.name
-      data['level']      = self.level.val
-      data['item_level'] = self.item_level.val
-      data['color']      = self.color.packet()
-      data['population'] = self.population.val
-      data['self']       = self.self.val
+  @property
+  def ent_id(self):
+    return self.id.val
 
-      return data
+  def packet(self):
+    data = {}
 
-class Entity:
-   def __init__(self, realm, pos, iden, name, color, pop):
-      self.realm        = realm
-      self.dataframe    = realm.dataframe
-      self.config       = realm.config
+    data['status'] = self.status.packet()
+    data['history'] = self.history.packet()
+    data['inventory'] = self.inventory.packet()
+    data['alive'] = self.alive
+    data['base'] = {
+      'r': self.row.val,
+      'c': self.col.val,
+      'name': self.name,
+      'level': self.attack_level,
+      'item_level': self.item_level.val,
+    }
 
-      self.policy       = name
-      self.entID        = iden
-      self.repr         = None
-      self.vision       = 5
+    return data
 
-      self.attacker     = None
-      self.target       = None
-      self.closest      = None
-      self.spawnPos     = pos
+  def update(self, realm, actions):
+    '''Update occurs after actions, e.g. does not include history'''
+    if self.history.damage == 0:
+      self.attacker = None
+      self.attacker_id.update(0)
 
-      self.attackerID = nmmo.Serialized.Entity.AttackerID(self.dataframe, self.entID, 0)
+    if realm.config.EQUIPMENT_SYSTEM_ENABLED:
+      self.item_level.update(self.equipment.total(lambda e: e.level))
 
-      #Submodules
-      self.base      = Base(self, pos, iden, name, color, pop)
-      self.status    = Status(self)
-      self.history   = History(self)
-      self.resources = Resources(self)
+    self.status.update()
+    self.history.update(self, actions)
 
-      self.inventory = inventory.Inventory(realm, self)
+  # Returns True if the entity is alive
+  def receive_damage(self, source, dmg):
+    self.history.damage_received += dmg
+    self.history.damage.update(dmg)
+    self.resources.health.decrement(dmg)
 
-   def packet(self):
-      data = {}
-
-      data['status']    = self.status.packet()
-      data['history']   = self.history.packet()
-      data['inventory'] = self.inventory.packet()
-      data['alive']     = self.alive
-
-      return data
-
-   def update(self, realm, actions):
-      '''Update occurs after actions, e.g. does not include history'''
-      if self.history.damage == 0:
-         self.attacker = None
-         self.attackerID.update(0)
-
-      self.base.update(realm, self, actions)
-      self.status.update(realm, self, actions)
-      self.history.update(realm, self, actions)
-
-   def receiveDamage(self, source, dmg):
-      self.history.damage_received += dmg
-      self.history.damage.update(dmg)
-      self.resources.health.decrement(dmg)
-
-      if self.alive:
-          return True
-
-      if source is None:
-          return True 
-
-      if not source.isPlayer:
-          return True 
-
-      return False
-
-   def applyDamage(self, dmg, style):
-      self.history.damage_inflicted += dmg
-
-   @property
-   def pos(self):
-      return self.base.pos
-
-   @property
-   def alive(self):
-      if self.resources.health.empty:
-         return False
-
+    if self.alive:
       return True
 
-   @property
-   def isPlayer(self) -> bool:
+    # at this point, self is dead
+    if source:
+      source.history.player_kills += 1
+      self.realm.event_log.record(EventCode.PLAYER_KILL, source, target=self)
+
+    # if self is dead, unlist its items from the market regardless of looting
+    if self.config.EXCHANGE_SYSTEM_ENABLED:
+      for item in list(self.inventory.items):
+        self.realm.exchange.unlist_item(item)
+
+    # if self is dead but no one can loot, destroy its items
+    if source is None or not source.is_player: # nobody or npcs cannot loot
+      if self.config.ITEM_SYSTEM_ENABLED:
+        for item in list(self.inventory.items):
+          item.destroy()
       return False
 
-   @property
-   def isNPC(self) -> bool:
+    # now, source can loot the dead self
+    return False
+
+  # pylint: disable=unused-argument
+  def apply_damage(self, dmg, style):
+    self.history.damage_inflicted += dmg
+
+  @property
+  def pos(self):
+    return int(self.row.val), int(self.col.val)
+
+  @property
+  def alive(self):
+    if self.resources.health.empty:
       return False
 
-   @property
-   def level(self) -> int:
-       melee  = self.skills.melee.level.val
-       ranged = self.skills.range.level.val
-       mage   = self.skills.mage.level.val
+    return True
 
-       return int(max(melee, ranged, mage))
+  @property
+  def is_player(self) -> bool:
+    return False
+
+  @property
+  def is_npc(self) -> bool:
+    return False
+
+  @property
+  def attack_level(self) -> int:
+    melee = self.skills.melee.level.val
+    ranged = self.skills.range.level.val
+    mage = self.skills.mage.level.val
+
+    return int(max(melee, ranged, mage))
+
+  @property
+  def in_combat(self) -> bool:
+    # NOTE: the initial latest_combat_tick is 0, and valid values are greater than 0
+    if not self.config.COMBAT_SYSTEM_ENABLED or self.latest_combat_tick.val == 0:
+      return False
+
+    return (self.realm.tick - self.latest_combat_tick.val) < self.config.COMBAT_STATUS_DURATION

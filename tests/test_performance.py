@@ -1,100 +1,139 @@
-from pdb import set_trace as T
-import pytest
 
 import nmmo
-from nmmo.core.config import Config, Small, Large, Resource, Combat, Progression, NPC, AllGameSystems
+from nmmo.core.config import (NPC, AllGameSystems, Combat, Communication,
+                              Equipment, Exchange, Item, Medium, Profession,
+                              Progression, Resource, Small, Terrain)
+from scripted import baselines
+
 
 # Test utils
 def create_and_reset(conf):
-    env = nmmo.Env(conf())
-    env.reset(idx=1)
+  env = nmmo.Env(conf())
+  env.reset(map_id=1)
 
 def create_config(base, *systems):
-    systems   = (base, *systems)
-    name      = '_'.join(cls.__name__ for cls in systems)
+  systems   = (base, *systems)
+  name      = '_'.join(cls.__name__ for cls in systems)
 
-    conf                    = type(name, systems, {})()
+  conf                    = type(name, systems, {})()
 
-    conf.TERRAIN_TRAIN_MAPS = 1
-    conf.TERRAIN_EVAL_MAPS  = 1
+  conf.TERRAIN_TRAIN_MAPS = 1
+  conf.TERRAIN_EVAL_MAPS  = 1
+  conf.IMMORTAL = True
 
-    return conf
+  return conf
 
 def benchmark_config(benchmark, base, nent, *systems):
-    conf      = create_config(base, *systems)
-    conf.NENT = nent
+  conf = create_config(base, *systems)
+  conf.PLAYER_N = nent
+  conf.PLAYERS = [baselines.Random]
 
-    env = nmmo.Env(conf)
-    env.reset()
+  env = nmmo.Env(conf)
+  env.reset()
 
-    benchmark(env.step, actions={})
-
-def benchmark_env(benchmark, env, nent):
-    env.config.NENT = nent
-    env.reset()
-
-    benchmark(env.step, actions={})
+  benchmark(env.step, actions={})
 
 # Small map tests -- fast with greater coverage for individual game systems
 def test_small_env_creation(benchmark):
-    benchmark(lambda: nmmo.Env(Small()))
+  benchmark(lambda: nmmo.Env(Small()))
 
 def test_small_env_reset(benchmark):
-    env = nmmo.Env(Small())
-    benchmark(lambda: env.reset(idx=1))
+  config = Small()
+  config.PLAYERS = [baselines.Random]
+  env = nmmo.Env(config)
+  benchmark(lambda: env.reset(map_id=1))
 
-def test_fps_small_base_1_pop(benchmark):
-    benchmark_config(benchmark, Small, 1) 
+def test_fps_base_small_1_pop(benchmark):
+  benchmark_config(benchmark, Small, 1)
 
-def test_fps_small_resource_1_pop(benchmark):
-    benchmark_config(benchmark, Small, 1, Resource) 
+def test_fps_minimal_small_1_pop(benchmark):
+  benchmark_config(benchmark, Small, 1, Terrain, Resource, Combat, Progression)
 
-def test_fps_small_combat_1_pop(benchmark):
-    benchmark_config(benchmark, Small, 1, Combat) 
+def test_fps_npc_small_1_pop(benchmark):
+  benchmark_config(benchmark, Small, 1, Terrain, Resource, Combat, Progression, NPC)
 
-def test_fps_small_progression_1_pop(benchmark):
-    benchmark_config(benchmark, Small, 1, Progression) 
+def test_fps_test_small_1_pop(benchmark):
+  benchmark_config(benchmark, Small, 1, Terrain, Resource, Combat, Progression, Item, Exchange)
 
-def test_fps_small_rcp_1_pop(benchmark):
-    benchmark_config(benchmark, Small, 1, Resource, Combat, Progression) 
+def test_fps_no_npc_small_1_pop(benchmark):
+  benchmark_config(benchmark, Small, 1, Terrain, Resource,
+    Combat, Progression, Item, Equipment, Profession, Exchange, Communication)
 
-def test_fps_small_npc_1_pop(benchmark):
-    benchmark_config(benchmark, Small, 1, NPC)
+def test_fps_all_small_1_pop(benchmark):
+  benchmark_config(benchmark, Small, 1, AllGameSystems)
 
-def test_fps_small_all_1_pop(benchmark):
-    benchmark_config(benchmark, Small, 1, AllGameSystems)
+def test_fps_base_med_1_pop(benchmark):
+  benchmark_config(benchmark, Medium, 1)
 
-def test_fps_small_rcp_100_pop(benchmark):
-    benchmark_config(benchmark, Small, 100, Resource, Combat, Progression) 
+def test_fps_minimal_med_1_pop(benchmark):
+  benchmark_config(benchmark, Medium, 1, Terrain, Resource, Combat)
 
-def test_fps_small_all_100_pop(benchmark):
-    benchmark_config(benchmark, Small, 100, AllGameSystems)
+def test_fps_npc_med_1_pop(benchmark):
+  benchmark_config(benchmark, Medium, 1, Terrain, Resource, Combat, NPC)
 
+def test_fps_test_med_1_pop(benchmark):
+  benchmark_config(benchmark, Medium, 1, Terrain, Resource, Combat, Progression, Item, Exchange)
+
+def test_fps_no_npc_med_1_pop(benchmark):
+  benchmark_config(benchmark, Medium, 1, Terrain, Resource,
+    Combat, Progression, Item, Equipment, Profession, Exchange, Communication)
+
+def test_fps_all_med_1_pop(benchmark):
+  benchmark_config(benchmark, Medium, 1, AllGameSystems)
+
+def test_fps_base_med_100_pop(benchmark):
+  benchmark_config(benchmark, Medium, 100)
+
+def test_fps_minimal_med_100_pop(benchmark):
+  benchmark_config(benchmark, Medium, 100, Terrain, Resource, Combat)
+
+def test_fps_npc_med_100_pop(benchmark):
+  benchmark_config(benchmark, Medium, 100, Terrain, Resource, Combat, NPC)
+
+def test_fps_test_med_100_pop(benchmark):
+  benchmark_config(benchmark, Medium, 100, Terrain, Resource, Combat, Progression, Item, Exchange)
+
+def test_fps_no_npc_med_100_pop(benchmark):
+  benchmark_config(benchmark, Medium, 100, Terrain, Resource, Combat,
+    Progression, Item, Equipment, Profession, Exchange, Communication)
+
+def test_fps_all_med_100_pop(benchmark):
+  benchmark_config(benchmark, Medium, 100, AllGameSystems)
+
+
+'''
+def benchmark_env(benchmark, env, nent):
+  env.config.PLAYER_N = nent
+  env.config.PLAYERS = [nmmo.agent.Random]
+  env.reset()
+
+  benchmark(env.step, actions={})
 # Reuse large maps since we aren't benchmarking the reset function
 def test_large_env_creation(benchmark):
-    benchmark(lambda: nmmo.Env(Large()))
+  benchmark(lambda: nmmo.Env(Large()))
 
 def test_large_env_reset(benchmark):
-    env = nmmo.Env(Large())
-    benchmark(lambda: env.reset(idx=1))
+  env = nmmo.Env(Large())
+  benchmark(lambda: env.reset(idx=1))
 
-LargeMapsRCP = nmmo.Env(create_config(Large, Resource, Combat, Progression))
+LargeMapsRCP = nmmo.Env(create_config(Large, Resource, Terrain, Combat, Progression))
 LargeMapsAll = nmmo.Env(create_config(Large, AllGameSystems))
 
 def test_fps_large_rcp_1_pop(benchmark):
-    benchmark_env(benchmark, LargeMapsRCP, 1)
+  benchmark_env(benchmark, LargeMapsRCP, 1)
 
 def test_fps_large_rcp_100_pop(benchmark):
-    benchmark_env(benchmark, LargeMapsRCP, 100)
+  benchmark_env(benchmark, LargeMapsRCP, 100)
 
 def test_fps_large_rcp_1000_pop(benchmark):
-    benchmark_env(benchmark, LargeMapsRCP, 1000)
+  benchmark_env(benchmark, LargeMapsRCP, 1000)
 
 def test_fps_large_all_1_pop(benchmark):
-    benchmark_env(benchmark, LargeMapsAll, 1)
+  benchmark_env(benchmark, LargeMapsAll, 1)
 
 def test_fps_large_all_100_pop(benchmark):
-    benchmark_env(benchmark, LargeMapsAll, 100)
+  benchmark_env(benchmark, LargeMapsAll, 100)
 
 def test_fps_large_all_1000_pop(benchmark):
-    benchmark_env(benchmark, LargeMapsAll, 1000)
+  benchmark_env(benchmark, LargeMapsAll, 1000)
+'''

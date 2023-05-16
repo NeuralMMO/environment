@@ -1,1 +1,2 @@
-from . import utils, move, attack, behavior, policy
+# pylint: disable=import-self
+from . import utils, move, behavior, policy

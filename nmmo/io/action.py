@@ -1,440 +1,711 @@
-from pdb import set_trace as T
-from ordered_set import OrderedSet
-import numpy as np
+# CHECK ME: Should these be fixed as well?
+# pylint: disable=no-method-argument,unused-argument,no-self-argument,no-member
 
 from enum import Enum, auto
+from ordered_set import OrderedSet
 
-import nmmo
+import numpy as np
+
 from nmmo.lib import utils
 from nmmo.lib.utils import staticproperty
+from nmmo.systems.item import Item, Stack
+from nmmo.lib.log import EventCode
+
 
 class NodeType(Enum):
-   #Tree edges
-   STATIC = auto()    #Traverses all edges without decisions
-   SELECTION = auto() #Picks an edge to follow
+  #Tree edges
+  STATIC = auto()    #Traverses all edges without decisions
+  SELECTION = auto() #Picks an edge to follow
 
-   #Executable actions
-   ACTION    = auto() #No arguments
-   CONSTANT  = auto() #Constant argument
-   VARIABLE  = auto() #Variable argument
+  #Executable actions
+  ACTION    = auto() #No arguments
+  CONSTANT  = auto() #Constant argument
+  VARIABLE  = auto() #Variable argument
 
 class Node(metaclass=utils.IterableNameComparable):
-   @classmethod
-   def init(cls, config):
-       pass
+  @classmethod
+  def init(cls, config):
+    pass
 
-   @staticproperty
-   def edges():
-      return []
+  @staticproperty
+  def edges():
+    return []
 
-   #Fill these in
-   @staticproperty
-   def priority():
-      return None
+  #Fill these in
+  @staticproperty
+  def priority():
+    return None
 
-   @staticproperty
-   def type():
-      return None
+  @staticproperty
+  def type():
+    return None
 
-   @staticproperty
-   def leaf():
-      return False
+  @staticproperty
+  def leaf():
+    return False
 
-   @classmethod
-   def N(cls, config):
-      return len(cls.edges)
+  @classmethod
+  def N(cls, config):
+    return len(cls.edges)
 
-   def deserialize(realm, entity, index):
-      return index
+  def deserialize(realm, entity, index):
+    return index
 
-   def args(stim, entity, config):
-      return []
+  def args(stim, entity, config):
+    return []
 
 class Fixed:
-   pass
+  pass
 
 #ActionRoot
 class Action(Node):
-   nodeType = NodeType.SELECTION
-   hooked   = False
+  nodeType = NodeType.SELECTION
+  hooked   = False
 
-   @classmethod
-   def init(cls, config):
-      # Sets up serialization domain
-      if Action.hooked:
-          return
+  @classmethod
+  def init(cls, config):
+    # Sets up serialization domain
+    if Action.hooked:
+      return
 
-      Action.hooked = True
+    Action.hooked = True
 
-   #Called upon module import (see bottom of file)
-   #Sets up serialization domain
-   def hook(config):
-      idx = 0
-      arguments = []
-      for action in Action.edges(config):
-         action.init(config)
-         for args in action.edges:
-            args.init(config)
-            if not 'edges' in args.__dict__:
-               continue
-            for arg in args.edges: 
-               arguments.append(arg)
-               arg.serial = tuple([idx])
-               arg.idx = idx 
-               idx += 1
-      Action.arguments = arguments
+  #Called upon module import (see bottom of file)
+  #Sets up serialization domain
+  def hook(config):
+    idx = 0
+    arguments = []
+    for action in Action.edges(config):
+      action.init(config)
+      for args in action.edges:
+        args.init(config)
+        if not 'edges' in args.__dict__:
+          continue
+        for arg in args.edges:
+          arguments.append(arg)
+          arg.serial = tuple([idx])
+          arg.idx = idx
+          idx += 1
+    Action.arguments = arguments
 
-   @staticproperty
-   def n():
-      return len(Action.arguments)
+  @staticproperty
+  def n():
+    return len(Action.arguments)
 
-   @classmethod
-   def edges(cls, config):
-      '''List of valid actions'''
-      edges = [Move]
-      if config.COMBAT_SYSTEM_ENABLED:
-          edges.append(Attack)
-      if config.ITEM_SYSTEM_ENABLED:
-          edges += [Use]
-      if config.EXCHANGE_SYSTEM_ENABLED:
-          edges += [Buy, Sell]
-      if config.COMMUNICATION_SYSTEM_ENABLED:
-          edges.append(Comm)
-      return edges
+  # pylint: disable=invalid-overridden-method
+  @classmethod
+  def edges(cls, config):
+    '''List of valid actions'''
+    edges = [Move]
+    if config.COMBAT_SYSTEM_ENABLED:
+      edges.append(Attack)
+    if config.ITEM_SYSTEM_ENABLED:
+      edges += [Use, Give, Destroy]
+    if config.EXCHANGE_SYSTEM_ENABLED:
+      edges += [Buy, Sell, GiveGold]
+    if config.COMMUNICATION_SYSTEM_ENABLED:
+      edges.append(Comm)
+    return edges
 
-   def args(stim, entity, config):
-      return nmmo.Serialized.edges 
+  def args(stim, entity, config):
+    raise NotImplementedError
+
 
 class Move(Node):
-   priority = 1
-   nodeType = NodeType.SELECTION
-   def call(env, entity, direction):
-      r, c  = entity.pos
-      entID = entity.entID
-      entity.history.lastPos = (r, c)
-      rDelta, cDelta = direction.delta
-      rNew, cNew = r+rDelta, c+cDelta
-      
-      #One agent per cell
-      tile = env.map.tiles[rNew, cNew] 
-      if tile.occupied and not tile.lava:
-         return
+  priority = 60
+  nodeType = NodeType.SELECTION
+  def call(realm, entity, direction):
+    if direction is None:
+      return
 
-      if entity.status.freeze > 0:
-         return
+    assert entity.alive, "Dead entity cannot act"
 
-      env.dataframe.move(nmmo.Serialized.Entity, entID, (r, c), (rNew, cNew))
-      entity.base.r.update(rNew)
-      entity.base.c.update(cNew)
+    r, c  = entity.pos
+    ent_id = entity.ent_id
+    entity.history.last_pos = (r, c)
+    r_delta, c_delta = direction.delta
+    r_new, c_new = r+r_delta, c+c_delta
 
-      env.map.tiles[r, c].delEnt(entID)
-      env.map.tiles[rNew, cNew].addEnt(entity)
+    # CHECK ME: lava-jumping agents in the tutorial no longer works
+    if realm.map.tiles[r_new, c_new].impassible:
+      return
 
-      if env.map.tiles[rNew, cNew].lava:
-         entity.receiveDamage(None, entity.resources.health.val)
+    if entity.status.freeze > 0:
+      return
 
-   @staticproperty
-   def edges():
-      return [Direction]
+    entity.row.update(r_new)
+    entity.col.update(c_new)
 
-   @staticproperty
-   def leaf():
-      return True
+    realm.map.tiles[r, c].remove_entity(ent_id)
+    realm.map.tiles[r_new, c_new].add_entity(entity)
+
+    # exploration record keeping. moved from entity.py, History.update()
+    dist_from_spawn = utils.linf(entity.spawn_pos, (r_new, c_new))
+    if dist_from_spawn > entity.history.exploration:
+      entity.history.exploration = dist_from_spawn
+      if entity.is_player:
+        realm.event_log.record(EventCode.GO_FARTHEST, entity,
+                               distance=dist_from_spawn)
+
+    # CHECK ME: material.Impassible includes lava, so this line is not reachable
+    if realm.map.tiles[r_new, c_new].lava:
+      entity.receive_damage(None, entity.resources.health.val)
+
+  @staticproperty
+  def edges():
+    return [Direction]
+
+  @staticproperty
+  def leaf():
+    return True
+
+  def enabled(config):
+    return True
 
 class Direction(Node):
-   argType = Fixed
+  argType = Fixed
 
-   @staticproperty
-   def edges():
-      return [North, South, East, West]
+  @staticproperty
+  def edges():
+    return [North, South, East, West, Stay]
 
-   def args(stim, entity, config):
-      return Direction.edges
+  def args(stim, entity, config):
+    return Direction.edges
+
+  def deserialize(realm, entity, index):
+    return deserialize_fixed_arg(Direction, index)
+
+# a quick helper function
+def deserialize_fixed_arg(arg, index):
+  if isinstance(index, (int, np.int64)):
+    if index < 0:
+      return None # so that the action will be discarded
+    val = min(index-1, len(arg.edges)-1)
+    return arg.edges[val]
+
+  # if index is not int, it's probably already deserialized
+  if index not in arg.edges:
+    return None # so that the action will be discarded
+  return index
 
 class North(Node):
-   delta = (-1, 0)
+  delta = (-1, 0)
 
 class South(Node):
-   delta = (1, 0)
+  delta = (1, 0)
 
 class East(Node):
-   delta = (0, 1)
+  delta = (0, 1)
 
 class West(Node):
-   delta = (0, -1)
+  delta = (0, -1)
 
+class Stay(Node):
+  delta = (0, 0)
 
 class Attack(Node):
-   priority = 0
-   nodeType = NodeType.SELECTION
-   @staticproperty
-   def n():
-      return 3
+  priority = 50
+  nodeType = NodeType.SELECTION
+  @staticproperty
+  def n():
+    return 3
 
-   @staticproperty
-   def edges():
-      return [Style, Target]
+  @staticproperty
+  def edges():
+    return [Style, Target]
 
-   @staticproperty
-   def leaf():
-      return True
+  @staticproperty
+  def leaf():
+    return True
 
-   def inRange(entity, stim, config, N):
-      R, C = stim.shape
-      R, C = R//2, C//2
+  def enabled(config):
+    return config.COMBAT_SYSTEM_ENABLED
 
-      rets = OrderedSet([entity])
-      for r in range(R-N, R+N+1):
-         for c in range(C-N, C+N+1):
-            for e in stim[r, c].ents.values():
-               rets.add(e)
+  def in_range(entity, stim, config, N):
+    R, C = stim.shape
+    R, C = R//2, C//2
 
-      rets = list(rets)
-      return rets
+    rets = OrderedSet([entity])
+    for r in range(R-N, R+N+1):
+      for c in range(C-N, C+N+1):
+        for e in stim[r, c].entities.values():
+          rets.add(e)
 
-   def l1(pos, cent):
-      r, c = pos
-      rCent, cCent = cent
-      return abs(r - rCent) + abs(c - cCent)
+    rets = list(rets)
+    return rets
 
-   def call(env, entity, style, targ):
-      config = env.config
+  # CHECK ME: do we need l1 distance function?
+  #   systems/ai/utils.py also has various distance functions
+  #   which we may want to clean up
+  # def l1(pos, cent):
+  #   r, c = pos
+  #   r_cent, c_cent = cent
+  #   return abs(r - r_cent) + abs(c - c_cent)
 
-      if entity.isPlayer and not config.COMBAT_SYSTEM_ENABLED:
-         return 
+  def call(realm, entity, style, target):
+    if style is None or target is None:
+      return None
 
-      # Testing a spawn immunity against old agents to avoid spawn camping
-      immunity = config.COMBAT_SPAWN_IMMUNITY
-      if entity.isPlayer and targ.isPlayer and entity.history.timeAlive.val > immunity and targ.history.timeAlive < immunity:
-         return
+    assert entity.alive, "Dead entity cannot act"
 
-      #Check if self targeted
-      if entity.entID == targ.entID:
-         return
+    config = realm.config
+    if entity.is_player and not config.COMBAT_SYSTEM_ENABLED:
+      return None
 
-      #ADDED: POPULATION IMMUNITY
-      if not config.COMBAT_FRIENDLY_FIRE and entity.isPlayer and entity.base.population.val == targ.base.population.val:
-         return
+    # Testing a spawn immunity against old agents to avoid spawn camping
+    immunity = config.COMBAT_SPAWN_IMMUNITY
+    if entity.is_player and target.is_player and \
+      target.history.time_alive < immunity < entity.history.time_alive.val:
+      return None
 
-      #Check attack range
-      rng     = style.attackRange(config)
-      start   = np.array(entity.base.pos)
-      end     = np.array(targ.base.pos)
-      dif     = np.max(np.abs(start - end))
+    #Check if self targeted
+    if entity.ent_id == target.ent_id:
+      return None
 
-      #Can't attack same cell or out of range
-      if dif == 0 or dif > rng:
-         return 
-      
-      #Execute attack
-      entity.history.attack = {}
-      entity.history.attack['target'] = targ.entID
-      entity.history.attack['style'] = style.__name__
-      targ.attacker = entity
-      targ.attackerID.update(entity.entID)
+    #Can't attack out of range
+    if utils.linf(entity.pos, target.pos) > style.attack_range(config):
+      return None
 
-      from nmmo.systems import combat
-      dmg = combat.attack(env, entity, targ, style.skill)
+    #Execute attack
+    entity.history.attack = {}
+    entity.history.attack['target'] = target.ent_id
+    entity.history.attack['style'] = style.__name__
+    target.attacker = entity
+    target.attacker_id.update(entity.ent_id)
 
-      if style.freeze and dmg > 0:
-         targ.status.freeze.update(config.COMBAT_FREEZE_TIME)
+    from nmmo.systems import combat
+    dmg = combat.attack(realm, entity, target, style.skill)
 
-      return dmg
+    if style.freeze and dmg > 0:
+      target.status.freeze.update(config.COMBAT_FREEZE_TIME)
+
+    # record the combat tick for both entities
+    # players and npcs both have latest_combat_tick in EntityState
+    for ent in [entity, target]:
+      ent.latest_combat_tick.update(realm.tick + 1) # because the tick is about to increment
+
+    return dmg
 
 class Style(Node):
-   argType = Fixed
-   @staticproperty
-   def edges():
-      return [Melee, Range, Mage]
+  argType = Fixed
+  @staticproperty
+  def edges():
+    return [Melee, Range, Mage]
 
-   def args(stim, entity, config):
-      return Style.edges
+  def args(stim, entity, config):
+    return Style.edges
+
+  def deserialize(realm, entity, index):
+    return deserialize_fixed_arg(Style, index)
 
 
 class Target(Node):
-   argType = None
+  argType = None
 
-   @classmethod
-   def N(cls, config):
-      #return config.WINDOW ** 2
-      return config.PLAYER_N_OBS
+  @classmethod
+  def N(cls, config):
+    return config.PLAYER_N_OBS
 
-   def deserialize(realm, entity, index):
-      return realm.entity(index)
+  def deserialize(realm, entity, index: int):
+    # NOTE: index is the entity id
+    # CHECK ME: should index be renamed to ent_id?
+    return realm.entity_or_none(index)
 
-   def args(stim, entity, config):
-      #Should pass max range?
-      return Attack.inRange(entity, stim, config, None)
+  def args(stim, entity, config):
+    #Should pass max range?
+    return Attack.in_range(entity, stim, config, None)
 
 class Melee(Node):
-   nodeType = NodeType.ACTION
-   freeze=False
+  nodeType = NodeType.ACTION
+  freeze=False
 
-   def attackRange(config):
-      return config.COMBAT_MELEE_REACH
+  def attack_range(config):
+    return config.COMBAT_MELEE_REACH
 
-   def skill(entity):
-      return entity.skills.melee
+  def skill(entity):
+    return entity.skills.melee
 
 class Range(Node):
-   nodeType = NodeType.ACTION
-   freeze=False
+  nodeType = NodeType.ACTION
+  freeze=False
 
-   def attackRange(config):
-      return config.COMBAT_RANGE_REACH
+  def attack_range(config):
+    return config.COMBAT_RANGE_REACH
 
-   def skill(entity):
-      return entity.skills.range
+  def skill(entity):
+    return entity.skills.range
 
 class Mage(Node):
-   nodeType = NodeType.ACTION
-   freeze=False
+  nodeType = NodeType.ACTION
+  freeze=False
 
-   def attackRange(config):
-      return config.COMBAT_MAGE_REACH
+  def attack_range(config):
+    return config.COMBAT_MAGE_REACH
 
-   def skill(entity):
-      return entity.skills.mage
+  def skill(entity):
+    return entity.skills.mage
+
+
+class InventoryItem(Node):
+  argType  = None
+
+  @classmethod
+  def N(cls, config):
+    return config.INVENTORY_N_OBS
+
+  # TODO(kywch): What does args do?
+  def args(stim, entity, config):
+    return stim.exchange.items()
+
+  def deserialize(realm, entity, index: int):
+    # NOTE: index is from the inventory, NOT item id
+    inventory = Item.Query.owned_by(realm.datastore, entity.id.val)
+
+    if index >= inventory.shape[0]:
+      return None
+
+    item_id = inventory[index, Item.State.attr_name_to_col["id"]]
+    return realm.items[item_id]
 
 class Use(Node):
-    priority = 3
+  priority = 10
 
-    @staticproperty
-    def edges():
-        return [Item]
+  @staticproperty
+  def edges():
+    return [InventoryItem]
 
-    def call(env, entity, item):
-        if item not in entity.inventory:
-            return
+  def enabled(config):
+    return config.ITEM_SYSTEM_ENABLED
 
-        return item.use(entity)
+  def call(realm, entity, item):
+    if item is None or item.owner_id.val != entity.ent_id:
+      return
+
+    assert entity.alive, "Dead entity cannot act"
+    assert entity.is_player, "Npcs cannot use an item"
+    assert item.quantity.val > 0, "Item quantity cannot be 0" # indicates item leak
+
+    if not realm.config.ITEM_SYSTEM_ENABLED:
+      return
+
+    if item not in entity.inventory:
+      return
+
+    if entity.in_combat: # player cannot use item during combat
+      return
+
+    # cannot use listed items or items that have higher level
+    if item.listed_price.val > 0 or item.level_gt(entity):
+      return
+
+    item.use(entity)
+
+class Destroy(Node):
+  priority = 40
+
+  @staticproperty
+  def edges():
+    return [InventoryItem]
+
+  def enabled(config):
+    return config.ITEM_SYSTEM_ENABLED
+
+  def call(realm, entity, item):
+    if item is None or item.owner_id.val != entity.ent_id:
+      return
+
+    assert entity.alive, "Dead entity cannot act"
+    assert entity.is_player, "Npcs cannot destroy an item"
+    assert item.quantity.val > 0, "Item quantity cannot be 0" # indicates item leak
+
+    if not realm.config.ITEM_SYSTEM_ENABLED:
+      return
+
+    if item not in entity.inventory:
+      return
+
+    if item.equipped.val: # cannot destroy equipped item
+      return
+
+    if entity.in_combat: # player cannot destroy item during combat
+      return
+
+    item.destroy()
+
+    realm.event_log.record(EventCode.DESTROY_ITEM, entity)
 
 class Give(Node):
-    priority = 2
+  priority = 30
 
-    @staticproperty
-    def edges():
-        return [Item, Target]
+  @staticproperty
+  def edges():
+    return [InventoryItem, Target]
 
-    def call(env, entity, item, target):
-        if item not in entity.inventory:
-            return
+  def enabled(config):
+    return config.ITEM_SYSTEM_ENABLED
 
-        if not target.isPlayer:
-            return
+  def call(realm, entity, item, target):
+    if item is None or item.owner_id.val != entity.ent_id or target is None:
+      return
 
-        if not target.inventory.space:
-            return
+    assert entity.alive, "Dead entity cannot act"
+    assert entity.is_player, "Npcs cannot give an item"
+    assert item.quantity.val > 0, "Item quantity cannot be 0" # indicates item leak
 
-        entity.inventory.remove(item, quantity=1)
-        item = type(item)(env, item.level.val)
-        target.inventory.receive(item)
+    config = realm.config
+    if not config.ITEM_SYSTEM_ENABLED:
+      return
 
-        return True
+    if not (target.is_player and target.alive):
+      return
+
+    if item not in entity.inventory:
+      return
+
+    # cannot give the equipped or listed item
+    if item.equipped.val or item.listed_price.val:
+      return
+
+    if entity.in_combat: # player cannot give item during combat
+      return
+
+    if not (config.ITEM_ALLOW_GIFT and
+            entity.ent_id != target.ent_id and                      # but not self
+            target.is_player and
+            entity.pos == target.pos):               # the same tile
+      return
+
+    if not target.inventory.space:
+      # receiver inventory is full - see if it has an ammo stack with the same sig
+      if isinstance(item, Stack):
+        if not target.inventory.has_stack(item.signature):
+          # no ammo stack with the same signature, so cannot give
+          return
+      else: # no space, and item is not ammo stack, so cannot give
+        return
+
+    entity.inventory.remove(item)
+    target.inventory.receive(item)
+
+    realm.event_log.record(EventCode.GIVE_ITEM, entity)
 
 
-class Item(Node):
-    argType  = 'Entity'
+class GiveGold(Node):
+  priority = 30
 
-    @classmethod
-    def N(cls, config):
-        return config.ITEM_N_OBS
+  @staticproperty
+  def edges():
+    # CHECK ME: for now using Price to indicate the gold amount to give
+    return [Price, Target]
 
-    def args(stim, entity, config):
-        return stim.exchange.items()
+  def enabled(config):
+    return config.EXCHANGE_SYSTEM_ENABLED
 
-    def deserialize(realm, entity, index):
-        return realm.items[index]
+  def call(realm, entity, amount, target):
+    if amount is None or target is None:
+      return
+
+    assert entity.alive, "Dead entity cannot act"
+    assert entity.is_player, "Npcs cannot give gold"
+
+    config = realm.config
+    if not config.EXCHANGE_SYSTEM_ENABLED:
+      return
+
+    if not (target.is_player and target.alive):
+      return
+
+    if entity.in_combat: # player cannot give gold during combat
+      return
+
+    if not (config.ITEM_ALLOW_GIFT and
+            entity.ent_id != target.ent_id and                      # but not self
+            target.is_player and
+            entity.pos == target.pos):                              # the same tile
+      return
+
+    if not isinstance(amount, int):
+      amount = amount.val
+
+    if not (amount > 0 and entity.gold.val > 0): # no gold to give
+      return
+
+    amount = min(amount, entity.gold.val)
+
+    entity.gold.decrement(amount)
+    target.gold.increment(amount)
+
+    realm.event_log.record(EventCode.GIVE_GOLD, entity)
+
+
+class MarketItem(Node):
+  argType  = None
+
+  @classmethod
+  def N(cls, config):
+    return config.MARKET_N_OBS
+
+  # TODO(kywch): What does args do?
+  def args(stim, entity, config):
+    return stim.exchange.items()
+
+  def deserialize(realm, entity, index: int):
+    # NOTE: index is from the market, NOT item id
+    market = Item.Query.for_sale(realm.datastore)
+
+    if index >= market.shape[0]:
+      return None
+
+    item_id = market[index, Item.State.attr_name_to_col["id"]]
+    return realm.items[item_id]
 
 class Buy(Node):
-    priority = 4
-    argType  = Fixed
+  priority = 20
+  argType  = Fixed
 
-    @staticproperty
-    def edges():
-        return [Item]
+  @staticproperty
+  def edges():
+    return [MarketItem]
 
-    def call(env, entity, item):
-        #Do not process exchange actions on death tick
-        if not entity.alive:
-            return
+  def enabled(config):
+    return config.EXCHANGE_SYSTEM_ENABLED
 
-        if not entity.inventory.space:
-            return
+  def call(realm, entity, item):
+    if item is None or item.owner_id.val == 0:
+      return
 
-        return env.exchange.buy(env, entity, item)
+    assert entity.alive, "Dead entity cannot act"
+    assert entity.is_player, "Npcs cannot buy an item"
+    assert item.quantity.val > 0, "Item quantity cannot be 0" # indicates item leak
+    assert item.equipped.val == 0, 'Listed item must not be equipped'
+
+    if not realm.config.EXCHANGE_SYSTEM_ENABLED:
+      return
+
+    if entity.gold.val < item.listed_price.val: # not enough money
+      return
+
+    if entity.ent_id == item.owner_id.val: # cannot buy own item
+      return
+
+    if entity.in_combat: # player cannot buy item during combat
+      return
+
+    if not entity.inventory.space:
+      # buyer inventory is full - see if it has an ammo stack with the same sig
+      if isinstance(item, Stack):
+        if not entity.inventory.has_stack(item.signature):
+          # no ammo stack with the same signature, so cannot give
+          return
+      else: # no space, and item is not ammo stack, so cannot give
+        return
+
+    # one can try to buy, but the listing might have gone (perhaps bought by other)
+    realm.exchange.buy(entity, item)
 
 class Sell(Node):
-    priority = 4
-    argType  = Fixed
+  priority = 70
+  argType  = Fixed
 
-    @staticproperty
-    def edges():
-        return [Item, Price]
+  @staticproperty
+  def edges():
+    return [InventoryItem, Price]
 
-    def call(env, entity, item, price):
-        #Do not process exchange actions on death tick
-        if not entity.alive:
-            return
+  def enabled(config):
+    return config.EXCHANGE_SYSTEM_ENABLED
 
-        # TODO: Find a better way to check this
-        # Should only occur when item is used on same tick
-        # Otherwise should not be possible
-        if item not in entity.inventory:
-            return
+  def call(realm, entity, item, price):
+    if item is None or item.owner_id.val != entity.ent_id or price is None:
+      return
 
-        if type(price) != int:
-            price = price.val
+    assert entity.alive, "Dead entity cannot act"
+    assert entity.is_player, "Npcs cannot sell an item"
+    assert item.quantity.val > 0, "Item quantity cannot be 0" # indicates item leak
 
-        return env.exchange.sell(env, entity, item, price)
+    if not realm.config.EXCHANGE_SYSTEM_ENABLED:
+      return
+
+    if item not in entity.inventory:
+      return
+
+    if entity.in_combat: # player cannot sell item during combat
+      return
+
+    # cannot sell the equipped or listed item
+    if item.equipped.val or item.listed_price.val:
+      return
+
+    if not isinstance(price, int):
+      price = price.val
+
+    if not price > 0:
+      return
+
+    realm.exchange.sell(entity, item, price, realm.tick)
 
 def init_discrete(values):
-    classes = []
-    for i in values:
-        name = f'Discrete_{i}'
-        cls  = type(name, (object,), {'val': i})
-        classes.append(cls)
-    return classes
+  classes = []
+  for i in values:
+    name = f'Discrete_{i}'
+    cls  = type(name, (object,), {'val': i})
+    classes.append(cls)
+
+  return classes
 
 class Price(Node):
-    argType  = Fixed
+  argType  = Fixed
 
-    @classmethod
-    def init(cls, config):
-        Price.classes = init_discrete(list(range(100)))
+  @classmethod
+  def init(cls, config):
+    # gold should be > 0
+    Price.classes = init_discrete(range(1, config.PRICE_N_OBS+1))
 
-    @staticproperty
-    def edges():
-        return Price.classes
+  @staticproperty
+  def edges():
+    return Price.classes
 
-    def args(stim, entity, config):
-        return Price.edges
+  def args(stim, entity, config):
+    return Price.edges
+
+  def deserialize(realm, entity, index):
+    return deserialize_fixed_arg(Price, index)
+
 
 class Token(Node):
-    argType  = Fixed
+  argType  = Fixed
 
-    @classmethod
-    def init(cls, config):
-        Comm.classes = init_discrete(range(config.COMMUNICATION_NUM_TOKENS))
+  @classmethod
+  def init(cls, config):
+    Token.classes = init_discrete(range(config.COMMUNICATION_NUM_TOKENS))
 
-    @staticproperty
-    def edges():
-        return Comm.classes
+  @staticproperty
+  def edges():
+    return Token.classes
 
-    def args(stim, entity, config):
-        return Comm.edges
+  def args(stim, entity, config):
+    return Token.edges
+
+  def deserialize(realm, entity, index):
+    return deserialize_fixed_arg(Token, index)
+
 
 class Comm(Node):
-    argType  = Fixed
-    priority = 0
+  argType  = Fixed
+  priority = 99
 
-    @staticproperty
-    def edges():
-        return [Token]
+  @staticproperty
+  def edges():
+    return [Token]
 
-    def call(env, entity, token):
-        entity.base.comm.update(token.val)
+  def enabled(config):
+    return config.COMMUNICATION_SYSTEM_ENABLED
+
+  def call(realm, entity, token):
+    if token is None:
+      return
+
+    entity.message.update(token.val)
 
 #TODO: Solve AGI
 class BecomeSkynet:
-   pass
+  pass

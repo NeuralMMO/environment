@@ -1,12 +1,15 @@
-from pdb import set_trace as T
+# pylint: disable=all
+
 import numpy as np
 
 from signal import signal, SIGINT
-import sys, os, json, pickle, time
+import json
+import os
+import sys
+import time
 import threading
 
 from twisted.internet import reactor
-from twisted.internet.task import LoopingCall
 from twisted.python import log
 from twisted.web.server import Site
 from twisted.web.static import File
@@ -14,6 +17,8 @@ from twisted.web.static import File
 from autobahn.twisted.websocket import WebSocketServerFactory, \
     WebSocketServerProtocol
 from autobahn.twisted.resource import WebSocketResource
+
+from .render_utils import np_encoder
 
 class GodswordServerProtocol(WebSocketServerProtocol):
     def __init__(self):
@@ -76,7 +81,7 @@ class GodswordServerProtocol(WebSocketServerProtocol):
         packet['pos']        = data['pos']
         packet['wilderness'] = data['wilderness']
         packet['market']     = data['market']
-        
+
         print('Is Connected? : {}'.format(self.isConnected))
         if not self.sent_environment:
             packet['map']    = data['environment']
@@ -88,8 +93,9 @@ class GodswordServerProtocol(WebSocketServerProtocol):
            packet['overlay'] = data['overlay']
            print('SENDING OVERLAY: ', len(packet['overlay']))
 
-        packet = json.dumps(packet).encode('utf8')
+        packet = json.dumps(packet, default=np_encoder).encode('utf8')
         self.sendMessage(packet, False)
+
 
 class WSServerFactory(WebSocketServerFactory):
     def __init__(self, ip, realm):
@@ -108,7 +114,7 @@ class WSServerFactory(WebSocketServerFactory):
         uptime = np.round(self.tickRate*self.tick, 1)
         delta = time.time() - self.time
         print('Wall Clock: ', str(delta)[:5], 'Uptime: ', uptime, ', Tick: ', self.tick)
-        delta = self.tickRate - delta    
+        delta = self.tickRate - delta
         if delta > 0:
            time.sleep(delta)
         self.time = time.time()
@@ -134,7 +140,7 @@ class Application:
 
       port = 8080
       self.factory          = WSServerFactory(u'ws://localhost:{}'.format(port), realm)
-      self.factory.protocol = GodswordServerProtocol 
+      self.factory.protocol = GodswordServerProtocol
       resource              = WebSocketResource(self.factory)
 
       root = File(".")

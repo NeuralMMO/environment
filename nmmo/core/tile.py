@@ -1,93 +1,99 @@
-from pdb import set_trace as T
+from types import SimpleNamespace
 import numpy as np
 
-import nmmo
+from nmmo.datastore.serialized import SerializedState
 from nmmo.lib import material
 
-class Tile:
-   def __init__(self, config, realm, r, c):
-      self.config = config
-      self.realm  = realm
+# pylint: disable=no-member
+TileState = SerializedState.subclass(
+  "Tile", [
+    "row",
+    "col",
+    "material_id",
+  ])
 
-      self.serialized = 'R{}-C{}'.format(r, c)
+TileState.Limits = lambda config: {
+  "row": (0, config.MAP_SIZE-1),
+  "col": (0, config.MAP_SIZE-1),
+  "material_id": (0, config.MAP_N_TILE),
+}
 
-      self.r     = nmmo.Serialized.Tile.R(realm.dataframe, self.serial, r)
-      self.c     = nmmo.Serialized.Tile.C(realm.dataframe, self.serial, c)
-      self.nEnts = nmmo.Serialized.Tile.NEnts(realm.dataframe, self.serial)
-      self.index = nmmo.Serialized.Tile.Index(realm.dataframe, self.serial, 0)
+TileState.Query = SimpleNamespace(
+  window=lambda ds, r, c, radius: ds.table("Tile").window(
+    TileState.State.attr_name_to_col["row"],
+    TileState.State.attr_name_to_col["col"],
+    r, c, radius),
+)
 
-      realm.dataframe.init(nmmo.Serialized.Tile, self.serial, (r, c))
+class Tile(TileState):
+  def __init__(self, realm, r, c):
+    super().__init__(realm.datastore, TileState.Limits(realm.config))
+    self.realm = realm
+    self.config = realm.config
 
-   @property
-   def serial(self):
-      return self.serialized
+    self.row.update(r)
+    self.col.update(c)
 
-   @property
-   def repr(self):
-      return ((self.r, self.c))
+    self.state = None
+    self.material = None
+    self.depleted = False
+    self.tex = None
 
-   @property
-   def pos(self):
-      return self.r.val, self.c.val
+    self.entities = {}
 
-   @property
-   def habitable(self):
-      return self.mat in material.Habitable
+  @property
+  def repr(self):
+    return ((self.row.val, self.col.val))
 
-   @property
-   def vacant(self):
-      return len(self.ents) == 0 and self.habitable
+  @property
+  def pos(self):
+    return self.row.val, self.col.val
 
-   @property
-   def occupied(self):
-      return not self.vacant
+  @property
+  def habitable(self):
+    return self.material in material.Habitable
 
-   @property
-   def impassible(self):
-      return self.mat in material.Impassible
+  @property
+  def impassible(self):
+    return self.material in material.Impassible
 
-   @property
-   def lava(self):
-      return self.mat == material.Lava
+  @property
+  def lava(self):
+    return self.material == material.Lava
 
-   def reset(self, mat, config):
-      self.state  = mat(config)
-      self.mat    = mat(config)
+  def reset(self, mat, config):
+    self.state = mat(config)
+    self.material = mat(config)
+    self.material_id.update(self.state.index)
 
-      self.depleted = False
-      self.tex      = mat.tex
-      self.ents     = {}
+    self.depleted = False
+    self.tex = self.material.tex
 
-      self.nEnts.update(0)
-      self.index.update(self.state.index)
- 
-   def addEnt(self, ent):
-      assert ent.entID not in self.ents
-      self.nEnts.update(1)
-      self.ents[ent.entID] = ent
+    self.entities = {}
 
-   def delEnt(self, entID):
-      assert entID in self.ents
-      self.nEnts.update(0)
-      del self.ents[entID]
+  def add_entity(self, ent):
+    assert ent.ent_id not in self.entities
+    self.entities[ent.ent_id] = ent
 
-   def step(self):
-      if not self.depleted or np.random.rand() > self.mat.respawn:
-         return
+  def remove_entity(self, ent_id):
+    assert ent_id in self.entities
+    del self.entities[ent_id]
 
-      self.depleted = False
-      self.state = self.mat
+  def step(self):
+    if not self.depleted or np.random.rand() > self.material.respawn:
+      return
 
-      self.index.update(self.state.index)
+    self.depleted = False
+    self.state = self.material
+    self.material_id.update(self.state.index)
 
-   def harvest(self, deplete):
-      if __debug__:
-          assert not self.depleted, f'{self.state} is depleted'
-          assert self.state in material.Harvestable, f'{self.state} not harvestable'
+  def harvest(self, deplete):
+    assert not self.depleted, f'{self.state} is depleted'
+    assert self.state in material.Harvestable, f'{self.state} not harvestable'
 
-      if deplete:
-          self.depleted = True
-          self.state    = self.mat.deplete(self.config)
-          self.index.update(self.state.index)
+    if deplete:
+      self.depleted = True
+      self.state = self.material.deplete(self.config)
+      self.material_id.update(self.state.index)
 
-      return self.mat.harvest()
+    return self.material.harvest()

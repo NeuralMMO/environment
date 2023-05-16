@@ -1,4 +1,5 @@
-from pdb import set_trace as T
+# pylint: disable=all
+
 import numpy as np
 import h5py
 
@@ -42,13 +43,13 @@ class OfflineDataset:
 
     def write_vectorized(self, t, episode, obs=None, atn=None, rewards=None, dones=None):
         if obs is not None:
-            self.obs[t, episode_list] = obs
+            self.obs[t, episode] = obs
         if atn is not None:
-            self.atn[t, episode_list] = atn
+            self.atn[t, episode] = atn
         if rewards is not None:
-            self.rewards[t, episode_list] = rewards
+            self.rewards[t, episode] = rewards
         if dones is not None:
-            self.dones[t, episode_list] = dones
+            self.dones[t, episode] = dones
 
 EPISODES = 5
 HORIZON = 16

@@ -1,107 +1,66 @@
-from pdb import set_trace as T
 from collections import defaultdict
-from nmmo.lib import material
-from copy import deepcopy
-import os
 
 import logging
-import numpy as np
-import json, pickle
-import time
 
-from nmmo.lib import utils
 
 class Logger:
-    def __init__(self):
-        self.stats = defaultdict(list)
+  def __init__(self):
+    self.stats = defaultdict(list)
 
-    def log(self, key, val):
-        try:
-            int_val = int(val)
-        except TypeError as e:
-            print(f'{val} must be int or float')
-            raise e
-        self.stats[key].append(val)
-        return True
+  def log(self, key, val):
+    if not isinstance(val, (int, float)):
+      raise RuntimeError(f'{val} must be int or float')
+
+    self.stats[key].append(val)
+    return True
 
 class MilestoneLogger(Logger):
-    def __init__(self, log_file):
-        super().__init__()
-        logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO, filename=log_file, filemode='w')
+  def __init__(self, log_file):
+    super().__init__()
+    logging.basicConfig(format='%(levelname)s:%(message)s',
+      level=logging.INFO, filename=log_file, filemode='w')
 
-    def log_min(self, key, val):
-        if key in self.stats and val >= self.stats[key][-1]:
-            return False
+  def log_min(self, key, val):
+    if key in self.stats and val >= self.stats[key][-1]:
+      return False
 
-        self.log(key, val)
-        return True
+    self.log(key, val)
+    return True
 
-    def log_max(self, key, val):
-        if key in self.stats and val <= self.stats[key][-1]:
-            return False
+  def log_max(self, key, val):
+    if key in self.stats and val <= self.stats[key][-1]:
+      return False
 
-        self.log(key, val)
-        return True
+    self.log(key, val)
+    return True
 
-class Quill:
-   def __init__(self, config):
-      self.config = config
 
-      self.env    = Logger()
-      self.player = Logger()
-      self.event  = Logger()
+# CHECK ME: Is this a good place to put here?
+#   EventCode is used in many places, and I(kywch)'m putting it here
+#   to avoid a circular import, which happened a few times with event_log.py
+class EventCode:
+  # Move
+  EAT_FOOD = 1
+  DRINK_WATER = 2
+  GO_FARTHEST = 3 # record when breaking the previous record
 
-      self.shared = {}
+  # Attack
+  SCORE_HIT = 11
+  PLAYER_KILL = 12
 
-      if config.LOG_MILESTONES:
-          self.milestone = MilestoneLogger(config.LOG_FILE)
+  # Item
+  CONSUME_ITEM = 21
+  GIVE_ITEM = 22
+  DESTROY_ITEM = 23
+  HARVEST_ITEM = 24
+  EQUIP_ITEM = 25
 
-   def register(self, key, fn):
-       assert key not in self.shared, f'Log key {key} already exists'
-       self.shared[key] = fn
+  # Exchange
+  GIVE_GOLD = 31
+  LIST_ITEM = 32
+  EARN_GOLD = 33
+  BUY_ITEM = 34
+  #SPEND_GOLD = 35 # BUY_ITEM, price has the same info
 
-   def log_env(self, key, val):
-      self.env.log(key, val)
-
-   def log_player(self, key, val):
-      self.player.log(key, val)
-
-   @property
-   def packet(self):
-      packet = {'Env':    self.env.stats,
-              'Player': self.player.stats}
-
-      if self.config.LOG_EVENTS:
-          packet['Event'] = self.event.stats
-      else:
-          packet['Event'] = 'Unavailable: config.LOG_EVENTS = False'
-
-      if self.config.LOG_MILESTONES:
-          packet['Milestone'] = self.event.stats
-      else:
-          packet['Milestone'] = 'Unavailable: config.LOG_MILESTONES = False'
-
-      return packet
-
-#Log wrapper and benchmarker
-class Benchmarker:
-   def __init__(self, logdir):
-      self.benchmarks = {}
-
-   def wrap(self, func):
-      self.benchmarks[func] = Utils.BenchmarkTimer()
-      def wrapped(*args):
-         self.benchmarks[func].startRecord()
-         ret = func(*args)
-         self.benchmarks[func].stopRecord()
-         return ret
-      return wrapped
-
-   def bench(self, tick):
-      if tick % 100 == 0:
-         for k, benchmark in self.benchmarks.items():
-            bench = benchmark.benchmark()
-            print(k.__func__.__name__, 'Tick: ', tick,
-                  ', Benchmark: ', bench, ', FPS: ', 1/bench)
- 
-
+  # Level up
+  LEVEL_UP = 41
