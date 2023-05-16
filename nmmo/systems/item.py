@@ -209,7 +209,7 @@ class Equipment(Item):
       # always empty the slot first
       self._slot(entity).unequip()
       self.equip(entity, self._slot(entity))
-
+      self.realm.event_log.record(EventCode.EQUIP_ITEM, entity, item=self)
 
 class Armor(Equipment, ABC):
   def __init__(self, realm, level, **kwargs):

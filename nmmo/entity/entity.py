@@ -5,7 +5,6 @@ from types import SimpleNamespace
 import numpy as np
 
 from nmmo.core.config import Config
-from nmmo.lib import utils
 from nmmo.datastore.serialized import SerializedState
 from nmmo.systems import inventory
 from nmmo.lib.log import EventCode
@@ -153,6 +152,7 @@ class Status:
     return data
 
 
+# NOTE: History.packet() is actively used in visulazing attacks
 class History:
   def __init__(self, ent):
     self.actions = {}
@@ -177,9 +177,6 @@ class History:
     self.actions = {}
     if entity.ent_id in actions:
       self.actions = actions[entity.ent_id]
-
-    exploration = utils.linf(entity.pos, self.starting_position)
-    self.exploration = max(exploration, self.exploration)
 
     self.time_alive.increment()
 

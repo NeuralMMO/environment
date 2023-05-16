@@ -42,6 +42,7 @@ class EventCode:
   # Move
   EAT_FOOD = 1
   DRINK_WATER = 2
+  GO_FARTHEST = 3 # record when breaking the previous record
 
   # Attack
   SCORE_HIT = 11
@@ -52,6 +53,7 @@ class EventCode:
   GIVE_ITEM = 22
   DESTROY_ITEM = 23
   HARVEST_ITEM = 24
+  EQUIP_ITEM = 25
 
   # Exchange
   GIVE_GOLD = 31
