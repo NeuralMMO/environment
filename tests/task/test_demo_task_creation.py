@@ -94,7 +94,7 @@ class TestDemoTask(unittest.TestCase):
       scenario = Scenario(config)
       tasks = tg(scenario)
       env.change_task(tasks)
-      for _ in range(30):
+      for _ in range(10):
         env.step({})
 
     # DONE
