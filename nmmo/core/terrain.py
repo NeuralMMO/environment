@@ -237,8 +237,20 @@ class MapGenerator:
     #Only generate if maps are not cached
     path_maps = os.path.join(config.PATH_CWD, config.PATH_MAPS)
     os.makedirs(path_maps, exist_ok=True)
+
     if not config.MAP_FORCE_GENERATION and os.listdir(path_maps):
-      return
+      # check if the folder has all the required maps
+      all_maps_exist = True
+      for idx in range(config.MAP_N, -1, -1):
+        map_file = path_maps + '/map' + str(idx+1) + '/map.npy'
+        if not os.path.exists(map_file):
+          # override MAP_FORCE_GENERATION = FALSE and generate maps
+          all_maps_exist = False
+          break
+
+      # do not generate maps if all maps exist
+      if all_maps_exist:
+        return
 
     if __debug__:
       logging.info('Generating %s maps', str(config.MAP_N))
