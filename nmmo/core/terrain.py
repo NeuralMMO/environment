@@ -7,7 +7,6 @@ import numpy as np
 import vec_noise
 from imageio import imread, imsave
 from scipy import stats
-from tqdm import tqdm
 
 from nmmo import material
 
@@ -255,7 +254,7 @@ class MapGenerator:
     if __debug__:
       logging.info('Generating %s maps', str(config.MAP_N))
 
-    for idx in tqdm(range(config.MAP_N)):
+    for idx in range(config.MAP_N):
       path = path_maps + '/map' + str(idx+1)
       os.makedirs(path, exist_ok=True)
 
