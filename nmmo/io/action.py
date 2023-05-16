@@ -126,11 +126,7 @@ class Move(Node):
     r_delta, c_delta = direction.delta
     r_new, c_new = r+r_delta, c+c_delta
 
-    # CHECK ME: before this agents were allowed to jump into lava and die
-    #   however, when config.IMMORTAL = True was set, lava-jumping agents
-    #   did not die and made all the way to the map edge, causing errors
-    #   e.g., systems/skill.py, line 135: realm.map.tiles[r, c+1] index error
-    # How do we want to handle this?
+    # CHECK ME: lava-jumping agents in the tutorial no longer works
     if realm.map.tiles[r_new, c_new].impassible:
       return
 
@@ -142,6 +138,14 @@ class Move(Node):
 
     realm.map.tiles[r, c].remove_entity(ent_id)
     realm.map.tiles[r_new, c_new].add_entity(entity)
+
+    # exploration record keeping. moved from entity.py, History.update()
+    dist_from_spawn = utils.linf(entity.spawn_pos, (r_new, c_new))
+    if dist_from_spawn > entity.history.exploration:
+      entity.history.exploration = dist_from_spawn
+      if entity.is_player:
+        realm.event_log.record(EventCode.GO_FARTHEST, entity,
+                               distance=dist_from_spawn)
 
     # CHECK ME: material.Impassible includes lava, so this line is not reachable
     if realm.map.tiles[r_new, c_new].lava:

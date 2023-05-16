@@ -5,7 +5,6 @@ from types import SimpleNamespace
 import numpy as np
 
 from nmmo.core.config import Config
-from nmmo.lib import utils
 from nmmo.datastore.serialized import SerializedState
 from nmmo.systems import inventory
 from nmmo.lib.log import EventCode
@@ -153,6 +152,7 @@ class Status:
     return data
 
 
+# NOTE: History.packet() is actively used in visulazing attacks
 class History:
   def __init__(self, ent):
     self.actions = {}
@@ -178,9 +178,6 @@ class History:
     if entity.ent_id in actions:
       self.actions = actions[entity.ent_id]
 
-    exploration = utils.linf(entity.pos, self.starting_position)
-    self.exploration = max(exploration, self.exploration)
-
     self.time_alive.increment()
 
   def packet(self):
@@ -193,21 +190,24 @@ class History:
     if self.attack is not None:
       data['attack'] = self.attack
 
-    actions = {}
-    for atn, args in self.actions.items():
-      atn_packet = {}
+    # NOTE: the client seems to use actions for visualization
+    #   but produces errors with the new actions. So we comment out these for now
+    # actions = {}
+    # for atn, args in self.actions.items():
+    #   atn_packet = {}
 
-      # Avoid recursive player packet
-      if atn.__name__ == 'Attack':
-        continue
+    #   # Avoid recursive player packet
+    #   if atn.__name__ == 'Attack':
+    #     continue
 
-      for key, val in args.items():
-        if hasattr(val, 'packet'):
-          atn_packet[key.__name__] = val.packet
-        else:
-          atn_packet[key.__name__] = val.__name__
-      actions[atn.__name__] = atn_packet
-    data['actions'] = actions
+    #   for key, val in args.items():
+    #     if hasattr(val, 'packet'):
+    #       atn_packet[key.__name__] = val.packet
+    #     else:
+    #       atn_packet[key.__name__] = val.__name__
+    #   actions[atn.__name__] = atn_packet
+    # data['actions'] = actions
+    data['actions'] = {}
 
     return data
 
