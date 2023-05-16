@@ -14,15 +14,12 @@ from nmmo.core.tile import Tile
 from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
 from nmmo.core import realm
+
 from scripted.baselines import Scripted
 
 
 class Env(ParallelEnv):
-  '''Environment wrapper for Neural MMO using the Parallel PettingZoo API
-
-  Neural MMO provides complex environments featuring structured observations/actions,
-  variably sized agent populations, and long time horizons. Usage in conjunction
-  with RLlib as demonstrated in the /projekt wrapper is highly recommended.'''
+  # Environment wrapper for Neural MMO using the Parallel PettingZoo API
 
   def __init__(self,
     config: Default = nmmo.config.Default(), seed=None):
@@ -60,6 +57,8 @@ class Env(ParallelEnv):
           dtype=np.float32)
 
     obs_space = {
+      "Tick": gym.spaces.Discrete(1),
+      "AgentId": gym.spaces.Discrete(1),
       "Tile": box(self.config.MAP_N_OBS, Tile.State.num_attributes),
       "Entity": box(self.config.PLAYER_N_OBS, Entity.State.num_attributes)
     }
@@ -254,7 +253,10 @@ class Env(ParallelEnv):
 
     dones = {}
     for eid in self.possible_agents:
-      if eid not in self.realm.players and eid not in self._dead_agents:
+      if eid not in self._dead_agents and (
+          eid not in self.realm.players or
+          self.realm.tick >= self.config.HORIZON):
+
         self._dead_agents.add(eid)
         dones[eid] = True
 
@@ -363,7 +365,8 @@ class Env(ParallelEnv):
       inventory = Item.Query.owned_by(self.realm.datastore, agent_id)
 
       obs[agent_id] = Observation(
-        self.config, agent_id, visible_tiles, visible_entities, inventory, market)
+        self.config, self.realm.tick,
+        agent_id, visible_tiles, visible_entities, inventory, market)
 
     return obs
 
@@ -390,14 +393,9 @@ class Env(ParallelEnv):
       agent = self.realm.players.get(agent_id)
       assert agent is not None, f'Agent {agent_id} not found'
 
-      infos[agent_id] =  {'population': agent.population}
-
-      if agent.diary is None:
-        rewards[agent_id] = 0
-        continue
-
-      rewards[agent_id] = sum(agent.diary.rewards.values())
-      infos[agent_id].update(agent.diary.rewards)
+      if agent.diary is not None:
+        rewards[agent_id] = sum(agent.diary.rewards.values())
+        infos[agent_id].update(agent.diary.rewards)
 
     return rewards, infos
 

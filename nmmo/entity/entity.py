@@ -5,7 +5,6 @@ from types import SimpleNamespace
 import numpy as np
 
 from nmmo.core.config import Config
-from nmmo.lib import utils
 from nmmo.datastore.serialized import SerializedState
 from nmmo.systems import inventory
 from nmmo.lib.log import EventCode
@@ -14,7 +13,7 @@ from nmmo.lib.log import EventCode
 EntityState = SerializedState.subclass(
   "Entity", [
     "id",
-    "population_id",
+    "npc_type", # 1 - passive, 2 - neutral, 3 - aggressive
     "row",
     "col",
 
@@ -24,6 +23,7 @@ EntityState = SerializedState.subclass(
     "freeze",
     "item_level",
     "attacker_id",
+    "latest_combat_tick",
     "message",
 
     # Resources
@@ -48,7 +48,7 @@ EntityState = SerializedState.subclass(
 EntityState.Limits = lambda config: {
   **{
     "id": (-math.inf, math.inf),
-    "population_id": (-3, config.PLAYER_POLICIES-1),
+    "npc_type": (0, 4),
     "row": (0, config.MAP_SIZE-1),
     "col": (0, config.MAP_SIZE-1),
     "damage": (0, math.inf),
@@ -56,6 +56,7 @@ EntityState.Limits = lambda config: {
     "freeze": (0, 3),
     "item_level": (0, 5*config.NPC_LEVEL_MAX),
     "attacker_id": (-np.inf, math.inf),
+    "latest_combat_tick": (0, math.inf),
     "health": (0, config.PLAYER_BASE_HEALTH),
   },
   **({
@@ -132,9 +133,9 @@ class Resources:
 
   def packet(self):
     data = {}
-    data['health'] = self.health.val
-    data['food'] = self.food.val
-    data['water'] = self.water.val
+    data['health'] = { 'val': self.health.val, 'max': self.config.PLAYER_BASE_HEALTH }
+    data['food'] = { 'val': self.food.val, 'max': self.config.RESOURCE_BASE }
+    data['water'] = { 'val': self.water.val, 'max': self.config.RESOURCE_BASE }
     return data
 
 class Status:
@@ -151,6 +152,7 @@ class Status:
     return data
 
 
+# NOTE: History.packet() is actively used in visulazing attacks
 class History:
   def __init__(self, ent):
     self.actions = {}
@@ -176,9 +178,6 @@ class History:
     if entity.ent_id in actions:
       self.actions = actions[entity.ent_id]
 
-    exploration = utils.linf(entity.pos, self.starting_position)
-    self.exploration = max(exploration, self.exploration)
-
     self.time_alive.increment()
 
   def packet(self):
@@ -191,27 +190,30 @@ class History:
     if self.attack is not None:
       data['attack'] = self.attack
 
-    actions = {}
-    for atn, args in self.actions.items():
-      atn_packet = {}
+    # NOTE: the client seems to use actions for visualization
+    #   but produces errors with the new actions. So we comment out these for now
+    # actions = {}
+    # for atn, args in self.actions.items():
+    #   atn_packet = {}
 
-      # Avoid recursive player packet
-      if atn.__name__ == 'Attack':
-        continue
+    #   # Avoid recursive player packet
+    #   if atn.__name__ == 'Attack':
+    #     continue
 
-      for key, val in args.items():
-        if hasattr(val, 'packet'):
-          atn_packet[key.__name__] = val.packet
-        else:
-          atn_packet[key.__name__] = val.__name__
-      actions[atn.__name__] = atn_packet
-    data['actions'] = actions
+    #   for key, val in args.items():
+    #     if hasattr(val, 'packet'):
+    #       atn_packet[key.__name__] = val.packet
+    #     else:
+    #       atn_packet[key.__name__] = val.__name__
+    #   actions[atn.__name__] = atn_packet
+    # data['actions'] = actions
+    data['actions'] = {}
 
     return data
 
 # pylint: disable=no-member
 class Entity(EntityState):
-  def __init__(self, realm, pos, entity_id, name, color, population_id):
+  def __init__(self, realm, pos, entity_id, name):
     super().__init__(realm.datastore, EntityState.Limits(realm.config))
 
     self.realm = realm
@@ -222,11 +224,9 @@ class Entity(EntityState):
     self.repr = None
 
     self.name = name + str(entity_id)
-    self.color = color
 
     self.row.update(pos[0])
     self.col.update(pos[1])
-    self.population_id.update(population_id)
     self.id.update(entity_id)
 
     self.vision = self.config.PLAYER_VISION_RADIUS
@@ -259,10 +259,6 @@ class Entity(EntityState):
       'name': self.name,
       'level': self.attack_level,
       'item_level': self.item_level.val,
-      'color': self.color.packet(),
-      'population': self.population,
-      # FIXME: Don't know what it does. Previous nmmo entities all returned 1
-      # 'self': self.self.val,
     }
 
     return data
@@ -303,7 +299,7 @@ class Entity(EntityState):
       if self.config.ITEM_SYSTEM_ENABLED:
         for item in list(self.inventory.items):
           item.destroy()
-      return True
+      return False
 
     # now, source can loot the dead self
     return False
@@ -340,5 +336,9 @@ class Entity(EntityState):
     return int(max(melee, ranged, mage))
 
   @property
-  def population(self):
-    return self.population_id.val
+  def in_combat(self) -> bool:
+    # NOTE: the initial latest_combat_tick is 0, and valid values are greater than 0
+    if not self.config.COMBAT_SYSTEM_ENABLED or self.latest_combat_tick.val == 0:
+      return False
+
+    return (self.realm.tick - self.latest_combat_tick.val) < self.config.COMBAT_STATUS_DURATION

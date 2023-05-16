@@ -3,7 +3,6 @@ import random
 
 from nmmo.entity import entity
 from nmmo.io import action as Action
-from nmmo.lib.colors import Neon
 from nmmo.systems import combat, droptable
 from nmmo.systems.ai import policy
 from nmmo.systems import item as Item
@@ -46,15 +45,17 @@ class Equipment:
     return packet
 
 
+# pylint: disable=no-member
 class NPC(entity.Entity):
-  def __init__(self, realm, pos, iden, name, color, pop):
-    super().__init__(realm, pos, iden, name, color, pop)
+  def __init__(self, realm, pos, iden, name, npc_type):
+    super().__init__(realm, pos, iden, name)
     self.skills = skill.Combat(realm, self)
     self.realm = realm
     self.last_action = None
     self.droptable = None
     self.spawn_danger = None
     self.equipment = None
+    self.npc_type.update(npc_type)
 
   def update(self, realm, actions):
     super().update(realm, actions)
@@ -151,7 +152,8 @@ class NPC(entity.Entity):
     data = super().packet()
 
     data['skills']   = self.skills.packet()
-    data['resource'] = {'health': self.resources.health.val}
+    data['resource'] = { 'health': {
+      'val': self.resources.health.val, 'max': self.config.PLAYER_BASE_HEALTH } }
 
     return data
 
@@ -161,21 +163,21 @@ class NPC(entity.Entity):
 
 class Passive(NPC):
   def __init__(self, realm, pos, iden):
-    super().__init__(realm, pos, iden, 'Passive', Neon.GREEN, -1)
+    super().__init__(realm, pos, iden, 'Passive', 1)
 
   def decide(self, realm):
     return policy.passive(realm, self)
 
 class PassiveAggressive(NPC):
   def __init__(self, realm, pos, iden):
-    super().__init__(realm, pos, iden, 'Neutral', Neon.ORANGE, -2)
+    super().__init__(realm, pos, iden, 'Neutral', 2)
 
   def decide(self, realm):
     return policy.neutral(realm, self)
 
 class Aggressive(NPC):
   def __init__(self, realm, pos, iden):
-    super().__init__(realm, pos, iden, 'Hostile', Neon.RED, -3)
+    super().__init__(realm, pos, iden, 'Hostile', 3)
 
   def decide(self, realm):
     return policy.hostile(realm, self)

@@ -4,11 +4,13 @@
 from enum import Enum, auto
 from ordered_set import OrderedSet
 
+import numpy as np
+
 from nmmo.lib import utils
 from nmmo.lib.utils import staticproperty
 from nmmo.systems.item import Item, Stack
 from nmmo.lib.log import EventCode
-import numpy as np
+
 
 class NodeType(Enum):
   #Tree edges
@@ -124,11 +126,7 @@ class Move(Node):
     r_delta, c_delta = direction.delta
     r_new, c_new = r+r_delta, c+c_delta
 
-    # CHECK ME: before this agents were allowed to jump into lava and die
-    #   however, when config.IMMORTAL = True was set, lava-jumping agents
-    #   did not die and made all the way to the map edge, causing errors
-    #   e.g., systems/skill.py, line 135: realm.map.tiles[r, c+1] index error
-    # How do we want to handle this?
+    # CHECK ME: lava-jumping agents in the tutorial no longer works
     if realm.map.tiles[r_new, c_new].impassible:
       return
 
@@ -140,6 +138,14 @@ class Move(Node):
 
     realm.map.tiles[r, c].remove_entity(ent_id)
     realm.map.tiles[r_new, c_new].add_entity(entity)
+
+    # exploration record keeping. moved from entity.py, History.update()
+    dist_from_spawn = utils.linf(entity.spawn_pos, (r_new, c_new))
+    if dist_from_spawn > entity.history.exploration:
+      entity.history.exploration = dist_from_spawn
+      if entity.is_player:
+        realm.event_log.record(EventCode.GO_FARTHEST, entity,
+                               distance=dist_from_spawn)
 
     # CHECK ME: material.Impassible includes lava, so this line is not reachable
     if realm.map.tiles[r_new, c_new].lava:
@@ -256,11 +262,6 @@ class Attack(Node):
     if entity.ent_id == target.ent_id:
       return None
 
-    #ADDED: POPULATION IMMUNITY
-    if not config.COMBAT_FRIENDLY_FIRE and entity.is_player \
-       and entity.population_id.val == target.population_id.val:
-      return None
-
     #Can't attack out of range
     if utils.linf(entity.pos, target.pos) > style.attack_range(config):
       return None
@@ -277,6 +278,11 @@ class Attack(Node):
 
     if style.freeze and dmg > 0:
       target.status.freeze.update(config.COMBAT_FREEZE_TIME)
+
+    # record the combat tick for both entities
+    # players and npcs both have latest_combat_tick in EntityState
+    for ent in [entity, target]:
+      ent.latest_combat_tick.update(realm.tick + 1) # because the tick is about to increment
 
     return dmg
 
@@ -372,7 +378,7 @@ class Use(Node):
     return config.ITEM_SYSTEM_ENABLED
 
   def call(realm, entity, item):
-    if item is None:
+    if item is None or item.owner_id.val != entity.ent_id:
       return
 
     assert entity.alive, "Dead entity cannot act"
@@ -383,6 +389,9 @@ class Use(Node):
       return
 
     if item not in entity.inventory:
+      return
+
+    if entity.in_combat: # player cannot use item during combat
       return
 
     # cannot use listed items or items that have higher level
@@ -402,7 +411,7 @@ class Destroy(Node):
     return config.ITEM_SYSTEM_ENABLED
 
   def call(realm, entity, item):
-    if item is None:
+    if item is None or item.owner_id.val != entity.ent_id:
       return
 
     assert entity.alive, "Dead entity cannot act"
@@ -418,8 +427,9 @@ class Destroy(Node):
     if item.equipped.val: # cannot destroy equipped item
       return
 
-    # inventory.remove() also unlists the item, if it has been listed
-    entity.inventory.remove(item)
+    if entity.in_combat: # player cannot destroy item during combat
+      return
+
     item.destroy()
 
     realm.event_log.record(EventCode.DESTROY_ITEM, entity)
@@ -435,7 +445,7 @@ class Give(Node):
     return config.ITEM_SYSTEM_ENABLED
 
   def call(realm, entity, item, target):
-    if item is None or target is None:
+    if item is None or item.owner_id.val != entity.ent_id or target is None:
       return
 
     assert entity.alive, "Dead entity cannot act"
@@ -456,10 +466,13 @@ class Give(Node):
     if item.equipped.val or item.listed_price.val:
       return
 
-    if not (config.ITEM_GIVE_TO_FRIENDLY and
-            entity.population_id == target.population_id and        # the same team
+    if entity.in_combat: # player cannot give item during combat
+      return
+
+    if not (config.ITEM_ALLOW_GIFT and
             entity.ent_id != target.ent_id and                      # but not self
-            utils.linf(entity.pos, target.pos) == 0):               # the same tile
+            target.is_player and
+            entity.pos == target.pos):               # the same tile
       return
 
     if not target.inventory.space:
@@ -502,10 +515,13 @@ class GiveGold(Node):
     if not (target.is_player and target.alive):
       return
 
-    if not (config.ITEM_GIVE_TO_FRIENDLY and
-            entity.population_id == target.population_id and        # the same team
+    if entity.in_combat: # player cannot give gold during combat
+      return
+
+    if not (config.ITEM_ALLOW_GIFT and
             entity.ent_id != target.ent_id and                      # but not self
-            utils.linf(entity.pos, target.pos) == 0):               # the same tile
+            target.is_player and
+            entity.pos == target.pos):                              # the same tile
       return
 
     if not isinstance(amount, int):
@@ -555,7 +571,7 @@ class Buy(Node):
     return config.EXCHANGE_SYSTEM_ENABLED
 
   def call(realm, entity, item):
-    if item is None:
+    if item is None or item.owner_id.val == 0:
       return
 
     assert entity.alive, "Dead entity cannot act"
@@ -570,6 +586,9 @@ class Buy(Node):
       return
 
     if entity.ent_id == item.owner_id.val: # cannot buy own item
+      return
+
+    if entity.in_combat: # player cannot buy item during combat
       return
 
     if not entity.inventory.space:
@@ -596,7 +615,7 @@ class Sell(Node):
     return config.EXCHANGE_SYSTEM_ENABLED
 
   def call(realm, entity, item, price):
-    if item is None or price is None:
+    if item is None or item.owner_id.val != entity.ent_id or price is None:
       return
 
     assert entity.alive, "Dead entity cannot act"
@@ -606,11 +625,10 @@ class Sell(Node):
     if not realm.config.EXCHANGE_SYSTEM_ENABLED:
       return
 
-    # TODO(kywch): Find a better way to check this
-    # Should only occur when item is used on same tick
-    # Otherwise should not be possible
-    #   >> Actions on the same item should be checked at env._validate_actions
     if item not in entity.inventory:
+      return
+
+    if entity.in_combat: # player cannot sell item during combat
       return
 
     # cannot sell the equipped or listed item

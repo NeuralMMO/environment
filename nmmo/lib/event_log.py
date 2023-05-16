@@ -45,6 +45,8 @@ ITEM_COL_MAP = {
 
 LEVEL_COL_MAP = { 'skill': EventAttr['type'] }
 
+EXPLORE_COL_MAP = { 'distance': EventAttr['number'] }
+
 
 class EventLogger(EventCode):
   def __init__(self, realm):
@@ -60,6 +62,7 @@ class EventLogger(EventCode):
     self.attr_to_col.update(ATTACK_COL_MAP)
     self.attr_to_col.update(ITEM_COL_MAP)
     self.attr_to_col.update(LEVEL_COL_MAP)
+    self.attr_to_col.update(EXPLORE_COL_MAP)
 
   def reset(self):
     EventState.State.table(self.datastore).reset()
@@ -69,7 +72,8 @@ class EventLogger(EventCode):
     log = EventState(self.datastore)
     log.id.update(log.datastore_record.id)
     log.ent_id.update(entity.ent_id)
-    log.tick.update(self.realm.tick)
+    # the tick increase by 1 after executing all actions
+    log.tick.update(self.realm.tick+1)
     log.event.update(event_code)
 
     return log
@@ -81,6 +85,12 @@ class EventLogger(EventCode):
       # Logs for these events are for counting only
       self._create_event(entity, event_code)
       return
+
+    if event_code == EventCode.GO_FARTHEST: # use EXPLORE_COL_MAP
+      if ('distance' in kwargs and kwargs['distance'] > 0):
+        log = self._create_event(entity, event_code)
+        log.number.update(kwargs['distance'])
+        return
 
     if event_code == EventCode.SCORE_HIT:
       # kwargs['combat_style'] should be Skill.CombatSkill
@@ -101,10 +111,11 @@ class EventLogger(EventCode):
         log.level.update(target.attack_level)
         return
 
-    if event_code in [EventCode.CONSUME_ITEM, EventCode.HARVEST_ITEM]:
+    if event_code in [EventCode.CONSUME_ITEM, EventCode.HARVEST_ITEM, EventCode.EQUIP_ITEM]:
       # CHECK ME: item types should be checked. For example,
       #   Only Ration and Poultice can be consumed
       #   Only Ration, Poultice, Scrap, Shaving, Shard can be produced
+      #   The quantity should be 1 for all of these events
       if ('item' in kwargs and isinstance(kwargs['item'], Item)):
         item = kwargs['item']
         log = self._create_event(entity, event_code)

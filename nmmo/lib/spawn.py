@@ -4,8 +4,6 @@ class SequentialLoader:
   '''config.PLAYER_LOADER that spreads out agent populations'''
   def __init__(self, config):
     items = config.PLAYERS
-    for idx, itm in enumerate(items):
-      itm.policyID = idx
 
     self.items = items
     self.idx   = -1
@@ -15,28 +13,7 @@ class SequentialLoader:
 
   def __next__(self):
     self.idx = (self.idx + 1) % len(self.items)
-    return self.idx, self.items[self.idx]
-
-class TeamLoader:
-  '''config.PLAYER_LOADER that loads agent populations adjacent'''
-  def __init__(self, config):
-    items = config.PLAYERS
-    self.team_size = config.PLAYER_N // len(items)
-
-    for idx, itm in enumerate(items):
-      itm.policyID = idx
-
-    self.items = items
-    self.idx   = -1
-
-  def __iter__(self):
-    return self
-
-  def __next__(self):
-    self.idx += 1
-    team_idx  = self.idx // self.team_size
-    return team_idx, self.items[team_idx]
-
+    return self.items[self.idx]
 
 def spawn_continuous(config):
   '''Generates spawn positions for new agents
@@ -105,15 +82,20 @@ def spawn_concurrent(config):
   sides += list(zip(inc, highs))
   sides += list(zip(highs, inc[::-1]))
   sides += list(zip(inc[::-1], lows))
+  np.random.shuffle(sides)
 
-  # Space across and within teams
-  spawn_positions = []
-  for idx in range(team_sep//2, len(sides), tiles_per_team+team_sep):
-    for offset in list(range(0,  tiles_per_team, teammate_sep+1)):
-      if len(spawn_positions) >= config.PLAYER_N:
-        continue
+  if team_n > 1:
+    # Space across and within teams
+    spawn_positions = []
+    for idx in range(team_sep//2, len(sides), tiles_per_team+team_sep):
+      for offset in list(range(0,  tiles_per_team, teammate_sep+1)):
+        if len(spawn_positions) >= config.PLAYER_N:
+          continue
 
-      pos = sides[idx + offset]
-      spawn_positions.append(pos)
+        pos = sides[idx + offset]
+        spawn_positions.append(pos)
+  else:
+    # team_n = 1: to fit 128 agents in a small map, ignore spacing and spawn randomly
+    spawn_positions = sides[:config.PLAYER_N]
 
   return spawn_positions

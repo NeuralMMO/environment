@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Dict, Set
+from typing import Dict
 
 import numpy as np
 from ordered_set import OrderedSet
@@ -7,7 +7,7 @@ from ordered_set import OrderedSet
 from nmmo.entity.entity import Entity
 from nmmo.entity.npc import NPC
 from nmmo.entity.player import Player
-from nmmo.lib import colors, spawn
+from nmmo.lib import spawn
 from nmmo.systems import combat
 
 
@@ -17,8 +17,8 @@ class EntityGroup(Mapping):
     self.realm = realm
     self.config = realm.config
 
-    self.entities: Dict[int, Entity]  = {}
-    self.dead: Set(int) = {}
+    self.entities: Dict[int, Entity] = {}
+    self.dead: Dict[int, Entity] = {}
 
   def __len__(self):
     return len(self.entities)
@@ -48,7 +48,7 @@ class EntityGroup(Mapping):
       ent.datastore_record.delete()
 
     self.entities = {}
-    self.dead     = {}
+    self.dead = {}
 
   def spawn(self, entity):
     pos, ent_id = entity.pos, entity.id.val
@@ -126,7 +126,6 @@ class NPCManager(EntityGroup):
 class PlayerManager(EntityGroup):
   def __init__(self, realm):
     super().__init__(realm)
-    self.palette = colors.Palette()
     self.loader  = self.realm.config.PLAYER_LOADER
     self.agents = None
     self.spawned = None
@@ -137,9 +136,9 @@ class PlayerManager(EntityGroup):
     self.spawned = OrderedSet()
 
   def spawn_individual(self, r, c, idx):
-    pop, agent = next(self.agents)
+    agent = next(self.agents)
     agent      = agent(self.config, idx)
-    player     = Player(self.realm, (r, c), agent, self.palette.color(pop), pop)
+    player     = Player(self.realm, (r, c), agent)
     super().spawn(player)
 
   def spawn(self):

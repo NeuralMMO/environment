@@ -29,6 +29,8 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
+        'numpy==1.23.3',
+        'scipy==1.10.0',
         'pytest==7.3.0',
         'pytest-benchmark==3.4.1',
         'openskill==4.0.0',
@@ -47,8 +49,6 @@ setup(
         'gym==0.23.0',
         'pylint==2.16.0',
         'py==1.11.0',
-        'scipy==1.10.0',
-        'numpy==1.23.3',
         'numpy-indexed==0.3.7'
     ],
     extras_require=extra,

@@ -146,17 +146,23 @@ class Terrain:
 
     return val, matl, interpolaters
 
-def fish(config, tiles, mat, mmin, mmax):
-  r = random.randint(mmin, mmax)
-  c = random.randint(mmin, mmax)
-
+def place_fish(tiles):
+  placed = False
   allow = {Terrain.GRASS}
-  if (tiles[r, c] not in {Terrain.WATER} or
-          (tiles[r-1, c] not in allow and tiles[r+1, c] not in allow and
-          tiles[r, c-1] not in allow and tiles[r, c+1] not in allow)):
-    fish(config, tiles, mat, mmin, mmax)
-  else:
-    tiles[r, c] = mat
+
+  water_loc = np.where(tiles == Terrain.WATER)
+  water_loc = list(zip(water_loc[0], water_loc[1]))
+  random.shuffle(water_loc)
+
+  for r, c in water_loc:
+    if tiles[r-1, c] in allow or tiles[r+1, c] in allow or \
+       tiles[r, c-1] in allow or tiles[r, c+1] in allow:
+      tiles[r, c] = Terrain.FISH
+      placed = True
+      break
+
+  if not placed:
+    raise RuntimeError('Could not find the water tile to place fish.')
 
 def uniform(config, tiles, mat, mmin, mmax):
   r = random.randint(mmin, mmax)
@@ -200,7 +206,7 @@ def spawn_profession_resources(config, tiles):
 
   for _ in range(config.PROGRESSION_SPAWN_UNIFORMS):
     uniform(config, tiles, Terrain.HERB, mmin, mmax)
-    fish(config, tiles, Terrain.FISH, mmin, mmax)
+    place_fish(tiles)
 
 class MapGenerator:
   '''Procedural map generation'''
@@ -231,8 +237,20 @@ class MapGenerator:
     #Only generate if maps are not cached
     path_maps = os.path.join(config.PATH_CWD, config.PATH_MAPS)
     os.makedirs(path_maps, exist_ok=True)
+
     if not config.MAP_FORCE_GENERATION and os.listdir(path_maps):
-      return
+      # check if the folder has all the required maps
+      all_maps_exist = True
+      for idx in range(config.MAP_N, -1, -1):
+        map_file = path_maps + '/map' + str(idx+1) + '/map.npy'
+        if not os.path.exists(map_file):
+          # override MAP_FORCE_GENERATION = FALSE and generate maps
+          all_maps_exist = False
+          break
+
+      # do not generate maps if all maps exist
+      if all_maps_exist:
+        return
 
     if __debug__:
       logging.info('Generating %s maps', str(config.MAP_N))

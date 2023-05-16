@@ -38,7 +38,7 @@ class Map:
   def repr(self):
     '''Flat matrix of tile material indices'''
     if not self._repr:
-      self._repr = [[t.mat.index for t in row] for row in self.tiles]
+      self._repr = [[t.material.index for t in row] for row in self.tiles]
 
     return self._repr
 
@@ -62,6 +62,7 @@ class Map:
         mat  = materials[idx]
         tile = self.tiles[r, c]
         tile.reset(mat, config)
+    self._repr = None
 
   def step(self):
     '''Evaluate updatable tiles'''

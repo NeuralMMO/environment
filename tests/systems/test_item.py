@@ -1,8 +1,9 @@
 import unittest
+import numpy as np
+
 import nmmo
 from nmmo.datastore.numpy_datastore import NumpyDatastore
-from nmmo.systems.item import Hat, ItemState
-import numpy as np
+from nmmo.systems.item import Hat, Top, ItemState
 
 class MockRealm:
   def __init__(self):
@@ -10,7 +11,9 @@ class MockRealm:
     self.datastore = NumpyDatastore()
     self.items = {}
     self.datastore.register_object_type("Item", ItemState.State.num_attributes)
+    self.players = {}
 
+# pylint: disable=no-member
 class TestItem(unittest.TestCase):
   def test_item(self):
     realm = MockRealm()
@@ -32,9 +35,20 @@ class TestItem(unittest.TestCase):
     ids = [hat_1.id.val, hat_2.id.val]
     hat_1.destroy()
     hat_2.destroy()
+    # after destroy(), the datastore entry is gone, but the class still exsits
+    # make sure that after destroy the owner_id is 0, at least
+    self.assertTrue(hat_1.owner_id.val == 0)
+    self.assertTrue(hat_2.owner_id.val == 0)
     for item_id in ids:
       self.assertTrue(len(ItemState.Query.by_id(realm.datastore, item_id)) == 0)
     self.assertDictEqual(realm.items, {})
+
+    # create a new item with the hat_1's id, but it must still be void
+    new_top = Top(realm, 3)
+    new_top.id.update(ids[0]) # hat_1's id
+    new_top.owner_id.update(100)
+    # make sure that the hat_1 is not linked to the new_top
+    self.assertTrue(hat_1.owner_id.val == 0)
 
   def test_owned_by(self):
     realm = MockRealm()
@@ -46,10 +60,10 @@ class TestItem(unittest.TestCase):
     hat_2.owner_id.update(1)
 
     np.testing.assert_array_equal(
-      ItemState.Query.owned_by(realm.datastore, 1)[:,0], 
+      ItemState.Query.owned_by(realm.datastore, 1)[:,0],
       [hat_1.id.val, hat_2.id.val])
 
     self.assertEqual(Hat.Query.owned_by(realm.datastore, 2).size, 0)
 
 if __name__ == '__main__':
-    unittest.main()
+  unittest.main()

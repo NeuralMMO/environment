@@ -84,9 +84,10 @@ class Scripted(nmmo.Agent):
 
     selfLevel  = self.me.level
     targLevel  = max(self.closest.melee_level, self.closest.range_level, self.closest.mage_level)
-    population = self.closest.population_id
 
-    if population == -1 or targLevel <= selfLevel <= 5 or selfLevel >= targLevel + 3:
+    if self.closest.npc_type == 1 or \
+       targLevel <= selfLevel <= 5 or \
+       selfLevel >= targLevel + 3:
       self.target     = self.closest
       self.targetID   = self.closestID
       self.targetDist = self.closestDist

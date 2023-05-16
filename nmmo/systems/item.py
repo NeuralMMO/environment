@@ -1,14 +1,16 @@
 from __future__ import annotations
-from abc import ABC
-import math
 
+import math
+from abc import ABC
 from types import SimpleNamespace
 from typing import Dict
 
 from numpy import real
 
 from nmmo.lib.colors import Tier
+
 from nmmo.datastore.serialized import SerializedState
+from nmmo.lib.colors import Tier
 from nmmo.lib.log import EventCode
 
 # pylint: disable=no-member
@@ -111,6 +113,8 @@ class Item(ItemState):
     realm.items[self.id.val] = self
 
   def destroy(self):
+    if self.owner_id.val in self.realm.players:
+      self.realm.players[self.owner_id.val].inventory.remove(self)
     self.realm.items.pop(self.id.val, None)
     self.datastore_record.delete()
 
@@ -208,7 +212,7 @@ class Equipment(Item):
       # always empty the slot first
       self._slot(entity).unequip()
       self.equip(entity, self._slot(entity))
-
+      self.realm.event_log.record(EventCode.EQUIP_ITEM, entity, item=self)
 
 class Armor(Equipment, ABC):
   def __init__(self, realm, level, **kwargs):
