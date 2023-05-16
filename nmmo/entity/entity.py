@@ -193,21 +193,9 @@ class History:
     if self.attack is not None:
       data['attack'] = self.attack
 
-    actions = {}
-    for atn, args in self.actions.items():
-      atn_packet = {}
-
-      # Avoid recursive player packet
-      if atn.__name__ == 'Attack':
-        continue
-
-      for key, val in args.items():
-        if hasattr(val, 'packet'):
-          atn_packet[key.__name__] = val.packet
-        else:
-          atn_packet[key.__name__] = val.__name__
-      actions[atn.__name__] = atn_packet
-    data['actions'] = actions
+    # NOTE: the client seems to use actions for visualization
+    #   but produces errors with the new actions. So we disable it for now.
+    data['actions'] = {}
 
     return data
 
