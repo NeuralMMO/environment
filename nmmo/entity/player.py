@@ -1,5 +1,4 @@
 from nmmo.systems.skill import Skills
-from nmmo.systems.achievement import Diary
 from nmmo.entity import entity
 
 # pylint: disable=no-member
@@ -29,11 +28,6 @@ class Player(entity.Entity):
     # CHECK ME: should the initial amount be in the config?
     if realm.config.EXCHANGE_SYSTEM_ENABLED:
       self.gold.update(1)
-
-    self.diary  = None
-    tasks = realm.config.TASKS
-    if tasks:
-      self.diary = Diary(self, tasks)
 
   @property
   def serial(self):
@@ -131,6 +125,3 @@ class Player(entity.Entity):
 
     self.resources.update()
     self.skills.update()
-
-    if self.diary:
-      self.diary.update(realm)
