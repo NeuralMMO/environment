@@ -6,11 +6,13 @@ REPO_URL = "https://github.com/neuralmmo/environment"
 
 extra = {
     'docs': [
+        'sphinx==5.0.0',
         'sphinx-rtd-theme==0.5.1',
         'sphinxcontrib-youtube==1.0.1',
         'myst-parser==1.0.0',
         'sphinx-rtd-theme==0.5.1',
-        'sphinx_design==0.4.1',
+        'sphinx-design==0.4.1',
+        'furo==2023.3.27',
     ],
 }
 
