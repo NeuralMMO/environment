@@ -90,6 +90,10 @@ class NPC(entity.Entity):
   def spawn(realm, pos, iden):
     config = realm.config
 
+    # check the position
+    if realm.map.tiles[pos].impassible:
+      return None
+
     # Select AI Policy
     danger = combat.danger(config, pos)
     if danger >= config.NPC_SPAWN_AGGRESSIVE:
