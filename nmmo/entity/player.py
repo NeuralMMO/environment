@@ -67,7 +67,7 @@ class Player(entity.Entity):
       return False
 
     # starting from here, source receive gold & inventory items
-    if self.config.EXCHANGE_SYSTEM_ENABLED:
+    if self.config.EXCHANGE_SYSTEM_ENABLED and source is not None:
       source.gold.increment(self.gold.val)
       self.gold.update(0)
 
@@ -78,7 +78,8 @@ class Player(entity.Entity):
       self.inventory.remove(item)
 
       # if source doesn't have space, inventory.receive() destroys the item
-      source.inventory.receive(item)
+      if source is not None:
+        source.inventory.receive(item)
 
     # CHECK ME: this is an empty function. do we still need this?
     self.skills.receive_damage(dmg)
