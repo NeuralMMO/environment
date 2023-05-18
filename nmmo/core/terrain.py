@@ -241,7 +241,7 @@ class MapGenerator:
     if not config.MAP_FORCE_GENERATION and os.listdir(path_maps):
       # check if the folder has all the required maps
       all_maps_exist = True
-      for idx in range(config.MAP_N, -1, -1):
+      for idx in range(1, config.MAP_N):
         map_file = path_maps + '/map' + str(idx+1) + '/map.npy'
         if not os.path.exists(map_file):
           # override MAP_FORCE_GENERATION = FALSE and generate maps
