@@ -107,10 +107,16 @@ class Task(ABC):
               for arg in self._args]
     nkwargs = {k : v.sample(config) if isinstance(v, Constraint) else v
                 for k,v in self._kwargs.items()}
-    # Overload
     for i, (name, _) in enumerate(self._constraints):
       if i < len(nargs):
-        nkwargs[name] = overload[name]
+        if name in nkwargs:
+          raise InvalidTaskDefinition("Constraints should match arguments.")
+        nkwargs[name] = nargs[i]
+      else:
+        break
+
+    for k, v in overload.items():
+      nkwargs[k] = v
      # Result
     return self.__class__(**nkwargs)
 
@@ -273,8 +279,8 @@ class OR(TaskOperator):
     super().__init__(lambda n: n>0, *tasks, subject=subject)
   def _evaluate(self, gs: GameState) -> float:
     return max(t(gs) for t in self._tasks)
-  def sample(self, config: Config, **overload):
-    return super().sample(config, OR **overload)
+  def sample(self, config: Config, **kwargs):
+    return super().sample(config, OR, **kwargs)
 
 class AND(TaskOperator):
   def __init__(self, *tasks: Union[Task, Real], subject: Group=None):

@@ -8,7 +8,6 @@ from nmmo.task import base_predicates as p
 from nmmo.task import task_api as t
 from nmmo.task.game_state import GameState
 from nmmo.task.group import Group
-from nmmo.task.team_helper import TeamHelper
 from nmmo.task.scenario import Scenario
 
 class TestDemoTask(unittest.TestCase):
@@ -50,7 +49,7 @@ class TestDemoTask(unittest.TestCase):
       scenario.add_tasks(EquipmentLevel(number=5 )*Tier.NORMAL, groups='agents')
       scenario.add_tasks(EquipmentLevel(number=10)*Tier.HARD, groups='agents')
       return scenario.tasks
-    
+
     @t.define_predicate
     def CombatSkill(gs, subject, lvl):
         return t.OR(p.AttainSkill(subject, skill.Melee, lvl, 1),
@@ -70,7 +69,7 @@ class TestDemoTask(unittest.TestCase):
                   p.AttainSkill(subject, skill.Prospecting, lvl, 1),
                   p.AttainSkill(subject, skill.Carving, lvl, 1),
                   p.AttainSkill(subject, skill.Alchemy, lvl, 1))
-  
+
     def foraging(scenario: Scenario):
       scenario.add_tasks(ForageSkill(lvl=2)*Tier.EASY)
       scenario.add_tasks(ForageSkill(lvl=3)*Tier.NORMAL)
@@ -98,7 +97,7 @@ class TestDemoTask(unittest.TestCase):
         env.step({})
 
     # DONE
-  
+
   def test_player_kill_reward(self):
     """ Reward 0.1 per player defeated, 1 for first and 3rd kills
     """
@@ -111,10 +110,13 @@ class TestDemoTask(unittest.TestCase):
     @t.define_task
     def KillTask(gs: GameState,
                  subject: Group):
-      score = len(getattr(subject.event, 'PLAYER_KILL')) * 0.1
-      if p.CountEvent(subject, 'PLAYER_KILL', 1)(gs) == 1.0:
-        score += 0.9
-      if p.CountEvent(subject, 'PLAYER_KILL', 3)(gs) == 1.0:
+      """ Reward 0.1 per player defeated, with a bonus for the 1st and 3rd kills.
+      """
+      num_kills = len(subject.event.PLAYER_KILL)
+      score = num_kills * 0.1
+      if num_kills >= 1:
+        score += 1
+      if num_kills >= 3:
         score += 1
       return score
 
@@ -130,12 +132,12 @@ class TestDemoTask(unittest.TestCase):
     env.realm.event_log.record(code, players[2], target=players[5])
     env.realm.event_log.record(EventCode.EAT_FOOD, players[2])
       # Award given as designed
-      # Agent 1 kills 1 - reward 1
-      # Agent 2 kills 2 - reward 1 + 0.1
+      # Agent 1 kills 1 - reward 1 + 0.1
+      # Agent 2 kills 2 - reward 1 + 0.2
       # Agent 3 kills 0 - reward 0
     _, rewards, _, _ = env.step({})
-    self.assertEqual(rewards[1],1)
-    self.assertEqual(rewards[2],1.1)
+    self.assertEqual(rewards[1],1.1)
+    self.assertEqual(rewards[2],1.2)
     self.assertEqual(rewards[3],0)
       # No reward when no changes
     _, rewards, _, _ = env.step({})
@@ -151,6 +153,32 @@ class TestDemoTask(unittest.TestCase):
     env.change_task(scenario.tasks)
     for _ in range(10):
        env.step({})
+
+    # DONE
+
+  def test_combination_task_reward(self):
+    config = ScriptedAgentTestConfig()
+    env = Env(config)
+    scenario = Scenario(config)
+
+    task = t.OR(p.CountEvent(event='PLAYER_KILL',N=5),p.TickGE(num_tick=5))
+    task = task * 5
+    scenario.add_tasks(task)
+
+    # Test Reward
+    env.change_task(scenario.tasks)
+    code = EventCode.PLAYER_KILL
+    players = env.realm.players
+    env.realm.event_log.record(code, players[1], target=players[2])
+    env.realm.event_log.record(code, players[1], target=players[3])
+
+    _, rewards, _, _ = env.step({})
+    self.assertEqual(rewards[1],2)
+
+    for _ in range(4):
+      _, _, _, infos = env.step({})
+    
+    self.assertEqual(list(infos[1]['task'].values())[0],5.0)
 
     # DONE
 
