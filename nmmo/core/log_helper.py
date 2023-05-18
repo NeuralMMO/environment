@@ -80,13 +80,6 @@ class SimpleLogHelper(LogHelper):
 
   def _register_player_stats(self):
     self._register_player_stat('Basic/TimeAlive', lambda player: player.history.time_alive.val)
-
-    if self.config.TASKS:
-      self._register_player_stat('Task/Completed', lambda player: player.diary.completed)
-      self._register_player_stat('Task/Reward' , lambda player: player.diary.cumulative_reward)
-    else:
-      self._register_player_stat('Task/Completed', lambda player: player.history.time_alive.val)
-
     # Skills
     if self.config.PROGRESSION_SYSTEM_ENABLED:
       if self.config.COMBAT_SYSTEM_ENABLED:
@@ -137,13 +130,6 @@ class SimpleLogHelper(LogHelper):
     for key, stat_func in self._player_stats_funcs.items():
       stats[f'{key}_{policy}'] = stat_func(player)
 
-    stats['Task_Reward'] = player.history.time_alive.val
-
-    # If diary is enabled, log task and achievement stats
-    if player.diary:
-      stats['Task_Reward'] = player.diary.cumulative_reward
-
-      for achievement in player.diary.achievements:
-        stats["Achievement_{achievement.name}"] = float(achievement.completed)
+    stats['Time_Alive'] = player.history.time_alive.val
 
     return stats
