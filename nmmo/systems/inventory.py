@@ -99,11 +99,11 @@ class Inventory:
     self.equipment   = Equipment()
     self.capacity = 0
 
-    if config.ITEM_SYSTEM_ENABLED:
+    if config.ITEM_SYSTEM_ENABLED and entity.is_player:
       self.capacity         = config.ITEM_INVENTORY_CAPACITY
 
-      self._item_stacks: Dict[Tuple, Item.Stack] = {}
-      self.items: OrderedSet[Item.Item] = OrderedSet([])
+    self._item_stacks: Dict[Tuple, Item.Stack] = {}
+    self.items: OrderedSet[Item.Item] = OrderedSet([])
 
   @property
   def space(self):

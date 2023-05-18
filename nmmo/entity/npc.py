@@ -81,8 +81,10 @@ class NPC(entity.Entity):
     #   because source cannot take it if the inventory is full
     #   Also, destroy the remaining items if the source cannot take those
     for item in self.droptable.roll(self.realm, self.attack_level):
-      if source.inventory.space:
+      if source.is_player and source.inventory.space:
         source.inventory.receive(item)
+      else:
+        item.destroy()
 
     return False
 
