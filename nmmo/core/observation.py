@@ -123,7 +123,7 @@ class Observation:
         self.entities.values, np.zeros((
           self.config.PLAYER_N_OBS - self.entities.values.shape[0],
           self.entities.values.shape[1]))
-      ]),
+      ])
     }
 
     if self.config.ITEM_SYSTEM_ENABLED:

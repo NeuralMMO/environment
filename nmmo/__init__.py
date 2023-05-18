@@ -9,7 +9,6 @@ from .io.action import Action
 from .core import config, agent
 from .core.agent import Agent
 from .core.env import Env
-from .systems.achievement import Task
 from .core.terrain import MapGenerator, Terrain
 
 MOTD = rf'''      ___           ___           ___           ___
@@ -26,7 +25,7 @@ MOTD = rf'''      ___           ___           ___           ___
 
 __all__ = ['Env', 'config', 'agent', 'Agent', 'MapGenerator', 'Terrain',
         'action', 'Action', 'material', 'spawn',
-        'Task', 'Overlay', 'OverlayRegistry']
+        'Overlay', 'OverlayRegistry']
 
 try:
   __all__.append('OpenSkillRating')

@@ -1,5 +1,4 @@
 from nmmo.systems.skill import Skills
-from nmmo.systems.achievement import Diary
 from nmmo.entity import entity
 
 # pylint: disable=no-member
@@ -29,11 +28,6 @@ class Player(entity.Entity):
     # CHECK ME: should the initial amount be in the config?
     if realm.config.EXCHANGE_SYSTEM_ENABLED:
       self.gold.update(1)
-
-    self.diary  = None
-    tasks = realm.config.TASKS
-    if tasks:
-      self.diary = Diary(self, tasks)
 
   @property
   def serial(self):
@@ -67,7 +61,7 @@ class Player(entity.Entity):
       return False
 
     # starting from here, source receive gold & inventory items
-    if self.config.EXCHANGE_SYSTEM_ENABLED:
+    if self.config.EXCHANGE_SYSTEM_ENABLED and source is not None:
       source.gold.increment(self.gold.val)
       self.gold.update(0)
 
@@ -78,7 +72,8 @@ class Player(entity.Entity):
       self.inventory.remove(item)
 
       # if source doesn't have space, inventory.receive() destroys the item
-      source.inventory.receive(item)
+      if source.is_player:
+        source.inventory.receive(item)
 
     # CHECK ME: this is an empty function. do we still need this?
     self.skills.receive_damage(dmg)
@@ -131,6 +126,3 @@ class Player(entity.Entity):
 
     self.resources.update()
     self.skills.update()
-
-    if self.diary:
-      self.diary.update(realm)

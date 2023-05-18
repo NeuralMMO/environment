@@ -1,6 +1,7 @@
 import functools
 import random
-from typing import Any, Dict, List
+import copy
+from typing import Any, Dict, List, Optional, Union, Tuple
 from ordered_set import OrderedSet
 
 import gym
@@ -14,13 +15,15 @@ from nmmo.core.tile import Tile
 from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
 from nmmo.core import realm
-
+from nmmo.task.game_state import GameStateGenerator
+from nmmo.task.task_api import Task
+from nmmo.task.scenario import default_task
 from scripted.baselines import Scripted
-
 
 class Env(ParallelEnv):
   # Environment wrapper for Neural MMO using the Parallel PettingZoo API
 
+  #pylint: disable=no-value-for-parameter
   def __init__(self,
     config: Default = nmmo.config.Default(), seed=None):
     self._init_random(seed)
@@ -34,6 +37,18 @@ class Env(ParallelEnv):
     self.possible_agents = list(range(1, config.PLAYER_N + 1))
     self._dead_agents = OrderedSet()
     self.scripted_agents = OrderedSet()
+
+    self._gamestate_generator = GameStateGenerator(self.realm, self.config)
+    self.game_state = None
+    # Default task: rewards 1 each turn agent is alive
+    self.tasks: List[Tuple[Task,float]] = None
+    self._task_encoding = None
+    self._task_embedding_size = -1
+    t = default_task(self.possible_agents)
+    self.change_task(t,
+                     embedding_size=self._task_embedding_size,
+                     task_encoding=self._task_encoding,
+                     reset=False)
 
   # pylint: disable=method-cache-max-size-none
   @functools.lru_cache(maxsize=None)
@@ -60,7 +75,7 @@ class Env(ParallelEnv):
       "Tick": gym.spaces.Discrete(1),
       "AgentId": gym.spaces.Discrete(1),
       "Tile": box(self.config.MAP_N_OBS, Tile.State.num_attributes),
-      "Entity": box(self.config.PLAYER_N_OBS, Entity.State.num_attributes)
+      "Entity": box(self.config.PLAYER_N_OBS, Entity.State.num_attributes),
     }
 
     if self.config.ITEM_SYSTEM_ENABLED:
@@ -71,6 +86,12 @@ class Env(ParallelEnv):
 
     if self.config.PROVIDE_ACTION_TARGETS:
       obs_space['ActionTargets'] = self.action_space(None)
+
+    if self._task_encoding:
+      obs_space['Task'] = gym.spaces.Box(
+          low=-2**20, high=2**20,
+          shape=(self._task_embedding_size,),
+          dtype=np.float32)
 
     return gym.spaces.Dict(obs_space)
 
@@ -109,6 +130,28 @@ class Env(ParallelEnv):
   ############################################################################
   # Core API
 
+  def change_task(self,
+                  new_tasks: List[Union[Tuple[Task, float], Task]],
+                  task_encoding: Optional[Dict[int, np.ndarray]] = None,
+                  embedding_size: int=16,
+                  reset: bool=True,
+                  map_id=None,
+                  seed=None,
+                  options=None):
+    """ Changes the task given to each agent
+
+    Args:
+      new_task: The task to complete and calculate rewards
+      task_encoding: A mapping from eid to encoded task
+      embedding_size: The size of each embedding
+      reset: Resets the environment
+    """
+    self._tasks = [t if isinstance(t, Tuple) else (t,1) for t in new_tasks]
+    self._task_encoding = task_encoding
+    self._task_embedding_size = embedding_size
+    if reset:
+      self.reset(map_id=map_id, seed=seed, options=options)
+
   # TODO: This doesn't conform to the PettingZoo API
   # pylint: disable=arguments-renamed
   def reset(self, map_id=None, seed=None, options=None):
@@ -142,9 +185,16 @@ class Env(ParallelEnv):
       if isinstance(ent.agent, Scripted):
         self.scripted_agents.add(eid)
 
+    self.tasks = copy.deepcopy(self._tasks)
     self.obs = self._compute_observations()
+    self._gamestate_generator = GameStateGenerator(self.realm, self.config)
 
-    return {a: o.to_gym() for a,o in self.obs.items()}
+    gym_obs = {}
+    for a, o in self.obs.items():
+      gym_obs[a] = o.to_gym()
+      if self._task_encoding:
+        gym_obs[a]['Task'] = self._encode_goal().get(a,np.zeros(self._task_embedding_size))
+    return gym_obs
 
   def step(self, actions: Dict[int, Dict[str, Dict[str, Any]]]):
     '''Simulates one game tick or timestep
@@ -239,7 +289,6 @@ class Env(ParallelEnv):
           Provided for conformity with PettingZoo
     '''
     assert self.obs is not None, 'step() called before reset'
-
     # Add in scripted agents' actions, if any
     if self.scripted_agents:
       actions = self._compute_scripted_agent_actions(actions)
@@ -247,10 +296,8 @@ class Env(ParallelEnv):
     # Drop invalid actions of BOTH neural and scripted agents
     #   we don't need _deserialize_scripted_actions() anymore
     actions = self._validate_actions(actions)
-
     # Execute actions
     self.realm.step(actions)
-
     dones = {}
     for eid in self.possible_agents:
       if eid not in self._dead_agents and (
@@ -262,7 +309,11 @@ class Env(ParallelEnv):
 
     # Store the observations, since actions reference them
     self.obs = self._compute_observations()
-    gym_obs = {a: o.to_gym() for a,o in self.obs.items()}
+    gym_obs = {}
+    for a, o in self.obs.items():
+      gym_obs[a] = o.to_gym()
+      if self._task_encoding:
+        gym_obs[a]['Task'] = self._encode_goal()[a]
 
     rewards, infos = self._compute_rewards(self.obs.keys(), dones)
 
@@ -332,6 +383,7 @@ class Env(ParallelEnv):
         obs: Dictionary of observations for each agent
         obs[agent_id] = {
           "Entity": [e1, e2, ...],
+          "Task": [encoded_task],
           "Tile": [t1, t2, ...],
           "Inventory": [i1, i2, ...],
           "Market": [m1, m2, ...],
@@ -364,11 +416,16 @@ class Env(ParallelEnv):
 
       inventory = Item.Query.owned_by(self.realm.datastore, agent_id)
 
-      obs[agent_id] = Observation(
-        self.config, self.realm.tick,
-        agent_id, visible_tiles, visible_entities, inventory, market)
-
+      obs[agent_id] = Observation(self.config,
+                                  self.realm.tick,
+                                  agent_id,
+                                  visible_tiles,
+                                  visible_entities,
+                                  inventory, market)
     return obs
+
+  def _encode_goal(self):
+    return self._task_encoding
 
   def _compute_rewards(self, agents: List[AgentID], dones: Dict[AgentID, bool]):
     '''Computes the reward for the specified agent
@@ -385,20 +442,30 @@ class Env(ParallelEnv):
           The reward for the actions on the previous timestep of the
           entity identified by ent_id.
     '''
+    # Initialization
+    self.game_state = self._gamestate_generator.generate(self.realm, self.obs)
     infos = {}
-    rewards = { eid: -1 for eid in dones }
+    for eid in agents:
+      infos[eid] = {}
+      infos[eid]['task'] = {}
+    rewards = {eid: 0 for eid in agents}
 
-    for agent_id in agents:
-      infos[agent_id] = {}
-      agent = self.realm.players.get(agent_id)
-      assert agent is not None, f'Agent {agent_id} not found'
+    # Compute Rewards and infos
+    for task, weight in self.tasks:
+      task_rewards, task_infos = task.compute_rewards(self.game_state)
+      for eid, reward in task_rewards.items():
+        # Rewards, weighted
+        rewards[eid] = rewards.get(eid,0) + reward * weight
+        # Infos
+        for eid, info in task_infos.items():
+          if eid in infos:
+            infos[eid]['task'] = {**infos[eid]['task'], **info}
 
-      if agent.diary is not None:
-        rewards[agent_id] = sum(agent.diary.rewards.values())
-        infos[agent_id].update(agent.diary.rewards)
+    # Remove rewards for dead agents (?)
+    for eid in dones:
+      rewards[eid] = 0
 
     return rewards, infos
-
 
   ############################################################################
   # PettingZoo API

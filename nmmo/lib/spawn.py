@@ -39,7 +39,7 @@ def spawn_continuous(config):
   return (r, c)
 
 
-def spawn_concurrent(config):
+def spawn_concurrent(config, realm):
   '''Generates spawn positions for new agents
 
   Evenly spaces agents around the borders
@@ -83,6 +83,9 @@ def spawn_concurrent(config):
   sides += list(zip(highs, inc[::-1]))
   sides += list(zip(inc[::-1], lows))
   np.random.shuffle(sides)
+
+  # filter out invalid spawn positions
+  sides = [pos for pos in sides if not realm.map.tiles[pos].impassible]
 
   if team_n > 1:
     # Space across and within teams

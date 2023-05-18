@@ -5,7 +5,7 @@ import logging
 
 import numpy as np
 import vec_noise
-from imageio import imread, imsave
+from imageio.v2 import imread, imsave
 from scipy import stats
 
 from nmmo import material
@@ -237,18 +237,13 @@ class MapGenerator:
     path_maps = os.path.join(config.PATH_CWD, config.PATH_MAPS)
     os.makedirs(path_maps, exist_ok=True)
 
-    if not config.MAP_FORCE_GENERATION and os.listdir(path_maps):
-      # check if the folder has all the required maps
-      all_maps_exist = True
-      for idx in range(config.MAP_N, -1, -1):
-        map_file = path_maps + '/map' + str(idx+1) + '/map.npy'
-        if not os.path.exists(map_file):
-          # override MAP_FORCE_GENERATION = FALSE and generate maps
-          all_maps_exist = False
-          break
-
-      # do not generate maps if all maps exist
-      if all_maps_exist:
+    existing_maps = set(map_dir + '/map.npy' for map_dir in os.listdir(path_maps))
+    if not config.MAP_FORCE_GENERATION and existing_maps:
+      required_maps = {
+        f'map{idx}/map.npy' for idx in range(1, config.MAP_N+1)
+      }
+      missing = required_maps - existing_maps
+      if not missing:
         return
 
     if __debug__:

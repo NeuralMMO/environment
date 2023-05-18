@@ -164,6 +164,7 @@ class Realm:
     #  - 60: Move
     #  - 70: Sell - to guarantee the listed items are available to buy
     #  - 99: Comm
+
     for priority in sorted(merged):
       # TODO: we should be randomizing these, otherwise the lower ID agents
       # will always go first. --> ONLY SHUFFLE BUY
@@ -176,7 +177,6 @@ class Realm:
         ent = self.entity(ent_id)
         if ent.alive:
           atn.call(self, ent, *args)
-
     dead = self.players.cull()
     self.npcs.cull()
 

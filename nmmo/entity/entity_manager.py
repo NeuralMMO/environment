@@ -117,6 +117,9 @@ class NPCManager(EntityGroup):
     for entity in super().cull().values():
       self.spawn_dangers.append(entity.spawn_danger)
 
+    # refill npcs to target config.NPC_N, within config.NPC_SPAWN_ATTEMPTS
+    self.spawn()
+
   def actions(self, realm):
     actions = {}
     for idx, entity in self.entities.items():
@@ -143,7 +146,7 @@ class PlayerManager(EntityGroup):
 
   def spawn(self):
     idx = 0
-    for r, c in spawn.spawn_concurrent(self.config):
+    for r, c in spawn.spawn_concurrent(self.config, self.realm):
       idx += 1
 
       if idx in self.entities:
