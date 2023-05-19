@@ -13,7 +13,7 @@ RANDOM_SEED = 985
 LOGFILE = 'tests/action/test_destroy_give_gold.log'
 
 class TestDestroyGiveGold(ScriptedTestTemplate):
-  # pylint: disable=protected-access,multiple-statements
+  # pylint: disable=protected-access,multiple-statements,no-member
 
   @classmethod
   def setUpClass(cls):
@@ -25,8 +25,8 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
 
     cls.policy = { 1:'Melee', 2:'Range', 3:'Melee', 4:'Range', 5:'Melee', 6:'Range' }
     cls.spawn_locs = { 1:(17,17), 2:(21,21), 3:(17,17), 4:(21,21), 5:(21,21), 6:(17,17) }
-    cls.ammo = { 1:Item.Scrap, 2:Item.Shaving, 3:Item.Scrap,
-                 4:Item.Shaving, 5:Item.Scrap, 6:Item.Shaving }
+    cls.ammo = { 1:Item.Whetstone, 2:Item.Arrow, 3:Item.Whetstone,
+                 4:Item.Arrow, 5:Item.Whetstone, 6:Item.Arrow }
 
     cls.config.LOG_VERBOSE = False
     if cls.config.LOG_VERBOSE:

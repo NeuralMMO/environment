@@ -72,7 +72,7 @@ class Env(ParallelEnv):
           dtype=np.float32)
 
     obs_space = {
-      "Tick": gym.spaces.Discrete(1),
+      "CurrentTick": gym.spaces.Discrete(1),
       "AgentId": gym.spaces.Discrete(1),
       "Tile": box(self.config.MAP_N_OBS, Tile.State.num_attributes),
       "Entity": box(self.config.PLAYER_N_OBS, Entity.State.num_attributes),

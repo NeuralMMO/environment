@@ -137,10 +137,10 @@ EVENTCODE_CONSTRAINT = DiscreteConstraint(space=['EAT_FOOD',
                                                  'EARN_GOLD',
                                                  'BUY_ITEM'])
 armour = [item.Hat, item.Top, item.Bottom]
-weapons = [item.Sword, item.Bow, item.Wand]
-tools = [item.Chisel, item.Gloves, item.Rod, item.Pickaxe, item.Arcane]
-ammunition = [item.Shard, item.Shaving, item.Scrap]
-consumables = [item.Poultice, item.Ration]
+weapons = [item.Spear, item.Bow, item.Wand]
+tools = [item.Axe, item.Gloves, item.Rod, item.Pickaxe, item.Chisel]
+ammunition = [item.Runes, item.Arrow, item.Whetstone]
+consumables = [item.Potion, item.Ration]
 ITEM_CONSTRAINT = DiscreteConstraint(space=armour+weapons+tools+ammunition+consumables,
                                      systems=['ITEM_SYSTEM_ENABLED'])
 CONSUMABLE_CONSTRAINT = DiscreteConstraint(space=consumables,

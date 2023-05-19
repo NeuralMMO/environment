@@ -149,7 +149,7 @@ class NPC(entity.Entity):
       ent.droptable.add(random.choice(armor))
 
     if config.PROFESSION_SYSTEM_ENABLED:
-      tools =  [Item.Rod, Item.Gloves, Item.Pickaxe, Item.Chisel, Item.Arcane]
+      tools =  [Item.Rod, Item.Gloves, Item.Pickaxe, Item.Axe, Item.Chisel]
       ent.droptable.add(random.choice(tools))
 
     return ent

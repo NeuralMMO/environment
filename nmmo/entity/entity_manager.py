@@ -45,6 +45,10 @@ class EntityGroup(Mapping):
 
   def reset(self):
     for ent in self.entities.values():
+      # destroy the items
+      if self.config.ITEM_SYSTEM_ENABLED:
+        for item in list(ent.inventory.items):
+          item.destroy()
       ent.datastore_record.delete()
 
     self.entities = {}
@@ -65,6 +69,13 @@ class EntityGroup(Mapping):
         self.dead[ent_id] = player
 
         self.realm.map.tiles[r, c].remove_entity(ent_id)
+
+        # destroy the remaining items (of starved/dehydrated players)
+        #    of the agents who don't go through receive_damage()
+        if self.config.ITEM_SYSTEM_ENABLED:
+          for item in list(player.inventory.items):
+            item.destroy()
+
         self.entities[ent_id].datastore_record.delete()
         del self.entities[ent_id]
 

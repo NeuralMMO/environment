@@ -138,19 +138,19 @@ class Scripted(nmmo.Agent):
       item_system.Hat.ITEM_TYPE_ID: self.level,
       item_system.Top.ITEM_TYPE_ID: self.level,
       item_system.Bottom.ITEM_TYPE_ID: self.level,
-      item_system.Sword.ITEM_TYPE_ID: self.me.melee_level,
+      item_system.Spear.ITEM_TYPE_ID: self.me.melee_level,
       item_system.Bow.ITEM_TYPE_ID: self.me.range_level,
       item_system.Wand.ITEM_TYPE_ID: self.me.mage_level,
       item_system.Rod.ITEM_TYPE_ID: self.me.fishing_level,
       item_system.Gloves.ITEM_TYPE_ID: self.me.herbalism_level,
       item_system.Pickaxe.ITEM_TYPE_ID: self.me.prospecting_level,
-      item_system.Chisel.ITEM_TYPE_ID: self.me.carving_level,
-      item_system.Arcane.ITEM_TYPE_ID: self.me.alchemy_level,
-      item_system.Scrap.ITEM_TYPE_ID: self.me.melee_level,
-      item_system.Shaving.ITEM_TYPE_ID: self.me.range_level,
-      item_system.Shard.ITEM_TYPE_ID: self.me.mage_level,
+      item_system.Axe.ITEM_TYPE_ID: self.me.carving_level,
+      item_system.Chisel.ITEM_TYPE_ID: self.me.alchemy_level,
+      item_system.Whetstone.ITEM_TYPE_ID: self.me.melee_level,
+      item_system.Arrow.ITEM_TYPE_ID: self.me.range_level,
+      item_system.Runes.ITEM_TYPE_ID: self.me.mage_level,
       item_system.Ration.ITEM_TYPE_ID: self.level,
-      item_system.Poultice.ITEM_TYPE_ID: self.level
+      item_system.Potion.ITEM_TYPE_ID: self.level
     }
 
     for item_ary in self.ob.inventory.values:
@@ -231,8 +231,8 @@ class Scripted(nmmo.Agent):
     return True
 
   def consume(self):
-    if self.me.health <= self.health_max // 2 and item_system.Poultice.ITEM_TYPE_ID in self.best_items:
-      itm = self.best_items[item_system.Poultice.ITEM_TYPE_ID]
+    if self.me.health <= self.health_max // 2 and item_system.Potion.ITEM_TYPE_ID in self.best_items:
+      itm = self.best_items[item_system.Potion.ITEM_TYPE_ID]
     elif (self.me.food == 0 or self.me.water == 0) and item_system.Ration.ITEM_TYPE_ID in self.best_items:
       itm = self.best_items[item_system.Ration.ITEM_TYPE_ID]
     else:
@@ -331,7 +331,7 @@ class Scripted(nmmo.Agent):
     }
 
     # TODO(kywch): need a consistent level variables
-    # level for using armor, rations, and poultice
+    # level for using armor, rations, and potion
     self.level = min(1, max(self.skills.values()))
 
     if self.spawnR is None:
@@ -399,7 +399,7 @@ class Combat(Scripted):
   def supplies(self):
     return {
       item_system.Ration.ITEM_TYPE_ID: 2,
-      item_system.Poultice.ITEM_TYPE_ID: 2,
+      item_system.Potion.ITEM_TYPE_ID: 2,
       self.ammo.ITEM_TYPE_ID: 10
     }
 
@@ -433,7 +433,7 @@ class Gather(Scripted):
   def supplies(self):
     return {
       item_system.Ration.ITEM_TYPE_ID: 1,
-      item_system.Poultice.ITEM_TYPE_ID: 1
+      item_system.Potion.ITEM_TYPE_ID: 1
     }
 
   @property
@@ -483,22 +483,22 @@ class Carver(Gather):
     super().__init__(config, idx)
     if config.SPECIALIZE:
       self.resource = [material.Tree]
-    self.tool     = item_system.Chisel
+    self.tool     = item_system.Axe
 
 class Alchemist(Gather):
   def __init__(self, config, idx):
     super().__init__(config, idx)
     if config.SPECIALIZE:
       self.resource = [material.Crystal]
-    self.tool     = item_system.Arcane
+    self.tool     = item_system.Chisel
 
 class Melee(Combat):
   def __init__(self, config, idx):
     super().__init__(config, idx)
     if config.SPECIALIZE:
       self.style  = [action.Melee]
-    self.weapon = item_system.Sword
-    self.ammo   = item_system.Scrap
+    self.weapon = item_system.Spear
+    self.ammo   = item_system.Whetstone
 
 class Range(Combat):
   def __init__(self, config, idx):
@@ -506,7 +506,7 @@ class Range(Combat):
     if config.SPECIALIZE:
       self.style  = [action.Range]
     self.weapon = item_system.Bow
-    self.ammo   = item_system.Shaving
+    self.ammo   = item_system.Arrow
 
 class Mage(Combat):
   def __init__(self, config, idx):
@@ -514,4 +514,4 @@ class Mage(Combat):
     if config.SPECIALIZE:
       self.style  = [action.Mage]
     self.weapon = item_system.Wand
-    self.ammo   = item_system.Shard
+    self.ammo   = item_system.Runes

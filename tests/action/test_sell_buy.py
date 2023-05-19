@@ -13,7 +13,7 @@ RANDOM_SEED = 985
 LOGFILE = 'tests/action/test_sell_buy.log'
 
 class TestSellBuy(ScriptedTestTemplate):
-  # pylint: disable=protected-access,multiple-statements,unsubscriptable-object
+  # pylint: disable=protected-access,multiple-statements,unsubscriptable-object,no-member
 
   @classmethod
   def setUpClass(cls):
@@ -24,8 +24,8 @@ class TestSellBuy(ScriptedTestTemplate):
     cls.config.PLAYER_N = 6
 
     cls.policy = { 1:'Melee', 2:'Range', 3:'Melee', 4:'Range', 5:'Melee', 6:'Range' }
-    cls.ammo = { 1:Item.Scrap, 2:Item.Shaving, 3:Item.Scrap,
-                 4:Item.Shaving, 5:Item.Scrap, 6:Item.Shaving }
+    cls.ammo = { 1:Item.Whetstone, 2:Item.Arrow, 3:Item.Whetstone,
+                 4:Item.Arrow, 5:Item.Whetstone, 6:Item.Arrow }
 
     cls.config.LOG_VERBOSE = False
     if cls.config.LOG_VERBOSE:

@@ -93,8 +93,8 @@ class Observation:
       c_cond = (self.tiles[:,TileState.State.attr_name_to_col["col"]] == agent.col + c_delta)
       return TileState.parse_array(self.tiles[r_cond & c_cond][0])
 
-    # return a dummy lava tile at (inf, inf)
-    return TileState.parse_array([np.inf, np.inf, material.Lava.index])
+    # return a dummy void tile at (inf, inf)
+    return TileState.parse_array([np.inf, np.inf, material.Void.index])
 
   # pylint: disable=method-cache-max-size-none
   @lru_cache(maxsize=None)
@@ -259,19 +259,19 @@ class Observation:
       item_system.Hat.ITEM_TYPE_ID: level,
       item_system.Top.ITEM_TYPE_ID: level,
       item_system.Bottom.ITEM_TYPE_ID: level,
-      item_system.Sword.ITEM_TYPE_ID: agent.melee_level,
+      item_system.Spear.ITEM_TYPE_ID: agent.melee_level,
       item_system.Bow.ITEM_TYPE_ID: agent.range_level,
       item_system.Wand.ITEM_TYPE_ID: agent.mage_level,
       item_system.Rod.ITEM_TYPE_ID: agent.fishing_level,
       item_system.Gloves.ITEM_TYPE_ID: agent.herbalism_level,
       item_system.Pickaxe.ITEM_TYPE_ID: agent.prospecting_level,
-      item_system.Chisel.ITEM_TYPE_ID: agent.carving_level,
-      item_system.Arcane.ITEM_TYPE_ID: agent.alchemy_level,
-      item_system.Scrap.ITEM_TYPE_ID: agent.melee_level,
-      item_system.Shaving.ITEM_TYPE_ID: agent.range_level,
-      item_system.Shard.ITEM_TYPE_ID: agent.mage_level,
+      item_system.Axe.ITEM_TYPE_ID: agent.carving_level,
+      item_system.Chisel.ITEM_TYPE_ID: agent.alchemy_level,
+      item_system.Whetstone.ITEM_TYPE_ID: agent.melee_level,
+      item_system.Arrow.ITEM_TYPE_ID: agent.range_level,
+      item_system.Runes.ITEM_TYPE_ID: agent.mage_level,
       item_system.Ration.ITEM_TYPE_ID: level,
-      item_system.Poultice.ITEM_TYPE_ID: level
+      item_system.Potion.ITEM_TYPE_ID: level
     }
 
   def _make_destroy_item_mask(self):
@@ -349,7 +349,7 @@ class Observation:
     sig_col = (ItemState.State.attr_name_to_col["type_id"],
                ItemState.State.attr_name_to_col["level"])
     ammo_id = [ammo.ITEM_TYPE_ID for ammo in
-              [item_system.Scrap, item_system.Shaving, item_system.Shard]]
+              [item_system.Whetstone, item_system.Arrow, item_system.Runes]]
 
     # search ammo stack from the inventory
     type_flt = np.tile( np.array(ammo_id), (self.inventory.len,1))

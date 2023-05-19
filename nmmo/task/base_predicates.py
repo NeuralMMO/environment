@@ -221,9 +221,9 @@ def FullyArmed(gs: GameState,
        and see whether these are equipped and has level greater than or equal to _level.
   """
   WEAPON_IDS = {
-    nmmo_skill.Melee: {'weapon':5, 'ammo':13}, # Sword, Scrap
-    nmmo_skill.Range: {'weapon':6, 'ammo':14}, # Bow, Shaving
-    nmmo_skill.Mage: {'weapon':7, 'ammo':15} # Wand, Shard
+    nmmo_skill.Melee: {'weapon':5, 'ammo':13}, # Spear, Whetstone
+    nmmo_skill.Range: {'weapon':6, 'ammo':14}, # Bow, Arrow
+    nmmo_skill.Mage: {'weapon':7, 'ammo':15} # Wand, Runes
   }
   item_ids = { 'hat':2, 'top':3, 'bottom':4 }
   item_ids.update(WEAPON_IDS[combat_style])

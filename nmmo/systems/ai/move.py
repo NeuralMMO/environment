@@ -12,13 +12,13 @@ def random_direction():
 def random_safe(tiles, ent):
   r, c  = ent.pos
   cands = []
-  if not tiles[r-1, c].lava:
+  if not tiles[r-1, c].void:
     cands.append(action.North)
-  if not tiles[r+1, c].lava:
+  if not tiles[r+1, c].void:
     cands.append(action.South)
-  if not tiles[r, c-1].lava:
+  if not tiles[r, c-1].void:
     cands.append(action.West)
-  if not tiles[r, c+1].lava:
+  if not tiles[r, c+1].void:
     cands.append(action.East)
 
   return random.choice(cands)
