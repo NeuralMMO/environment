@@ -117,6 +117,7 @@ class Move(Node):
       return
 
     assert entity.alive, "Dead entity cannot act"
+    assert realm.map.is_valid_pos(*entity.pos), "Invalid entity position"
 
     r, c  = entity.pos
     ent_id = entity.ent_id
@@ -124,8 +125,8 @@ class Move(Node):
     r_delta, c_delta = direction.delta
     r_new, c_new = r+r_delta, c+c_delta
 
-    # CHECK ME: lava-jumping agents in the tutorial no longer works
-    if realm.map.tiles[r_new, c_new].impassible:
+    if not realm.map.is_valid_pos(r_new, c_new) or \
+       realm.map.tiles[r_new, c_new].impassible:
       return
 
     if entity.status.freeze > 0:
@@ -145,8 +146,9 @@ class Move(Node):
         realm.event_log.record(EventCode.GO_FARTHEST, entity,
                                distance=dist_from_spawn)
 
-    # CHECK ME: material.Impassible includes lava, so this line is not reachable
-    if realm.map.tiles[r_new, c_new].lava:
+    # CHECK ME: material.Impassible includes void, so this line is not reachable
+    #   Does this belong to Entity/Player.update()?
+    if realm.map.tiles[r_new, c_new].void:
       entity.receive_damage(None, entity.resources.health.val)
 
   @staticproperty

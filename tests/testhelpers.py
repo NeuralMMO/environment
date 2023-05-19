@@ -207,7 +207,7 @@ class ScriptedTestTemplate(unittest.TestCase):
     cls.policy = { 1:'Melee', 2:'Range', 3:'Mage' }
     # 1 cannot hit 3, 2 can hit 1, 3 cannot hit 2
     cls.spawn_locs = { 1:(17, 17), 2:(17, 19), 3:(21, 21) }
-    cls.ammo = { 1:Item.Scrap, 2:Item.Shaving, 3:Item.Shard }
+    cls.ammo = { 1:Item.Whetstone, 2:Item.Arrow, 3:Item.Runes }
     cls.ammo_quantity = 2
 
     # items to provide
@@ -219,7 +219,7 @@ class ScriptedTestTemplate(unittest.TestCase):
     item_sig = {}
     for ent_id, ammo in self.ammo.items():
       item_sig[ent_id] = []
-      for item in [ammo, Item.Top, Item.Gloves, Item.Ration, Item.Poultice]:
+      for item in [ammo, Item.Top, Item.Gloves, Item.Ration, Item.Potion]:
         for lvl in self.item_level:
           item_sig[ent_id].append((item, lvl))
 

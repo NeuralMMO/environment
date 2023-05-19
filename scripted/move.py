@@ -119,7 +119,7 @@ def forageDijkstra(config, ob: Observation, actions, food_max, water_max, cutoff
          food  = max(0, food - 1)
          water = max(0, water - 1)
 
-         if matl == material.Forest.index:
+         if matl == material.Foilage.index:
             food = min(food+food_max//2, food_max)
          for pos in adjacentPos(nxt):
             if not inSight(*pos, vision):

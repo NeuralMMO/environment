@@ -21,13 +21,16 @@ class Player(entity.Entity):
     self.ration_level_consumed    = 0
     self.poultice_level_consumed  = 0
 
-    # Submodules
+    # initialize skills with the base level
     self.skills = Skills(realm, self)
+    if realm.config.PROGRESSION_SYSTEM_ENABLED:
+      for skill in self.skills.skills:
+        skill.level.update(realm.config.PROGRESSION_BASE_LEVEL)
 
-    # Gold: initialize with 1 gold, like the old nmmo
-    # CHECK ME: should the initial amount be in the config?
+    # Gold: initialize with 1 gold (EXCHANGE_BASE_GOLD).
+    # If the base amount is more than 1, alss check the npc's init gold.
     if realm.config.EXCHANGE_SYSTEM_ENABLED:
-      self.gold.update(1)
+      self.gold.update(realm.config.EXCHANGE_BASE_GOLD)
 
   @property
   def serial(self):
@@ -71,9 +74,12 @@ class Player(entity.Entity):
     for item in list(self.inventory.items):
       self.inventory.remove(item)
 
-      # if source doesn't have space, inventory.receive() destroys the item
+      # if source is None or NPC, destroy the item
       if source.is_player:
+        # if source doesn't have space, inventory.receive() destroys the item
         source.inventory.receive(item)
+      else:
+        item.destroy()
 
     # CHECK ME: this is an empty function. do we still need this?
     self.skills.receive_damage(dmg)

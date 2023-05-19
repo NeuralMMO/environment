@@ -81,3 +81,7 @@ class Map:
       self.update_list.add(self.tiles[r, c])
 
     return self.tiles[r, c].harvest(deplete)
+
+  def is_valid_pos(self, row, col):
+    '''Check if a position is valid'''
+    return 0 <= row < self.config.MAP_SIZE and 0 <= col < self.config.MAP_SIZE

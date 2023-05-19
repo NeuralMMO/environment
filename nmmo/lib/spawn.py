@@ -69,7 +69,7 @@ def spawn_concurrent(config, realm):
   # Number of tiles between teams
   team_sep = buffer_tiles // team_n
 
-  # Accounts for lava borders in coord calcs
+  # Accounts for void borders in coord calcs
   left = config.MAP_BORDER
   right = config.MAP_CENTER + config.MAP_BORDER
   lows = config.MAP_CENTER * [left]

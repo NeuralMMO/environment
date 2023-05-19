@@ -1,7 +1,6 @@
 '''Manual test for render client connectivity'''
 
 if __name__ == '__main__':
-  import time
   import random
   import nmmo
 
@@ -15,6 +14,7 @@ if __name__ == '__main__':
   # config.RENDER option is gone,
   # RENDER can be done without setting any config
   config = ScriptedAgentTestConfig()
+  config.NPC_SPAWN_ATTEMPTS = 8
   env = nmmo.Env(config)
 
   env.reset(seed=RANDOM_SEED)
@@ -25,7 +25,6 @@ if __name__ == '__main__':
   for tick in range(TEST_HORIZON):
     env.step({})
     renderer.render_realm()
-    time.sleep(1)
 
   # save the packet: this is possible because config.SAVE_REPLAY = True
   env.realm.save_replay(f'replay_seed_{RANDOM_SEED:04d}.json', compress=False)

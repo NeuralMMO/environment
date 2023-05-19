@@ -15,7 +15,7 @@ from nmmo.lib.log import EventCode
 
 # pylint: disable=import-error
 from nmmo.core.env import Env
-from nmmo.task.task_api import Task, Repeat, TaskOperator
+from nmmo.task.task_api import Task, TaskOperator
 from nmmo.task.group import Group
 import nmmo.task.base_predicates as bp
 
@@ -32,7 +32,7 @@ class Change(TaskOperator):
     return super().sample(config, Change, **kwargs)
 
 class TestBasePredicate(unittest.TestCase):
-  # pylint: disable=protected-access,invalid-name
+  # pylint: disable=protected-access,invalid-name,no-member
 
   def _get_taskenv(self,
                    test_tasks: List[Tuple[Task, Group]],
@@ -68,7 +68,8 @@ class TestBasePredicate(unittest.TestCase):
       for ent_id in infos:
         if ent_id in assignee:
           # the agents that are assigned the task get evaluated for reward
-          self.assertEqual(int(infos[ent_id]['task'][Change(task,assignee).name]), int(tid in true_task))
+          self.assertEqual(int(infos[ent_id]['task'][Change(task,assignee).name]),
+                           int(tid in true_task))
         else:
           # the agents that are not assigned the task are not evaluated
           self.assertTrue(task.name not in infos[ent_id]['task'])
@@ -139,7 +140,7 @@ class TestBasePredicate(unittest.TestCase):
     # DONE
 
   def test_can_see_tile(self):
-    a1_target = Material.Forest
+    a1_target = Material.Foilage
     a2_target = Material.Water
     test_tasks = [ # (Predicate, Team), the reward is 1 by default
       (bp.CanSeeTile(Group([1]), a1_target), ALL_AGENT), # True
@@ -154,8 +155,8 @@ class TestBasePredicate(unittest.TestCase):
     # Two corners to the target materials
     MS = env.config.MAP_SIZE
     tile = env.realm.map.tiles[0,MS-2]
-    tile.material = Material.Forest
-    tile.material_id.update(Material.Forest.index)
+    tile.material = Material.Foilage
+    tile.material_id.update(Material.Foilage.index)
 
     tile = env.realm.map.tiles[MS-1,0]
     tile.material = Material.Water
@@ -172,8 +173,8 @@ class TestBasePredicate(unittest.TestCase):
     true_task = []
     self._check_result(env, test_tasks, infos, true_task)
 
-    # Team one to forest, team two to water
-    change_agent_pos(env.realm,1,(0,MS-2)) # agent 1, team 0, forest
+    # Team one to foilage, team two to water
+    change_agent_pos(env.realm,1,(0,MS-2)) # agent 1, team 0, foilage
     change_agent_pos(env.realm,2,(MS-2,0)) # agent 2, team 1, water
     env.obs = env._compute_observations()
 
@@ -419,15 +420,15 @@ class TestBasePredicate(unittest.TestCase):
       (bp.OwnItem(Group([1,2]), Item.Ration, goal_level, goal_quantity), ALL_AGENT), # True
       (bp.OwnItem(Group([3]), Item.Ration, goal_level, goal_quantity), ALL_AGENT), # True
       (bp.OwnItem(Group([4,5,6]), Item.Ration, goal_level, goal_quantity), ALL_AGENT), # False
-      (bp.EquipItem(Group([4]), Item.Scrap, goal_level, 1), ALL_AGENT), # False
-      (bp.EquipItem(Group([4,5]), Item.Scrap, goal_level, 1), ALL_AGENT), # True
-      (bp.EquipItem(Group([4,5,6]), Item.Scrap, goal_level, 2), ALL_AGENT)] # True
+      (bp.EquipItem(Group([4]), Item.Whetstone, goal_level, 1), ALL_AGENT), # False
+      (bp.EquipItem(Group([4,5]), Item.Whetstone, goal_level, 1), ALL_AGENT), # True
+      (bp.EquipItem(Group([4,5,6]), Item.Whetstone, goal_level, 2), ALL_AGENT)] # True
 
     env = self._get_taskenv(test_tasks)
 
-    # set the level, so that agents 4-6 can equip the scrap
-    equip_scrap = [4, 5, 6]
-    for ent_id in equip_scrap:
+    # set the level, so that agents 4-6 can equip the Whetstone
+    equip_stone = [4, 5, 6]
+    for ent_id in equip_stone:
       env.realm.players[ent_id].skills.melee.level.update(6) # melee skill level=6
 
     # provide items
@@ -442,15 +443,15 @@ class TestBasePredicate(unittest.TestCase):
     # OwnItem(Group([4,5,6]), Item.Ration, goal_level, goal_quantity) is false
 
     # provide and equip items
-    ent_id = 4 # EquipItem(Group([4]), Item.Scrap, goal_level, 1) is false
-    provide_item(env.realm, ent_id, Item.Scrap, level=1, quantity=4)
-    ent_id = 5 # EquipItem(Group([4,5]), Item.Scrap, goal_level, 1) is true
-    provide_item(env.realm, ent_id, Item.Scrap, level=4, quantity=1)
-    ent_id = 6 # EquipItem(Group([4,5,6]), Item.Scrap, goal_level, 2) is true
-    provide_item(env.realm, ent_id, Item.Scrap, level=2, quantity=4)
+    ent_id = 4 # EquipItem(Group([4]), Item.Whetstone, goal_level, 1) is false
+    provide_item(env.realm, ent_id, Item.Whetstone, level=1, quantity=4)
+    ent_id = 5 # EquipItem(Group([4,5]), Item.Whetstone, goal_level, 1) is true
+    provide_item(env.realm, ent_id, Item.Whetstone, level=4, quantity=1)
+    ent_id = 6 # EquipItem(Group([4,5,6]), Item.Whetstone, goal_level, 2) is true
+    provide_item(env.realm, ent_id, Item.Whetstone, level=2, quantity=4)
     for ent_id in [4, 5, 6]:
-      scrap = env.realm.players[ent_id].inventory.items[0]
-      scrap.use(env.realm.players[ent_id])
+      whetstone = env.realm.players[ent_id].inventory.items[0]
+      whetstone.use(env.realm.players[ent_id])
     env.obs = env._compute_observations()
 
     _, _, _, infos = env.step({})
@@ -478,7 +479,7 @@ class TestBasePredicate(unittest.TestCase):
       env.realm.players[ent_id].skills.range.level.update(goal_level+2)
       # prepare the items
       item_list = [ itm(env.realm, goal_level) for itm in [
-        Item.Hat, Item.Top, Item.Bottom, Item.Bow, Item.Shaving]]
+        Item.Hat, Item.Top, Item.Bottom, Item.Bow, Item.Arrow]]
       for itm in item_list:
         env.realm.players[ent_id].inventory.receive(itm)
         itm.use(env.realm.players[ent_id])
@@ -617,7 +618,7 @@ class TestBasePredicate(unittest.TestCase):
     self._check_result(env, test_tasks, infos, true_task)
 
     # DONE
-  
+
   def test_item_event_predicates(self): # Consume, Harvest, List, Buy
     for predicate, event_type in [(bp.ConsumeItem, 'CONSUME_ITEM'),
                                   (bp.HarvestItem, 'HARVEST_ITEM'),
@@ -627,7 +628,7 @@ class TestBasePredicate(unittest.TestCase):
       lvl = random.randint(5,10)
       quantity = random.randint(5,10)
       true_item = Item.Ration
-      false_item = Item.Poultice
+      false_item = Item.Potion
       test_tasks = [
         (predicate(Group([1,3,5]), true_item, lvl, quantity), ALL_AGENT), # True
         (predicate(Group([2]), true_item, lvl, quantity), ALL_AGENT), # False
@@ -648,24 +649,25 @@ class TestBasePredicate(unittest.TestCase):
 
       # False case 1: Quantity
       for _ in range(quantity-1):
-          env.realm.event_log.record(id_,
-                                players[2],
-                                price=1,
-                                item=true_item(env.realm, lvl))
+        env.realm.event_log.record(id_,
+                              players[2],
+                              price=1,
+                              item=true_item(env.realm, lvl))
 
       # False case 2: Type
       for _ in range(quantity+1):
-          env.realm.event_log.record(id_,
-                                players[4],
-                                price=1,
-                                item=false_item(env.realm, lvl))
+        env.realm.event_log.record(id_,
+                              players[4],
+                              price=1,
+                              item=false_item(env.realm, lvl))
+
       # False case 3: Level
       for _ in range(quantity+1):
-          env.realm.event_log.record(id_,
-                                players[4],
-                                price=1,
-                                item=true_item(env.realm,
-                                               random.randint(0,lvl-1)))
+        env.realm.event_log.record(id_,
+                              players[4],
+                              price=1,
+                              item=true_item(env.realm,
+                                              random.randint(0,lvl-1)))
       env.obs = env._compute_observations()
       _, _, _, infos = env.step({})
       true_task = [0]

@@ -129,19 +129,19 @@ class Terrain:
           mat = Terrain.WATER
         elif v <= config.TERRAIN_GRASS:
           mat = Terrain.GRASS
-        elif v <= config.TERRAIN_FOREST:
-          mat = Terrain.FOREST
+        elif v <= config.TERRAIN_FOILAGE:
+          mat = Terrain.FOILAGE
         else:
           mat = Terrain.STONE
         matl[y, x] = mat
 
-    #Lava and grass border
-    matl[l1 > size/2 - border]   = Terrain.LAVA
+    # Void and grass border
+    matl[l1 > size/2 - border]   = Terrain.VOID
     matl[l1 == size//2 - border] = Terrain.GRASS
 
     edge  = l1 == size//2 - border - 1
     stone = (matl == Terrain.STONE) | (matl == Terrain.WATER)
-    matl[edge & stone] = Terrain.FOREST
+    matl[edge & stone] = Terrain.FOILAGE
 
     return val, matl, interpolaters
 
@@ -292,7 +292,7 @@ class MapGenerator:
           if linf <= size//2 - config.MAP_BORDER:
             tiles[r, c] = Terrain.GRASS
           else:
-            tiles[r, c] = Terrain.LAVA
+            tiles[r, c] = Terrain.VOID
 
     if config.PROFESSION_SYSTEM_ENABLED:
       spawn_profession_resources(config, tiles)

@@ -58,8 +58,8 @@ class Tile(TileState):
     return self.material in material.Impassible
 
   @property
-  def lava(self):
-    return self.material == material.Lava
+  def void(self):
+    return self.material == material.Void
 
   def reset(self, mat, config):
     self.state = mat(config)
