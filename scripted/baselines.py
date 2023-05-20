@@ -10,7 +10,7 @@ from nmmo import material
 from nmmo.systems import skill
 import nmmo.systems.item as item_system
 from nmmo.lib import colors
-from nmmo.io import action
+from nmmo.core import action
 from nmmo.core.observation import Observation
 
 from scripted import attack, move

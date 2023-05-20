@@ -5,7 +5,7 @@ import random
 
 import heapq
 
-from nmmo.io import action
+from nmmo.core import action
 from nmmo.core.observation import Observation
 from nmmo.lib import material
 

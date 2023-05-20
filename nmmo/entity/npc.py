@@ -2,7 +2,7 @@
 import random
 
 from nmmo.entity import entity
-from nmmo.io import action as Action
+from nmmo.core import action as Action
 from nmmo.systems import combat, droptable
 from nmmo.systems.ai import policy
 from nmmo.systems import item as Item
