@@ -62,7 +62,7 @@ class Realm:
     self.items = {}
 
     # Replay helper
-    self._replay_helper = ReplayHelper.create(self)
+    self._replay_helper = None
 
     # Initialize actions
     nmmo.Action.init(config)
@@ -75,7 +75,10 @@ class Realm:
     """
     self.log_helper.reset()
     self.event_log.reset()
-    self._replay_helper.reset()
+
+    if self._replay_helper is not None:
+      self._replay_helper.reset()
+
     self.map.reset(map_id or np.random.randint(self.config.MAP_N) + 1)
 
     # EntityState and ItemState tables must be empty after players/npcs.reset()
@@ -177,7 +180,8 @@ class Realm:
     self.map.step()
     self.exchange.step(self.tick)
     self.log_helper.update(dead)
-    self._replay_helper.update()
+    if self._replay_helper is not None:
+      self._replay_helper.update()
 
     self.tick += 1
 
@@ -194,11 +198,8 @@ class Realm:
       else:
         logging.info("Milestone: %s %s %s", category, value, message)
 
-  def save_replay(self, save_path, compress=True):
-    self._replay_helper.save(save_path, compress)
+  def record_replay(self, replay_helper: ReplayHelper) -> ReplayHelper:
+    self._replay_helper = replay_helper
+    self._replay_helper.set_realm(self)
 
-  def get_replay(self):
-    return {
-      'map': self._replay_helper.map,
-      'packets': self._replay_helper.packets 
-    }
+    return replay_helper
