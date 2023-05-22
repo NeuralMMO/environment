@@ -2,7 +2,7 @@
 
 import random
 
-from nmmo.io import action
+from nmmo.core import action
 from nmmo.systems.ai import utils
 
 

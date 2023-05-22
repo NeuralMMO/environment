@@ -1,7 +1,6 @@
-# pylint: disable=import-error, unused-argument
-import logging
+# pylint: disable=import-error,unused-argument,invalid-name
+# pylint: disable=no-member,no-value-for-parameter,not-callable,expression-not-assigned
 import unittest
-from tests.testhelpers import ScriptedAgentTestConfig
 import numpy as np
 
 import nmmo
@@ -13,7 +12,9 @@ from nmmo.task.constraint import InvalidConstraint, ScalarConstraint
 from nmmo.task.base_predicates import TickGE, CanSeeGroup
 
 from nmmo.systems import item as Item
-from nmmo.io import action as Action
+from nmmo.core import action as Action
+
+from tests.testhelpers import ScriptedAgentTestConfig
 
 @define_predicate
 def Success(gs, subject: Group):

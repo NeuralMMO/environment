@@ -6,7 +6,7 @@ from nmmo.core.tile import TileState
 from nmmo.entity.entity import EntityState
 from nmmo.systems.item import ItemState
 import nmmo.systems.item as item_system
-from nmmo.io import action
+from nmmo.core import action
 from nmmo.lib import material, utils
 
 

@@ -3,7 +3,7 @@ import logging
 
 from tests.testhelpers import ScriptedTestTemplate, provide_item
 
-from nmmo.io import action
+from nmmo.core import action
 from nmmo.systems import item as Item
 from nmmo.systems.item import ItemState
 from scripted import baselines

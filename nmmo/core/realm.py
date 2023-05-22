@@ -10,9 +10,9 @@ import nmmo
 from nmmo.core.log_helper import LogHelper
 from nmmo.core.map import Map
 from nmmo.core.tile import TileState
+from nmmo.core.action import Action, Buy
 from nmmo.entity.entity import EntityState
 from nmmo.entity.entity_manager import NPCManager, PlayerManager
-from nmmo.io.action import Action, Buy
 from nmmo.datastore.numpy_datastore import NumpyDatastore
 from nmmo.systems.exchange import Exchange
 from nmmo.systems.item import Item, ItemState

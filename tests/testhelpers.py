@@ -8,7 +8,7 @@ import nmmo
 
 from scripted import baselines
 from nmmo.entity.entity import EntityState
-from nmmo.io import action
+from nmmo.core import action
 from nmmo.systems import item as Item
 from nmmo.core.realm import Realm
 
