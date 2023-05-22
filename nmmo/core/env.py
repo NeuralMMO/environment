@@ -299,11 +299,8 @@ class Env(ParallelEnv):
     # Execute actions
     self.realm.step(actions)
     dones = {}
-    for eid in self.possible_agents:
-      if eid not in self._dead_agents and (
-          eid not in self.realm.players or
-          self.realm.tick >= self.config.HORIZON):
-
+    for eid in self.agents:
+      if eid not in self.realm.players or self.realm.tick >= self.config.HORIZON:
         self._dead_agents.add(eid)
         dones[eid] = True
 
@@ -363,7 +360,7 @@ class Env(ParallelEnv):
     '''Compute actions for scripted agents and add them into the action dict'''
     for eid in self.scripted_agents:
       # remove the dead scripted agent from the list
-      if eid not in self.realm.players:
+      if eid in self._dead_agents or eid not in self.realm.players:
         self.scripted_agents.discard(eid)
         continue
 
@@ -399,8 +396,8 @@ class Env(ParallelEnv):
 
     market = Item.Query.for_sale(self.realm.datastore)
 
-    for agent in self.realm.players.values():
-      agent_id = agent.id.val
+    for agent_id in self.agents:
+      agent = self.realm.players.get(agent_id)
       agent_r = agent.row.val
       agent_c = agent.col.val
 
@@ -477,7 +474,7 @@ class Env(ParallelEnv):
   @property
   def agents(self) -> List[AgentID]:
     '''For conformity with the PettingZoo API only; rendering is external'''
-    return list(self.realm.players.keys())
+    return list(set(self.realm.players.keys()) - self._dead_agents)
 
   def close(self):
     '''For conformity with the PettingZoo API only; rendering is external'''

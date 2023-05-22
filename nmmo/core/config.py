@@ -145,9 +145,6 @@ class Config(Template):
     return hasattr(self, name)
 
 
-  SAVE_REPLAY                  = False
-  '''Flag used to save replays'''
-
   PROVIDE_ACTION_TARGETS       = False
   '''Flag used to provide action targets mask'''
 

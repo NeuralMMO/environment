@@ -1,32 +1,33 @@
 import json
-import lzma
 import logging
+import lzma
+import pickle
+from typing import Dict
 
 from .render_utils import np_encoder, patch_packet
 
-
 class ReplayHelper:
-  @staticmethod
-  def create(realm):
-    if realm.config.SAVE_REPLAY:
-      return ReplayFileHelper(realm)
+  def __init__(self):
+    self._realm = None
 
-    return DummyReplayHelper()
+  def set_realm(self, realm) -> None:
+    self._realm = realm
 
-
-class DummyReplayHelper(ReplayHelper):
   def reset(self):
     pass
 
   def update(self):
     pass
 
-  def save(self, save_path, compress):
+  def save(self, filename_prefix, compress):
     pass
 
+class DummyReplayHelper(ReplayHelper):
+  pass
 
-class ReplayFileHelper(ReplayHelper):
+class FileReplayHelper(ReplayHelper):
   def __init__(self, realm=None):
+    super().__init__()
     self._realm = realm
     self.packets = None
     self.map = None
@@ -52,37 +53,50 @@ class ReplayFileHelper(ReplayHelper):
     self._i += 1
     return packet
 
-  def update(self, packet=None):
-    if packet is None:
-      if self._realm is None:
-        return
-      # TODO: patch_packet is a hack. best to remove, if possible
-      packet = patch_packet(self._realm.packet(), self._realm)
+  def _packet(self):
+    assert self._realm is not None, 'Realm not set'
 
-    data = {}
-    for key, val in packet.items():
-      if key == 'environment':
-        self.map = val
-        continue
-      if key == 'config':
-        continue
-      data[key] = val
+    # TODO: remove patch_packet
+    packet = patch_packet(self._realm.packet(), self._realm)
 
-    self.packets.append(data)
+    if "environment" in packet:
+      self.map = packet["environment"]
+      del packet["environment"]
+    if "config" in packet:
+      del packet["config"]
 
-  def save(self, save_file, compress=True):
-    logging.info('Saving replay to %s ...', save_file)
+    return packet
 
-    data = {
+  def _metadata(self) -> Dict:
+    return {
+      'event_log': self._realm.event_log.get_data(),
+      'event_attr_col': self._realm.event_log.attr_to_col
+    }
+
+  def update(self):
+    self.packets.append(self._packet())
+
+  def save(self, filename_prefix, compress=True):
+    replay_file = f'{filename_prefix}.replay.json'
+    metadata_file = f'{filename_prefix}.metadata.pkl'
+
+    logging.info('Saving replay to %s ...', replay_file)
+
+    data = json.dumps({
       'map': self.map,
-      'packets': self.packets }
+      'packets': self.packets
+    }, default=np_encoder).encode('utf8')
 
-    data = json.dumps(data, default=np_encoder).encode('utf8')
     if compress:
+      replay_file = f'{filename_prefix}.replay.lzma'
       data = lzma.compress(data, format=lzma.FORMAT_ALONE)
 
-    with open(save_file, 'wb') as out:
+    with open(replay_file, 'wb') as out:
       out.write(data)
+
+    with open(metadata_file, 'wb') as out:
+      pickle.dump(self._metadata(), out)
+
 
   @classmethod
   def load(cls, replay_file, decompress=True):
@@ -93,7 +107,7 @@ class ReplayFileHelper(ReplayHelper):
       data = lzma.decompress(data, format=lzma.FORMAT_ALONE)
     data = json.loads(data.decode('utf-8'))
 
-    replay_helper = ReplayFileHelper()
+    replay_helper = FileReplayHelper()
     replay_helper.map = data['map']
     replay_helper.packets = data['packets']
 

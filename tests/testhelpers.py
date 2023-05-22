@@ -113,7 +113,6 @@ class ScriptedAgentTestConfig(nmmo.config.Small, nmmo.config.AllGameSystems):
   LOG_EVENTS = False
   LOG_VERBOSE = False
 
-  SAVE_REPLAY = True
   PLAYER_DEATH_FOG = 5
 
   SPECIALIZE = True
