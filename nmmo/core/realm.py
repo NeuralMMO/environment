@@ -89,6 +89,10 @@ class Realm:
     assert ItemState.State.table(self.datastore).is_empty(), \
         "ItemState table is not empty"
 
+    # DataStore id allocator must be reset to be deterministic
+    EntityState.State.table(self.datastore).reset()
+    ItemState.State.table(self.datastore).reset()
+
     self.players.spawn()
     self.npcs.spawn()
     self.tick = 0
