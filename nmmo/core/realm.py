@@ -17,6 +17,7 @@ from nmmo.datastore.numpy_datastore import NumpyDatastore
 from nmmo.systems.exchange import Exchange
 from nmmo.systems.item import Item, ItemState
 from nmmo.lib.event_log import EventLogger, EventState
+from nmmo.lib.team_helper import TeamHelper
 from nmmo.render.replay_helper import ReplayHelper
 
 def prioritized(entities: Dict, merged: Dict):
@@ -30,7 +31,8 @@ def prioritized(entities: Dict, merged: Dict):
 class Realm:
   """Top-level world object"""
 
-  def __init__(self, config):
+  def __init__(self, config,
+               team_helper: TeamHelper = None):
     self.config = config
     assert isinstance(
         config, nmmo.config.Config
@@ -55,6 +57,7 @@ class Realm:
     self.event_log = EventLogger(self)
 
     # Entity handlers
+    self.team_helper = team_helper
     self.players = PlayerManager(self)
     self.npcs = NPCManager(self)
 

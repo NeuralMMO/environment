@@ -77,9 +77,6 @@ class NPC(entity.Entity):
     source.gold.increment(self.gold.val)
     self.gold.update(0)
 
-    # TODO(kywch): make source receive the highest-level items first
-    #   because source cannot take it if the inventory is full
-    #   Also, destroy the remaining items if the source cannot take those
     for item in self.droptable.roll(self.realm, self.attack_level):
       if source.is_player and source.inventory.space:
         source.inventory.receive(item)

@@ -156,6 +156,17 @@ class PlayerManager(EntityGroup):
     super().spawn(player)
 
   def spawn(self):
+    # perform team spawn if team helper is provided
+    if self.realm.team_helper is not None:
+      spawn_locs = spawn.spawn_team_together(self.config, self.realm)
+      for team_id, team_members in self.realm.team_helper.teams.items():
+        r, c = spawn_locs[team_id]
+        for agent_id in team_members:
+          self.spawned.add(agent_id)
+          self.spawn_individual(r, c, agent_id)
+      return
+
+    # run the legacy code when team helper is None (no team)
     idx = 0
     for r, c in spawn.spawn_concurrent(self.config, self.realm):
       idx += 1
