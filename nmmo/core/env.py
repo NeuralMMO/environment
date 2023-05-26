@@ -15,7 +15,6 @@ from nmmo.core.observation import Observation
 from nmmo.core.tile import Tile
 from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
-from nmmo.lib.team_helper import TeamHelper
 from nmmo.task.game_state import GameStateGenerator
 from nmmo.task.task_api import Task
 from nmmo.task.scenario import default_task
@@ -27,15 +26,13 @@ class Env(ParallelEnv):
   #pylint: disable=no-value-for-parameter
   def __init__(self,
                config: Default = nmmo.config.Default(),
-               seed = None,
-               team_helper: TeamHelper = None):
+               seed = None):
     self._init_random(seed)
 
     super().__init__()
 
     self.config = config
-    self.team_helper = team_helper
-    self.realm = realm.Realm(config, team_helper=team_helper)
+    self.realm = realm.Realm(config)
     self.obs = None
 
     self.possible_agents = list(range(1, config.PLAYER_N + 1))

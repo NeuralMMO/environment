@@ -1,20 +1,42 @@
 import unittest
 
 import nmmo
+from nmmo.core.agent import Agent
 from nmmo.lib.team_helper import TeamHelper
+from nmmo.lib import spawn
+
+
+class TeamLoader(spawn.SequentialLoader):
+  def __init__(self, config, team_helper: TeamHelper):
+    assert config.PLAYERS == [Agent], \
+      "TeamLoader only supports config.PLAYERS == [Agent]"
+    super().__init__(config)
+    self.team_helper = team_helper
+
+    self.candidate_spawn_pos = \
+      spawn.get_team_spawn_positions(config, team_helper.num_teams)
+
+  def get_spawn_position(self, agent_id):
+    team_id, _ = self.team_helper.team_and_position_for_agent[agent_id]
+    return self.candidate_spawn_pos[team_id]
+
 
 class TestTeamSpawn(unittest.TestCase):
   def test_team_spawn(self):
-    config = nmmo.config.Small()
     num_teams = 16
     team_size = 8
-
     team_helper = TeamHelper({
       i: [i*team_size+j+1 for j in range(team_size)]
       for i in range(num_teams)}
     )
 
-    env = nmmo.Env(config, team_helper=team_helper)
+    config = nmmo.config.Small()
+    config.PLAYER_N = num_teams * team_size
+    config.PLAYER_LOADER = lambda config: TeamLoader(config, team_helper)
+
+    assert config.PLAYER_N == num_teams * team_size,\
+      "config.PLAYER_N must be num_teams * team_size"
+    env = nmmo.Env(config)
     env.reset()
 
     # agents in the same team should spawn together

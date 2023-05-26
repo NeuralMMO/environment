@@ -8,12 +8,19 @@ class SequentialLoader:
     self.items = items
     self.idx   = -1
 
+    self.candidate_spawn_pos = spawn_concurrent(config)
+
   def __iter__(self):
     return self
 
   def __next__(self):
     self.idx = (self.idx + 1) % len(self.items)
     return self.items[self.idx]
+
+  # pylint: disable=unused-argument
+  def get_spawn_position(self, agent_id):
+    # the basic SequentialLoader just provides a random spawn position
+    return self.candidate_spawn_pos.pop()
 
 def spawn_continuous(config):
   '''Generates spawn positions for new agents
@@ -56,12 +63,11 @@ def get_edge_tiles(config):
 
   return sides
 
-# TODO: consider removing this
-def spawn_concurrent(config, realm):
+def spawn_concurrent(config):
   '''Generates spawn positions for new agents
 
   Evenly spaces agents around the borders
-  of the square game map
+  of the square game map, assuming the edge tiles are all habitable
 
   Returns:
       list of tuple(int, int):
@@ -87,10 +93,9 @@ def spawn_concurrent(config, realm):
   # Number of tiles between teams
   team_sep = buffer_tiles // team_n
 
-  merged = []
+  sides = []
   for side in get_edge_tiles(config):
-    merged += side
-  sides = [pos for pos in merged if not realm.map.tiles[pos].impassible]
+    sides += side
 
   if team_n > 1:
     # Space across and within teams
@@ -99,7 +104,7 @@ def spawn_concurrent(config, realm):
       for offset in list(range(0,  tiles_per_team, teammate_sep+1)):
         if len(spawn_positions) >= config.PLAYER_N:
           continue
-        pos = merged[idx + offset]
+        pos = sides[idx + offset]
         spawn_positions.append(pos)
   else:
     # team_n = 1: to fit 128 agents in a small map, ignore spacing and spawn randomly
@@ -108,7 +113,7 @@ def spawn_concurrent(config, realm):
 
   return spawn_positions
 
-def spawn_team_together(config, realm):
+def get_team_spawn_positions(config, num_teams):
   '''Generates spawn positions for new teams
   Agents in the same team spawn together in the same tile
   Evenly spaces teams around the square map borders
@@ -119,7 +124,6 @@ def spawn_team_together(config, realm):
   position:
       The position (row, col) to spawn the given teams
   '''
-  num_teams = realm.team_helper.num_teams
   teams_per_sides = (num_teams + 3) // 4 # 1-4 -> 1, 5-8 -> 2, etc.
 
   sides = get_edge_tiles(config)
