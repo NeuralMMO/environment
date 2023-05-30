@@ -140,17 +140,17 @@ class NPCManager(EntityGroup):
 class PlayerManager(EntityGroup):
   def __init__(self, realm):
     super().__init__(realm)
-    self.loader  = self.realm.config.PLAYER_LOADER
-    self.agents: spawn.SequentialLoader = None
+    self.loader_class = self.realm.config.PLAYER_LOADER
+    self._agent_loader: spawn.SequentialLoader = None
     self.spawned = None
 
   def reset(self):
     super().reset()
-    self.agents  = self.loader(self.config)
+    self._agent_loader = self.loader_class(self.config)
     self.spawned = OrderedSet()
 
   def spawn_individual(self, r, c, idx):
-    agent = next(self.agents)
+    agent = next(self._agent_loader)
     agent      = agent(self.config, idx)
     player     = Player(self.realm, (r, c), agent)
     super().spawn(player)
@@ -160,7 +160,7 @@ class PlayerManager(EntityGroup):
     idx = 0
     while idx < self.config.PLAYER_N:
       idx += 1
-      r, c = self.agents.get_spawn_position(idx)
+      r, c = self._agent_loader.get_spawn_position(idx)
 
       if idx in self.entities:
         continue
