@@ -8,12 +8,19 @@ class SequentialLoader:
     self.items = items
     self.idx   = -1
 
+    self.candidate_spawn_pos = spawn_concurrent(config)
+
   def __iter__(self):
     return self
 
   def __next__(self):
     self.idx = (self.idx + 1) % len(self.items)
     return self.items[self.idx]
+
+  # pylint: disable=unused-argument
+  def get_spawn_position(self, agent_id):
+    # the basic SequentialLoader just provides a random spawn position
+    return self.candidate_spawn_pos.pop()
 
 def spawn_continuous(config):
   '''Generates spawn positions for new agents
@@ -38,15 +45,32 @@ def spawn_continuous(config):
     r, c = c, r
   return (r, c)
 
+def get_edge_tiles(config):
+  '''Returns a list of all edge tiles'''
+  # Accounts for void borders in coord calcs
+  left = config.MAP_BORDER
+  right = config.MAP_CENTER + config.MAP_BORDER
+  lows = config.MAP_CENTER * [left]
+  highs = config.MAP_CENTER * [right]
+  inc = list(range(config.MAP_BORDER, config.MAP_CENTER+config.MAP_BORDER))
 
-def spawn_concurrent(config, realm):
+  # All edge tiles in order
+  sides = []
+  sides.append(list(zip(lows, inc)))
+  sides.append(list(zip(inc, highs)))
+  sides.append(list(zip(highs, inc[::-1])))
+  sides.append(list(zip(inc[::-1], lows)))
+
+  return sides
+
+def spawn_concurrent(config):
   '''Generates spawn positions for new agents
 
   Evenly spaces agents around the borders
-  of the square game map
+  of the square game map, assuming the edge tiles are all habitable
 
   Returns:
-      tuple(int, int):
+      list of tuple(int, int):
 
   position:
       The position (row, col) to spawn the given agent
@@ -69,23 +93,9 @@ def spawn_concurrent(config, realm):
   # Number of tiles between teams
   team_sep = buffer_tiles // team_n
 
-  # Accounts for void borders in coord calcs
-  left = config.MAP_BORDER
-  right = config.MAP_CENTER + config.MAP_BORDER
-  lows = config.MAP_CENTER * [left]
-  highs = config.MAP_CENTER * [right]
-  inc = list(range(config.MAP_BORDER, config.MAP_CENTER+config.MAP_BORDER))
-
-  # All edge tiles in order
   sides = []
-  sides += list(zip(lows, inc))
-  sides += list(zip(inc, highs))
-  sides += list(zip(highs, inc[::-1]))
-  sides += list(zip(inc[::-1], lows))
-  np.random.shuffle(sides)
-
-  # filter out invalid spawn positions
-  sides = [pos for pos in sides if not realm.map.tiles[pos].impassible]
+  for side in get_edge_tiles(config):
+    sides += side
 
   if team_n > 1:
     # Space across and within teams
@@ -94,11 +104,36 @@ def spawn_concurrent(config, realm):
       for offset in list(range(0,  tiles_per_team, teammate_sep+1)):
         if len(spawn_positions) >= config.PLAYER_N:
           continue
-
         pos = sides[idx + offset]
         spawn_positions.append(pos)
   else:
     # team_n = 1: to fit 128 agents in a small map, ignore spacing and spawn randomly
+    np.random.shuffle(sides)
     spawn_positions = sides[:config.PLAYER_N]
 
   return spawn_positions
+
+def get_team_spawn_positions(config, num_teams):
+  '''Generates spawn positions for new teams
+  Agents in the same team spawn together in the same tile
+  Evenly spaces teams around the square map borders
+
+  Returns:
+      list of tuple(int, int):
+
+  position:
+      The position (row, col) to spawn the given teams
+  '''
+  teams_per_sides = (num_teams + 3) // 4 # 1-4 -> 1, 5-8 -> 2, etc.
+
+  sides = get_edge_tiles(config)
+  assert len(sides[0]) > 4*teams_per_sides, 'Map too small for teams'
+
+  team_spawn_positions = []
+  for side in sides:
+    for i in range(teams_per_sides):
+      idx = int(len(side)*(i+1)/(teams_per_sides + 1))
+      team_spawn_positions.append(side[idx])
+
+  np.random.shuffle(team_spawn_positions)
+  return team_spawn_positions

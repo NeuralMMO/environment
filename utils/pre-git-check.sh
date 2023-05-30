@@ -4,6 +4,9 @@ echo
 echo "Checking pylint, xcxc, pytest without touching git"
 echo
 
+# Check the number of physical cores only
+cores=$(lscpu -b -p=Core,Socket | grep -v '^#' | sort -u | wc -l)
+
 # Run linter
 echo "--------------------------------------------------------------------"
 echo "Running linter..."
@@ -18,7 +21,7 @@ for file in $files; do
   fi
 done
 
-if ! pylint --recursive=y nmmo tests; then
+if ! pylint --jobs=$cores --recursive=y nmmo tests; then
   echo "Lint failed. Exiting."
   exit 1
 fi

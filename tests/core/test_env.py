@@ -45,6 +45,7 @@ class TestEnv(unittest.TestCase):
 
     self.assertEqual(obs.keys(), self.env.realm.players.keys())
 
+    dead_agents = set()
     for _ in tqdm(range(TEST_HORIZON)):
       entity_locations = [
         [ev.row.val, ev.col.val, e] for e, ev in self.env.realm.players.entities.items()
@@ -58,7 +59,16 @@ class TestEnv(unittest.TestCase):
             player_id, player_obs, self.env.realm, entity_locations)
         self._validate_inventory(player_id, player_obs, self.env.realm)
         self._validate_market(player_obs, self.env.realm)
-      obs, _, _, _ = self.env.step({})
+      obs, _, dones, _ = self.env.step({})
+
+      # make sure dead agents return proper dones=True
+      self.assertEqual(len(self.env.agents), len(self.env.realm.players))
+      self.assertEqual(len(self.env.possible_agents),
+                       len(self.env.realm.players) + len(self.env._dead_agents))
+      if len(self.env._dead_agents) > len(dead_agents):
+        for dead_id in self.env._dead_agents - dead_agents:
+          self.assertTrue(dones[dead_id])
+          dead_agents.add(dead_id)
 
   def _validate_tiles(self, obs, realm: Realm):
     for tile_obs in obs["Tile"]:

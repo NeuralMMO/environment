@@ -9,12 +9,12 @@ import numpy as np
 from pettingzoo.utils.env import AgentID, ParallelEnv
 
 import nmmo
+from nmmo.core import realm
 from nmmo.core.config import Default
 from nmmo.core.observation import Observation
 from nmmo.core.tile import Tile
 from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
-from nmmo.core import realm
 from nmmo.task.game_state import GameStateGenerator
 from nmmo.task.task_api import Task
 from nmmo.task.scenario import default_task
@@ -25,7 +25,8 @@ class Env(ParallelEnv):
 
   #pylint: disable=no-value-for-parameter
   def __init__(self,
-    config: Default = nmmo.config.Default(), seed=None):
+               config: Default = nmmo.config.Default(),
+               seed = None):
     self._init_random(seed)
 
     super().__init__()
@@ -299,10 +300,11 @@ class Env(ParallelEnv):
     # Execute actions
     self.realm.step(actions)
     dones = {}
-    for eid in self.agents:
+    for eid in self.possible_agents:
       if eid not in self.realm.players or self.realm.tick >= self.config.HORIZON:
-        self._dead_agents.add(eid)
-        dones[eid] = True
+        if eid not in self._dead_agents:
+          self._dead_agents.add(eid)
+          dones[eid] = True
 
     # Store the observations, since actions reference them
     self.obs = self._compute_observations()

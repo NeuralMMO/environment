@@ -7,10 +7,11 @@ import nmmo
 class TestMapGeneration(unittest.TestCase):
   def test_insufficient_maps(self):
     config = nmmo.config.Small()
+    config.PATH_MAPS = 'maps/test_map_gen'
     config.MAP_N = 20
 
     path_maps = os.path.join(config.PATH_CWD, config.PATH_MAPS)
-    shutil.rmtree(path_maps)
+    shutil.rmtree(path_maps, ignore_errors=True)
 
     # this generates 20 maps
     nmmo.Env(config)
@@ -20,7 +21,7 @@ class TestMapGeneration(unittest.TestCase):
     config.MAP_FORCE_GENERATION = False
 
     test_env = nmmo.Env(config)
-    test_env.reset(map_id = 25)
+    test_env.reset(map_id=config.MAP_N)
 
     # this should finish without error
 
