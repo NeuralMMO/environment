@@ -5,12 +5,11 @@ from copy import deepcopy
 import numpy as np
 
 import nmmo
-
-from scripted import baselines
-from nmmo.entity.entity import EntityState
 from nmmo.core import action
 from nmmo.systems import item as Item
 from nmmo.core.realm import Realm
+
+from scripted import baselines
 
 # this function can be replaced by assertDictEqual
 # but might be still useful for debugging
@@ -142,9 +141,6 @@ class ScriptedAgentTestEnv(nmmo.Env):
 
   def reset(self, map_id=None, seed=None, options=None):
     self.actions = {}
-    # manually resetting the EntityState, ItemState datastore tables
-    EntityState.State.table(self.realm.datastore).reset()
-    Item.ItemState.State.table(self.realm.datastore).reset()
     return super().reset(map_id=map_id, seed=seed, options=options)
 
   def _compute_scripted_agent_actions(self, actions):
