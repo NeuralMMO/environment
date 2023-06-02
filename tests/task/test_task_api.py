@@ -4,7 +4,7 @@ import unittest
 import nmmo
 from nmmo.core.env import Env
 from nmmo.task.predicate_api import define_predicate
-from nmmo.task.task_api import Task, nmmo_default_task, make_same_tasks
+from nmmo.task.task_api import Task, nmmo_default_task
 from nmmo.task.group import Group
 from nmmo.task.constraint import InvalidConstraint, ScalarConstraint
 from nmmo.task.base_predicates import TickGE, CanSeeGroup
@@ -124,11 +124,11 @@ class TestTaskAPI(unittest.TestCase):
     # DONE
 
   def test_task_api_with_predicate(self):
-    # pylint: disable=no-value-for-parameter
+    # pylint: disable=no-value-for-parameter,no-member
     mock_gs = MockGameState()
-    pred = Fake(Group(2), 1, Item.Hat, Action.Melee)
+    predicate = Fake(Group(2), 1, Item.Hat, Action.Melee)
     assignee = [1,2,3] # list of agent ids
-    task = Task(pred, assignee)
+    task = predicate.create_task(assignee=assignee)
     rewards, infos = task.compute_rewards(mock_gs)
 
     self.assertEqual(task.name, # contains predicate name and assignee list
@@ -165,21 +165,26 @@ class TestTaskAPI(unittest.TestCase):
     for _ in range(3):
       env.step({})
 
+    for agent_id in env.possible_agents:
+      self.assertTrue('StayAlive' in env.tasks[agent_id-1].name) # default task
+      self.assertTrue(f'assignee:({agent_id},)' in env.tasks[agent_id-1].name)
+
     # DONE
 
   def test_completed_tasks_in_info(self):
-    # pylint: disable=no-value-for-parameter
+    # pylint: disable=no-value-for-parameter,no-member
     config = ScriptedAgentTestConfig()
     env = Env(config)
 
-    # Use make_atomic_task(predicate, agent_list) when
-    # the predicate's subject is the same as the task assignee
     same_team = [1, 2, 3, 4]
-    fake_pred = Fake(Group(3), 1, Item.Hat, Action.Melee)
-    tasks = make_same_tasks(pred=Success, assignee=1) # task 1
-    tasks += make_same_tasks(pred=Failure, assignee=2) # task 2
-    tasks += [Task(fake_pred, assignee=3), # task 3: fake_pred is already instantiated
-              Task(Success(Group(same_team)), assignee=same_team)] # task 4: team task
+    predicates = [
+      Success(Group(1)), # task 1
+      Failure(Group(2)), # task 2
+      Fake(Group(3), 1, Item.Hat, Action.Melee), # task 3
+      Success(Group(same_team))] # task 4
+
+    # in this case the task assignees are the same as the predicate subjects
+    tasks = [pred.create_task() for pred in predicates]
 
     # tasks are all instantiated with the agent ids
     env.reset(new_tasks=tasks)

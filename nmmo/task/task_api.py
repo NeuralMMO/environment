@@ -4,7 +4,7 @@ from types import FunctionType
 from abc import ABC
 
 from nmmo.task.group import Group
-from nmmo.task.predicate_api import Predicate
+from nmmo.task.predicate_api import Predicate, arg_to_string
 from nmmo.task.base_predicates import StayAlive
 
 class Task(ABC):
@@ -44,7 +44,7 @@ class Task(ABC):
   def reward_multiplier(self) -> float:
     return self._reward_multiplier
 
-  def _map_eval_to_reward(self, gs) -> float:
+  def _map_progress_to_reward(self, gs) -> float:
     """ The default reward is the diff between the old and new progress.
         Once the task is completed, no more reward is provided.
 
@@ -66,7 +66,7 @@ class Task(ABC):
 
     Returns rewards and infos for all agents in subject
     """
-    reward = self._map_eval_to_reward(gs) * self._reward_multiplier
+    reward = self._map_progress_to_reward(gs) * self._reward_multiplier
     rewards = {int(ent_id): reward for ent_id in self._assignee}
     infos = {int(ent_id): {'reward': reward, 'progress': self._progress}
              for ent_id in self._assignee}
@@ -76,13 +76,6 @@ class Task(ABC):
     return rewards, infos
 
   def _make_name(self, class_name, **kwargs) -> str:
-    def arg_to_string(arg):
-      if isinstance(arg, (type, FunctionType)): # class or function
-        return arg.__name__
-      if arg is None:
-        return 'Any'
-      return str(arg)
-
     name = [class_name] + \
       [f"{arg_to_string(key)}:{arg_to_string(arg)}" for key, arg in kwargs.items()]
     name = "("+'_'.join(name).replace(' ', '')+")"
@@ -92,7 +85,7 @@ class Task(ABC):
     return self.name
 
 class OngoingTask(Task):
-  def _map_eval_to_reward(self, gs) -> float:
+  def _map_progress_to_reward(self, gs) -> float:
     """Keep returning the progress reward after the task is completed.
        However, this task tracks the completion status in the same manner.
     """
@@ -103,36 +96,37 @@ class OngoingTask(Task):
 
 
 ######################################################################
-# Task generator helpers
 
-def make_same_tasks(pred: Predicate,
-                    assignee: Union[Iterable[int], int],
-                    task_cls=Task,
-                    reward_multiplier=1.0,
-                    **kwargs):
-  if isinstance(assignee, int):
-    assignee = [assignee]
+def nmmo_default_task(agent_list: Iterable[int], test_mode=None) -> List[Task]:
+  if test_mode is None:
+    # use the full predicate system
+    return [StayAlive(Group(agent_id)).create_task(task_cls=OngoingTask)
+            for agent_id in agent_list]
 
-  # when a list of agent is provided, return a list of identical tasks
-  return [task_cls(eval_fn=pred(Group(agent_id),**kwargs),
-                   assignee=agent_id, reward_multiplier=reward_multiplier)
-          for agent_id in set(assignee)]
+  if test_mode == 'no_task':
+    return []
 
-# The performance of function based eval_fn vs. predicate
-# NOTE: there is ~30% perf overhead for the class based predicate
-def make_stay_alive_eval(subject: Group):
-  def stay_alive_eval(gs):
-    # return True  # for speed testing
-    return all(agent_id in gs.alive_agents for agent_id in subject.agents)
+  if test_mode == 'dummy_eval_fn':
+    return [OngoingTask(eval_fn=make_stay_alive_eval(Group(agent_id), test_mode),
+                        assignee=agent_id) for agent_id in agent_list]
+
+  # use the function-based eval
+  return [OngoingTask(eval_fn=make_stay_alive_eval(Group(agent_id)),
+                      assignee=agent_id) for agent_id in agent_list]
+
+# for speed testing, function-based eval
+def make_stay_alive_eval(subject: Group, test_mode=None):
+  if test_mode is None:
+    def stay_alive_eval(gs):
+      return all(agent_id in gs.alive_agents for agent_id in subject.agents)
+  else:
+    # use dummy eval function for speed testing
+    def stay_alive_eval(gs):
+      # pylint: disable=unused-argument
+      return True
 
   # change function name for each agent
   return FunctionType(
-    stay_alive_eval.__code__, globals(), f"stay_alive_{str(subject.agents)}",
+    stay_alive_eval.__code__, globals(), f"StayAlive_fn_{str(subject.agents)}",
     closure=stay_alive_eval.__closure__
   )
-
-def nmmo_default_task(agent_list: Iterable[int]) -> List[Task]:
-  #return make_same_tasks(StayAlive, agent_list, task_cls=RepeatTask)
-  return [OngoingTask(eval_fn=make_stay_alive_eval(Group(agent_id)),
-                      assignee=agent_id)
-          for agent_id in agent_list]

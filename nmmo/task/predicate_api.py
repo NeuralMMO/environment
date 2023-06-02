@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Callable, List, Optional, Tuple, Union
+from typing import Callable, List, Optional, Tuple, Union, Iterable, TYPE_CHECKING
+from types import FunctionType
 from abc import ABC, abstractmethod
 import inspect
 from numbers import Real
@@ -8,6 +9,9 @@ from nmmo.core.config import Config
 from nmmo.task.group import Group, union
 from nmmo.task.game_state import GameState
 from nmmo.task.constraint import Constraint, InvalidConstraint, GroupConstraint
+
+if TYPE_CHECKING:
+  from nmmo.task.task_api import Task
 
 class InvalidPredicateDefinition(Exception):
   pass
@@ -113,13 +117,6 @@ class Predicate(ABC):
     raise NotImplementedError
 
   def _make_name(self, class_name, args, kwargs) -> str:
-    def arg_to_string(arg):
-      if isinstance(arg, type): # class
-        return arg.__name__
-      if arg is None:
-        return 'Any'
-      return str(arg)
-
     name = [class_name] + \
       list(map(arg_to_string, args)) + \
       [f"{arg_to_string(key)}:{arg_to_string(arg)}" for key, arg in kwargs.items()]
@@ -132,6 +129,20 @@ class Predicate(ABC):
   @property
   def subject(self):
     return self._subject
+
+  def create_task(self, task_cls: Task=None,
+                  assignee: Union[Iterable[int], int]=None,
+                  reward_multiplier=1.0) -> Task:
+    """ Creates a task from this predicate"""
+    if task_cls is None:
+      from nmmo.task.task_api import Task
+      task_cls = Task
+
+    if assignee is None:
+      # the new task is assigned to this predicate's subject
+      assignee = self._subject.agents
+
+    return task_cls(eval_fn=self, assignee=assignee, reward_multiplier=reward_multiplier)
 
   def __and__(self, other):
     return PAND(self, other)
@@ -153,6 +164,14 @@ class Predicate(ABC):
     return PMUL(self, other)
   def __rmul__(self, other):
     return PMUL(self, other)
+
+# _make_name helper functions
+def arg_to_string(arg):
+  if isinstance(arg, (type, FunctionType)): # class or function
+    return arg.__name__
+  if arg is None:
+    return 'Any'
+  return str(arg)
 
 ################################################
 

@@ -7,7 +7,6 @@ from nmmo.lib.log import EventCode
 from nmmo.systems import skill
 from nmmo.task import predicate_api as p
 from nmmo.task import base_predicates as bp
-from nmmo.task import task_api as t
 from nmmo.task.game_state import GameState
 from nmmo.task.group import Group
 
@@ -101,9 +100,8 @@ class TestDemoTask(unittest.TestCase):
     team_tasks = []
     for pred, kwargs, weight in player_kills + exploration:
       for team in teams.values():
-        team_tasks.append(t.Task(pred(Group(team), **kwargs),
-                                 assignee=team,
-                                 reward_multiplier=weight))
+        team_tasks.append(
+          pred(Group(team), **kwargs).create_task(reward_multiplier=weight))
 
     # Run the environment with these tasks
     #   check rewards and infos for the task info
@@ -113,10 +111,9 @@ class TestDemoTask(unittest.TestCase):
     # i.e, each agent gets evaluated and rewarded individually
     same_tasks = []
     for pred, kwargs, weight in exploration + equipment + combat + foraging:
-      # a helper function can do this
-      same_tasks += t.make_same_tasks(pred, env.possible_agents,
-                                      reward_multiplier=weight,
-                                      **kwargs)
+      for agent_id in env.possible_agents:
+        same_tasks.append(
+          pred(Group([agent_id]), **kwargs).create_task(reward_multiplier=weight))
 
     # Run the environment with these tasks
     #   check rewards and infos for the task info
@@ -125,6 +122,7 @@ class TestDemoTask(unittest.TestCase):
     # DONE
 
   def test_player_kill_reward(self):
+    # pylint: disable=no-value-for-parameter
     """ Design a predicate with a complex progress scheme
     """
     config = ScriptedAgentTestConfig()
@@ -148,7 +146,8 @@ class TestDemoTask(unittest.TestCase):
         progress += .3
       return min(progress, 1.0)
 
-    kill_tasks = t.make_same_tasks(KillPredicate, env.possible_agents)
+    kill_tasks = [KillPredicate(Group(agent_id)).create_task()
+                  for agent_id in env.possible_agents]
 
     # Test Reward
     env.reset(new_tasks=kill_tasks)
@@ -177,6 +176,7 @@ class TestDemoTask(unittest.TestCase):
     # DONE
 
   def test_predicate_math(self):
+    # pylint: disable=no-value-for-parameter
     config = ScriptedAgentTestConfig()
     env = Env(config)
 
@@ -187,10 +187,10 @@ class TestDemoTask(unittest.TestCase):
       # NOTE: the resulting progress will be bounded from [0, 1] afterwards
       return progress
 
-    task_for_agent_1 = t.make_same_tasks(PredicateMath, assignee=1)
+    task_for_agent_1 = PredicateMath(Group(1)).create_task()
 
     # Test Reward
-    env.reset(new_tasks=task_for_agent_1)
+    env.reset(new_tasks=[task_for_agent_1])
     code = EventCode.PLAYER_KILL
     players = env.realm.players
     env.realm.event_log.record(code, players[1], target=players[2])
