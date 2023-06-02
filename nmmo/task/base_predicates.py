@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 from numpy import count_nonzero as count
 
-from nmmo.task.task_api import OR, define_predicate
+from nmmo.task.predicate_api import POR, define_predicate
 from nmmo.task.group import Group
 from nmmo.task.game_state import GameState
 from nmmo.task import constraint
@@ -87,7 +87,7 @@ def CanSeeGroup(gs: GameState,
                 target: Group               = constraint.TEAM_GROUPS):
   """ Returns True if subject can see any of target
   """
-  return OR(*(CanSeeAgent(subject, agent) for agent in target.agents))
+  return POR(*(CanSeeAgent(subject, agent) for agent in target.agents))
 
 @define_predicate
 def DistanceTraveled(gs: GameState,

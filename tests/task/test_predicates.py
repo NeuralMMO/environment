@@ -1,5 +1,5 @@
 import unittest
-from typing import List, Tuple
+from typing import List, Tuple, Union, Iterable
 import random
 
 from tests.testhelpers import ScriptedAgentTestConfig, provide_item
@@ -15,27 +15,21 @@ from nmmo.lib.log import EventCode
 
 # pylint: disable=import-error
 from nmmo.core.env import Env
-from nmmo.task.task_api import Task, TaskOperator
+from nmmo.task.predicate_api import Predicate
+from nmmo.task.task_api import OngoingTask
 from nmmo.task.group import Group
 import nmmo.task.base_predicates as bp
 
 # use the constant reward of 1 for testing predicates
 NUM_AGENT = 6
-ALL_AGENT = Group(list(range(1, NUM_AGENT+1)), 'All')
+ALL_AGENT = list(range(1, NUM_AGENT+1))
 
-class Change(TaskOperator):
-  def __init__(self, task: Task, subject: Group=None):
-    super().__init__(lambda n: n==1, task, subject=subject)
-  def _evaluate(self, gs) -> float:
-    return self._tasks[0](gs)
-  def sample(self, config, **kwargs):
-    return super().sample(config, Change, **kwargs)
 
 class TestBasePredicate(unittest.TestCase):
   # pylint: disable=protected-access,invalid-name,no-member
 
   def _get_taskenv(self,
-                   test_tasks: List[Tuple[Task, Group]],
+                   test_preds: List[Tuple[Predicate, Union[Iterable[int], int]]],
                    grass_map=False):
 
     config = ScriptedAgentTestConfig()
@@ -43,10 +37,12 @@ class TestBasePredicate(unittest.TestCase):
     config.PLAYER_N = NUM_AGENT
     config.IMMORTAL = True
 
-    tasks = [Change(tsk, subject=team) for tsk, team in test_tasks]
+    # OngoingTask keeps evaluating and returns progress as the reward
+    #   vs. Task stops evaluating once the task is completed
+    tasks = [OngoingTask(pred, assignee) for pred, assignee in test_preds]
 
     env = Env(config)
-    env.change_task(tasks)
+    env.reset(new_tasks=tasks)
 
     if grass_map:
       MS = env.config.MAP_SIZE
@@ -61,38 +57,39 @@ class TestBasePredicate(unittest.TestCase):
     return env
 
   def _check_result(self, env, test_tasks, infos, true_task):
-    for tid, (task, assignee) in enumerate(test_tasks):
+    for tid, (predicate, assignee) in enumerate(test_tasks):
       # result is cached when at least one assignee is alive so that the task is evaled
-      if set(assignee).intersection(infos):
-        self.assertEqual(int(env.game_state.cache_result[task.name]), tid in true_task)
+      if len(set(assignee) & set(infos)) > 0:
+        self.assertEqual(int(env.game_state.cache_result[predicate.name]),
+                         int(tid in true_task))
+
       for ent_id in infos:
         if ent_id in assignee:
           # the agents that are assigned the task get evaluated for reward
-          self.assertEqual(int(infos[ent_id]['task'][Change(task,assignee).name]),
+          self.assertEqual(int(infos[ent_id]['task'][env.tasks[tid].name]['reward']),
                            int(tid in true_task))
         else:
           # the agents that are not assigned the task are not evaluated
-          self.assertTrue(task.name not in infos[ent_id]['task'])
+          self.assertTrue(env.tasks[tid].name not in infos[ent_id]['task'])
 
   def _check_progress(self, task, infos, value):
-    """ Some predicates return a float in the range 0-1 indicating completion progress.
+    """ Tasks return a float in the range 0-1 indicating completion progress.
     """
-    predicate, assignee = task[0], task[1]
     for ent_id in infos:
-      if ent_id in assignee:
-        self.assertAlmostEqual(infos[ent_id]['task'][Change(predicate,assignee).name],value)
+      if ent_id in task.assignee:
+        self.assertAlmostEqual(infos[ent_id]['task'][task.name]['progress'],value)
 
   def test_tickge_stay_alive_rip(self):
     tick_true = 5
     death_note = [1, 2, 3]
-    test_tasks = [ # (Predicate, Team)
+    test_tasks = [ # (instantiated predicate, task assignee)
       (bp.TickGE(Group([1]), tick_true), ALL_AGENT),
-      (bp.StayAlive(Group([1, 3])), ALL_AGENT),
-      (bp.StayAlive(Group([3, 4])), Group([1, 2])),
-      (bp.StayAlive(Group([4])), Group([5, 6])),
-      (bp.AllDead(Group([1, 3])), ALL_AGENT),
-      (bp.AllDead(Group([3, 4])), Group([1, 2])),
-      (bp.AllDead(Group([4])), Group([5, 6]))]
+      (bp.StayAlive(Group([1,3])), ALL_AGENT),
+      (bp.StayAlive(Group([3,4])), [1,2]),
+      (bp.StayAlive(Group([4])), [5,6]),
+      (bp.AllDead(Group([1,3])), ALL_AGENT),
+      (bp.AllDead(Group([3,4])), [1,2]),
+      (bp.AllDead(Group([4])), [5,6])]
 
     env = self._get_taskenv(test_tasks)
 
@@ -105,7 +102,7 @@ class TestBasePredicate(unittest.TestCase):
 
     true_task = [1, 2, 3]
     self._check_result(env, test_tasks, infos, true_task)
-    self._check_progress(test_tasks[0], infos, (tick_true-1) / tick_true)
+    self._check_progress(env.tasks[0], infos, (tick_true-1) / tick_true)
 
     # kill agents 1-3
     for ent_id in death_note:
@@ -135,19 +132,19 @@ class TestBasePredicate(unittest.TestCase):
     self._check_result(env, test_tasks, infos, true_task)
 
     # 3 is dead but 4 is alive. Half of agents killed, 50% completion.
-    self._check_progress(test_tasks[5], infos, 0.5)
+    self._check_progress(env.tasks[5], infos, 0.5)
 
     # DONE
 
   def test_can_see_tile(self):
     a1_target = Material.Foilage
     a2_target = Material.Water
-    test_tasks = [ # (Predicate, Team), the reward is 1 by default
+    test_tasks = [ # (instantiated predicate, task assignee)
       (bp.CanSeeTile(Group([1]), a1_target), ALL_AGENT), # True
       (bp.CanSeeTile(Group([1,3,5]), a2_target), ALL_AGENT), # False
-      (bp.CanSeeTile(Group([2]), a2_target), Group([1,2,3])), # True
+      (bp.CanSeeTile(Group([2]), a2_target), [1,2,3]), # True
       (bp.CanSeeTile(Group([2,5,6]), a1_target), ALL_AGENT), # False
-      (bp.CanSeeTile(ALL_AGENT, a2_target), Group([2,3,4]))] # True
+      (bp.CanSeeTile(Group(ALL_AGENT), a2_target), [2,3,4])] # True
 
     # setup env with all grass map
     env = self._get_taskenv(test_tasks, grass_map=True)
@@ -190,8 +187,8 @@ class TestBasePredicate(unittest.TestCase):
     search_target = 1
     test_tasks = [ # (Predicate, Team), the reward is 1 by default
       (bp.CanSeeAgent(Group([1]), search_target), ALL_AGENT), # Always True
-      (bp.CanSeeAgent(Group([2]), search_target), Group([2,3,4])), # False -> True -> True
-      (bp.CanSeeAgent(Group([3,4,5]), search_target), Group([1,2,3])), # False -> False -> True
+      (bp.CanSeeAgent(Group([2]), search_target), [2,3,4]), # False -> True -> True
+      (bp.CanSeeAgent(Group([3,4,5]), search_target), [1,2,3]), # False -> False -> True
       (bp.CanSeeGroup(Group([1]), Group([3,4])), ALL_AGENT)] # False -> False -> True
 
     env = self._get_taskenv(test_tasks, grass_map=True)
@@ -235,9 +232,9 @@ class TestBasePredicate(unittest.TestCase):
     target_tile = (30, 30)
     test_tasks = [ # (Predicate, Team), the reward is 1 by default
       (bp.OccupyTile(Group([1]), *target_tile), ALL_AGENT), # False -> True
-      (bp.OccupyTile(Group([1,2,3]), *target_tile), Group([4,5,6])), # False -> True
-      (bp.OccupyTile(Group([2]), *target_tile), Group([2,3,4])), # False
-      (bp.OccupyTile(Group([3,4,5]), *target_tile), Group([1,2,3]))] # False
+      (bp.OccupyTile(Group([1,2,3]), *target_tile), [4,5,6]), # False -> True
+      (bp.OccupyTile(Group([2]), *target_tile), [2,3,4]), # False
+      (bp.OccupyTile(Group([3,4,5]), *target_tile), [1,2,3])] # False
 
     # make all tiles habitable
     env = self._get_taskenv(test_tasks, grass_map=True)
@@ -514,7 +511,7 @@ class TestBasePredicate(unittest.TestCase):
     true_task = [0, 2]
     self._check_result(env, test_tasks, infos, true_task)
     g = sum(env.realm.players[eid].gold.val for eid in Group([2,4,6]).agents)
-    self._check_progress(test_tasks[3], infos, g / team_gold_goal)
+    self._check_progress(env.tasks[3], infos, g / team_gold_goal)
 
     # DONE
 
@@ -543,7 +540,7 @@ class TestBasePredicate(unittest.TestCase):
 
     true_task = [0,4,5]
     self._check_result(env, test_tasks, infos, true_task)
-    self._check_progress(test_tasks[1], infos, 2 / gold_goal)
+    self._check_progress(env.tasks[1], infos, 2 / gold_goal)
 
     env.realm.event_log.record(EventCode.BUY_ITEM, players[1],
                                item=Item.Ration(env.realm,1),
@@ -600,7 +597,7 @@ class TestBasePredicate(unittest.TestCase):
 
     true_task = [1]
     self._check_result(env, test_tasks, infos, true_task)
-    self._check_progress(test_tasks[0], infos, 0.5)
+    self._check_progress(env.tasks[0], infos, 0.5)
 
     env.realm.event_log.record(EventCode.SCORE_HIT,
                                players[1],
@@ -674,5 +671,6 @@ class TestBasePredicate(unittest.TestCase):
       self._check_result(env, test_tasks, infos, true_task)
 
     # DONE
+
 if __name__ == '__main__':
   unittest.main()

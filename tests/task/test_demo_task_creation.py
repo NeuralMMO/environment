@@ -1,14 +1,22 @@
+# pylint: disable=invalid-name,unused-argument,unused-variable
 import unittest
 from tests.testhelpers import ScriptedAgentTestConfig
 
 from nmmo.core.env import Env
 from nmmo.lib.log import EventCode
 from nmmo.systems import skill
-from nmmo.task import base_predicates as p
+from nmmo.task import predicate_api as p
+from nmmo.task import base_predicates as bp
 from nmmo.task import task_api as t
 from nmmo.task.game_state import GameState
 from nmmo.task.group import Group
-from nmmo.task.scenario import Scenario
+
+
+def rollout(env, tasks, steps=5):
+  env.reset(new_tasks=tasks)
+  for _ in range(steps):
+    env.step({})
+  return env.step({})
 
 class TestDemoTask(unittest.TestCase):
 
@@ -22,163 +30,181 @@ class TestDemoTask(unittest.TestCase):
       NORMAL       = 6 / REWARD_SCALE
       HARD         = 11 / REWARD_SCALE
 
-    # Usage of inbuilt predicate
-    def player_kills(scenario: Scenario):
-      scenario.add_tasks(p.CountEvent(event='PLAYER_KILL',N=1)*Tier.EASY)
-      scenario.add_tasks(p.CountEvent(event='PLAYER_KILL',N=2)*Tier.NORMAL)
-      scenario.add_tasks(p.CountEvent(event='PLAYER_KILL',N=3)*Tier.HARD)
-      return scenario.tasks
+    # Predicates defined below can be evaluated over one agent or several agents,
+    #   which are sepcified separately
+    # Reward multiplier is indendent from predicates and used by tasks.
+    #   The multipliers are just shown to indicate the difficulty level of predicates
 
-    def exploration(scenario: Scenario):
-      scenario.add_tasks(p.DistanceTraveled(dist=16)*Tier.EASY)
-      scenario.add_tasks(p.DistanceTraveled(dist=32)*Tier.NORMAL)
-      scenario.add_tasks(p.DistanceTraveled(dist=64)*Tier.HARD)
-      return scenario.tasks
+    # Usage of base predicates (see nmmo/task/base_predicates.py)
+    player_kills = [ # (predicate, kwargs, reward_multiplier)
+      (bp.CountEvent, {'event': 'PLAYER_KILL', 'N': 1}, Tier.EASY),
+      (bp.CountEvent, {'event': 'PLAYER_KILL', 'N': 2}, Tier.NORMAL),
+      (bp.CountEvent, {'event': 'PLAYER_KILL', 'N': 3}, Tier.HARD)]
+
+    exploration = [ # (predicate, reward_multiplier)
+      (bp.DistanceTraveled, {'dist': 16}, Tier.EASY),
+      (bp.DistanceTraveled, {'dist': 32}, Tier.NORMAL),
+      (bp.DistanceTraveled, {'dist': 64}, Tier.HARD)]
 
     # Demonstrates custom predicate - return float/boolean
-    @t.define_predicate
+    @p.define_predicate
     def EquipmentLevel(gs: GameState,
                        subject: Group,
                        number: int):
-      equipped = (subject.item.equipped>0)
+      equipped = subject.item.equipped > 0
       levels = subject.item.level[equipped]
       return levels.sum() >= number
 
-    def equipment(scenario: Scenario):
-      scenario.add_tasks(EquipmentLevel(number=1 )*Tier.EASY, groups='agents')
-      scenario.add_tasks(EquipmentLevel(number=5 )*Tier.NORMAL, groups='agents')
-      scenario.add_tasks(EquipmentLevel(number=10)*Tier.HARD, groups='agents')
-      return scenario.tasks
+    equipment = [ # (predicate, reward_multiplier)
+      (EquipmentLevel, {'number': 1}, Tier.EASY),
+      (EquipmentLevel, {'number': 5}, Tier.NORMAL),
+      (EquipmentLevel, {'number': 10}, Tier.HARD)]
 
-    @t.define_predicate
+    @p.define_predicate
     def CombatSkill(gs, subject, lvl):
-        return t.OR(p.AttainSkill(subject, skill.Melee, lvl, 1),
-                  p.AttainSkill(subject, skill.Range, lvl, 1),
-                  p.AttainSkill(subject, skill.Mage, lvl, 1))
+      # using predicate OR
+      return p.POR(bp.AttainSkill(subject, skill.Melee, lvl, 1),
+                    bp.AttainSkill(subject, skill.Range, lvl, 1),
+                    bp.AttainSkill(subject, skill.Mage, lvl, 1))
 
-    def combat(scenario: Scenario):
-      scenario.add_tasks(CombatSkill(lvl=2)*Tier.EASY, groups='agents')
-      scenario.add_tasks(CombatSkill(lvl=3)*Tier.NORMAL, groups='agents')
-      scenario.add_tasks(CombatSkill(lvl=4)*Tier.HARD, groups='agents')
-      return scenario.tasks
+    combat = [ # (predicate, reward_multiplier)
+      (CombatSkill, {'lvl': 2}, Tier.EASY),
+      (CombatSkill, {'lvl': 3}, Tier.NORMAL),
+      (CombatSkill, {'lvl': 4}, Tier.HARD)]
 
-    @t.define_predicate
+    @p.define_predicate
     def ForageSkill(gs, subject, lvl):
-        return t.OR(p.AttainSkill(subject, skill.Fishing, lvl, 1),
-                  p.AttainSkill(subject, skill.Herbalism, lvl, 1),
-                  p.AttainSkill(subject, skill.Prospecting, lvl, 1),
-                  p.AttainSkill(subject, skill.Carving, lvl, 1),
-                  p.AttainSkill(subject, skill.Alchemy, lvl, 1))
+      return p.POR(bp.AttainSkill(subject, skill.Fishing, lvl, 1),
+                    bp.AttainSkill(subject, skill.Herbalism, lvl, 1),
+                    bp.AttainSkill(subject, skill.Prospecting, lvl, 1),
+                    bp.AttainSkill(subject, skill.Carving, lvl, 1),
+                    bp.AttainSkill(subject, skill.Alchemy, lvl, 1))
 
-    def foraging(scenario: Scenario):
-      scenario.add_tasks(ForageSkill(lvl=2)*Tier.EASY)
-      scenario.add_tasks(ForageSkill(lvl=3)*Tier.NORMAL)
-      scenario.add_tasks(ForageSkill(lvl=4)*Tier.HARD)
-      return scenario.tasks
-
-    # Demonstrate task scenario definition API
-    def all_tasks(scenario: Scenario):
-      player_kills(scenario)
-      exploration(scenario)
-      equipment(scenario)
-      combat(scenario)
-      foraging(scenario)
-      return scenario.tasks
+    foraging = [ # (predicate, reward_multiplier)
+      (ForageSkill, {'lvl': 2}, Tier.EASY),
+      (ForageSkill, {'lvl': 3}, Tier.NORMAL),
+      (ForageSkill, {'lvl': 4}, Tier.HARD)]
 
     # Test rollout
-    task_generators = [player_kills, exploration, equipment, combat, foraging, all_tasks]
-    for tg in task_generators:
-      config = ScriptedAgentTestConfig()
-      env = Env(config)
-      scenario = Scenario(config)
-      tasks = tg(scenario)
-      env.change_task(tasks)
-      for _ in range(10):
-        env.step({})
+    config = ScriptedAgentTestConfig()
+    env = Env(config)
+
+    # Creating and testing "team" tasks
+    # i.e., predicates are evalauated over all team members,
+    #   and all team members get the same reward from each task
+
+    # The team mapping can come from anywhere.
+    # The below is an arbitrary example and even doesn't include all agents
+    teams = {0: [1, 2, 3, 4], 1: [5, 6, 7, 8]}
+
+    # Making player_kills and exploration team tasks,
+    team_tasks = []
+    for pred, kwargs, weight in player_kills + exploration:
+      for team in teams.values():
+        team_tasks.append(t.Task(pred(Group(team), **kwargs),
+                                 assignee=team,
+                                 reward_multiplier=weight))
+
+    # Run the environment with these tasks
+    #   check rewards and infos for the task info
+    obs, rewards, dones, infos = rollout(env, team_tasks)
+
+    # Creating and testing the same task for all agents
+    # i.e, each agent gets evaluated and rewarded individually
+    same_tasks = []
+    for pred, kwargs, weight in exploration + equipment + combat + foraging:
+      # a helper function can do this
+      same_tasks += t.make_same_tasks(pred, env.possible_agents,
+                                      reward_multiplier=weight,
+                                      **kwargs)
+
+    # Run the environment with these tasks
+    #   check rewards and infos for the task info
+    obs, rewards, dones, infos = rollout(env, same_tasks)
 
     # DONE
 
   def test_player_kill_reward(self):
-    """ Reward 0.1 per player defeated, 1 for first and 3rd kills
+    """ Design a predicate with a complex progress scheme
     """
     config = ScriptedAgentTestConfig()
     env = Env(config)
-    scenario = Scenario(config)
 
     # PARTICIPANT WRITES
     # ====================================
-    @t.define_task
-    def KillTask(gs: GameState,
-                 subject: Group):
-      """ Reward 0.1 per player defeated, with a bonus for the 1st and 3rd kills.
+    @p.define_predicate
+    def KillPredicate(gs: GameState,
+                      subject: Group):
+      """The progress, the max of which is 1, should
+           * increase small for each player kill
+           * increase big for the 1st and 3rd kills
+           * reach 1 with 10 kills
       """
       num_kills = len(subject.event.PLAYER_KILL)
-      score = num_kills * 0.1
+      progress = num_kills * 0.06
       if num_kills >= 1:
-        score += 1
+        progress += .1
       if num_kills >= 3:
-        score += 1
-      return score
+        progress += .3
+      return min(progress, 1.0)
 
-    scenario.add_tasks(lambda agent: KillTask(agent), groups='agents')
-    # ====================================
+    kill_tasks = t.make_same_tasks(KillPredicate, env.possible_agents)
 
     # Test Reward
-    env.change_task(scenario.tasks)
+    env.reset(new_tasks=kill_tasks)
     players = env.realm.players
     code = EventCode.PLAYER_KILL
     env.realm.event_log.record(code, players[1], target=players[3])
     env.realm.event_log.record(code, players[2], target=players[4])
     env.realm.event_log.record(code, players[2], target=players[5])
     env.realm.event_log.record(EventCode.EAT_FOOD, players[2])
-      # Award given as designed
-      # Agent 1 kills 1 - reward 1 + 0.1
-      # Agent 2 kills 2 - reward 1 + 0.2
-      # Agent 3 kills 0 - reward 0
-    _, rewards, _, _ = env.step({})
-    self.assertEqual(rewards[1],1.1)
-    self.assertEqual(rewards[2],1.2)
-    self.assertEqual(rewards[3],0)
-      # No reward when no changes
-    _, rewards, _, _ = env.step({})
-    self.assertEqual(rewards[1],0)
-    self.assertEqual(rewards[2],0)
-    self.assertEqual(rewards[3],0)
-      # Test task reset on env reset
-    env.reset() 
-    _, rewards, _, _ = env.step({})
-    self.assertEqual(env.tasks[0][0]._score,0)
 
-    # Test Rollout
-    env.change_task(scenario.tasks)
-    for _ in range(10):
-       env.step({})
+    # Award given as designed
+    # Agent 1 kills 1 - reward .06 + .1
+    # Agent 2 kills 2 - reward .12 + .1
+    # Agent 3 kills 0 - reward 0
+    _, rewards, _, _ = env.step({})
+    self.assertEqual(rewards[1], 0.16)
+    self.assertEqual(rewards[2], 0.22)
+    self.assertEqual(rewards[3], 0)
+
+    # No reward when no changes
+    _, rewards, _, _ = env.step({})
+    self.assertEqual(rewards[1], 0)
+    self.assertEqual(rewards[2], 0)
+    self.assertEqual(rewards[3], 0)
 
     # DONE
 
-  def test_combination_task_reward(self):
+  def test_predicate_math(self):
     config = ScriptedAgentTestConfig()
     env = Env(config)
-    scenario = Scenario(config)
 
-    task = t.OR(p.CountEvent(event='PLAYER_KILL',N=5),p.TickGE(num_tick=5))
-    task = task * 5
-    scenario.add_tasks(task)
+    @p.define_predicate
+    def PredicateMath(gs, subject):
+      progress = 0.8 * bp.CountEvent(subject, event='PLAYER_KILL', N=7) + \
+                 1.1 * bp.TickGE(subject, num_tick=3)
+      # NOTE: the resulting progress will be bounded from [0, 1] afterwards
+      return progress
+
+    task_for_agent_1 = t.make_same_tasks(PredicateMath, assignee=1)
 
     # Test Reward
-    env.change_task(scenario.tasks)
+    env.reset(new_tasks=task_for_agent_1)
     code = EventCode.PLAYER_KILL
     players = env.realm.players
     env.realm.event_log.record(code, players[1], target=players[2])
     env.realm.event_log.record(code, players[1], target=players[3])
 
     _, rewards, _, _ = env.step({})
-    self.assertEqual(rewards[1],2)
+    self.assertAlmostEqual(rewards[1], 0.8*2/7 + 1.1*1/3)
 
-    for _ in range(4):
+    for _ in range(2):
       _, _, _, infos = env.step({})
-    
-    self.assertEqual(list(infos[1]['task'].values())[0],5.0)
+
+    # 0.8*2/7 + 1.1 > 1, but the progress is maxed at 1
+    self.assertEqual(infos[1]['task'][env.tasks[0].name]['progress'], 1.0)
+    self.assertTrue(env.tasks[0].completed) # because progress >= 1
 
     # DONE
 

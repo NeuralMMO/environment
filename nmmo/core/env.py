@@ -1,7 +1,6 @@
 import functools
 import random
-import copy
-from typing import Any, Dict, List, Optional, Union, Tuple
+from typing import Any, Dict, List
 from ordered_set import OrderedSet
 
 import gym
@@ -16,8 +15,7 @@ from nmmo.core.tile import Tile
 from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
 from nmmo.task.game_state import GameStateGenerator
-from nmmo.task.task_api import Task
-from nmmo.task.scenario import default_task
+from nmmo.task.task_api import Task, nmmo_default_task
 from scripted.baselines import Scripted
 
 class Env(ParallelEnv):
@@ -41,15 +39,7 @@ class Env(ParallelEnv):
 
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
     self.game_state = None
-    # Default task: rewards 1 each turn agent is alive
-    self.tasks: List[Tuple[Task,float]] = None
-    self._task_encoding = None
-    self._task_embedding_size = -1
-    t = default_task(self.possible_agents)
-    self.change_task(t,
-                     embedding_size=self._task_embedding_size,
-                     task_encoding=self._task_encoding,
-                     reset=False)
+    self.tasks = None
 
   # pylint: disable=method-cache-max-size-none
   @functools.lru_cache(maxsize=None)
@@ -88,12 +78,6 @@ class Env(ParallelEnv):
     if self.config.PROVIDE_ACTION_TARGETS:
       obs_space['ActionTargets'] = self.action_space(None)
 
-    if self._task_encoding:
-      obs_space['Task'] = gym.spaces.Box(
-          low=-2**20, high=2**20,
-          shape=(self._task_embedding_size,),
-          dtype=np.float32)
-
     return gym.spaces.Dict(obs_space)
 
   def _init_random(self, seed):
@@ -131,31 +115,10 @@ class Env(ParallelEnv):
   ############################################################################
   # Core API
 
-  def change_task(self,
-                  new_tasks: List[Union[Tuple[Task, float], Task]],
-                  task_encoding: Optional[Dict[int, np.ndarray]] = None,
-                  embedding_size: int=16,
-                  reset: bool=True,
-                  map_id=None,
-                  seed=None,
-                  options=None):
-    """ Changes the task given to each agent
-
-    Args:
-      new_task: The task to complete and calculate rewards
-      task_encoding: A mapping from eid to encoded task
-      embedding_size: The size of each embedding
-      reset: Resets the environment
-    """
-    self._tasks = [t if isinstance(t, Tuple) else (t,1) for t in new_tasks]
-    self._task_encoding = task_encoding
-    self._task_embedding_size = embedding_size
-    if reset:
-      self.reset(map_id=map_id, seed=seed, options=options)
-
   # TODO: This doesn't conform to the PettingZoo API
   # pylint: disable=arguments-renamed
-  def reset(self, map_id=None, seed=None, options=None):
+  def reset(self, map_id=None, seed=None, options=None,
+            new_tasks: List[Task]=None):
     '''OpenAI Gym API reset function
 
     Loads a new game map and returns initial observations
@@ -186,16 +149,19 @@ class Env(ParallelEnv):
       if isinstance(ent.agent, Scripted):
         self.scripted_agents.add(eid)
 
-    self.tasks = copy.deepcopy(self._tasks)
     self.obs = self._compute_observations()
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
 
-    gym_obs = {}
-    for a, o in self.obs.items():
-      gym_obs[a] = o.to_gym()
-      if self._task_encoding:
-        gym_obs[a]['Task'] = self._encode_goal().get(a,np.zeros(self._task_embedding_size))
-    return gym_obs
+    # CHECK ME: How the tasks are provided to the env?
+    #   If the provided task instances are mapped to the individual agents, this is enough
+    #   If not, we need to map the tasks to the agents using TeamHelper, in change_task perhaps
+    if new_tasks is None:
+      self.tasks = nmmo_default_task(self.possible_agents)
+    else:
+      # providing an empty new_tasks [] is also possible
+      self.tasks = new_tasks
+
+    return {a: o.to_gym() for a,o in self.obs.items()}
 
   def step(self, actions: Dict[int, Dict[str, Dict[str, Any]]]):
     '''Simulates one game tick or timestep
@@ -308,11 +274,7 @@ class Env(ParallelEnv):
 
     # Store the observations, since actions reference them
     self.obs = self._compute_observations()
-    gym_obs = {}
-    for a, o in self.obs.items():
-      gym_obs[a] = o.to_gym()
-      if self._task_encoding:
-        gym_obs[a]['Task'] = self._encode_goal()[a]
+    gym_obs = {a: o.to_gym() for a,o in self.obs.items()}
 
     rewards, infos = self._compute_rewards(self.obs.keys(), dones)
 
@@ -321,8 +283,6 @@ class Env(ParallelEnv):
   def _validate_actions(self, actions: Dict[int, Dict[str, Dict[str, Any]]]):
     '''Deserialize action arg values and validate actions
        For now, it does a basic validation (e.g., value is not none).
-
-       TODO(kywch): add sophisticated validation like use/sell/give on the same item
     '''
     validated_actions = {}
 
@@ -423,9 +383,6 @@ class Env(ParallelEnv):
                                   inventory, market)
     return obs
 
-  def _encode_goal(self):
-    return self._task_encoding
-
   def _compute_rewards(self, agents: List[AgentID], dones: Dict[AgentID, bool]):
     '''Computes the reward for the specified agent
 
@@ -442,27 +399,24 @@ class Env(ParallelEnv):
           entity identified by ent_id.
     '''
     # Initialization
-    self.game_state = self._gamestate_generator.generate(self.realm, self.obs)
     infos = {}
-    for eid in agents:
-      infos[eid] = {}
-      infos[eid]['task'] = {}
-    rewards = {eid: 0 for eid in agents}
+    for agent_id in agents:
+      infos[agent_id] = {}
+      infos[agent_id]['task'] = {}
+    rewards = {agent_id: 0 for agent_id in agents}
 
     # Compute Rewards and infos
-    for task, weight in self.tasks:
+    self.game_state = self._gamestate_generator.generate(self.realm, self.obs)
+    for task in self.tasks:
       task_rewards, task_infos = task.compute_rewards(self.game_state)
-      for eid, reward in task_rewards.items():
-        # Rewards, weighted
-        rewards[eid] = rewards.get(eid,0) + reward * weight
-        # Infos
-        for eid, info in task_infos.items():
-          if eid in infos:
-            infos[eid]['task'] = {**infos[eid]['task'], **info}
+      for agent_id, reward in task_rewards.items():
+        if agent_id in agents and agent_id not in dones:
+          rewards[agent_id] = rewards.get(agent_id,0) + reward
+          infos[agent_id]['task'][task.name] = task_infos[agent_id] # progress
 
-    # Remove rewards for dead agents (?)
-    for eid in dones:
-      rewards[eid] = 0
+    # Remove rewards for dead agents
+    for agent_id in dones:
+      rewards[agent_id] = -1
 
     return rewards, infos
 
