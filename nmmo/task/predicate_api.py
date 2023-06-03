@@ -45,7 +45,7 @@ class Predicate(ABC):
       gs: GameState
 
     Returns:
-      score: float bounded between [0, 1], 1 is considered to be true
+      progress: float bounded between [0, 1], 1 is considered to be true
     """
     if not self._config == gs.config:
       # TODO(mark) should we make this explicitly called by environment
@@ -56,12 +56,11 @@ class Predicate(ABC):
     # Calculate score
     cache = gs.cache_result
     if self.name in cache:
-      score = cache[self.name]
+      progress = cache[self.name]
     else:
-      score = max(min(self._evaluate(gs)*1.0,1.0),0.0)
-      cache[self.name] = score
-    # Calculate score
-    return score
+      progress = max(min(self._evaluate(gs)*1.0,1.0),0.0)
+      cache[self.name] = progress
+    return progress
 
   def _reset(self, config: Config):
     self._config = config
@@ -111,7 +110,7 @@ class Predicate(ABC):
 
   @abstractmethod
   def _evaluate(self, gs: GameState) -> float:
-    """ A mapping from a game state to the desirability of that state.
+    """ A mapping from a game state to the desirability/progress of that state.
         __call__() will cap its value to [0, 1]
     """
     raise NotImplementedError

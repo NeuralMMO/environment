@@ -5,7 +5,8 @@ from abc import ABC
 
 from nmmo.task.group import Group
 from nmmo.task.predicate_api import Predicate, arg_to_string
-from nmmo.task.base_predicates import StayAlive
+from nmmo.task import base_predicates as bp
+from nmmo.lib.team_helper import TeamHelper
 
 class Task(ABC):
   """ A task is used to calculate rewards for agents in assignee
@@ -100,7 +101,7 @@ class OngoingTask(Task):
 def nmmo_default_task(agent_list: Iterable[int], test_mode=None) -> List[Task]:
   if test_mode is None:
     # use the full predicate system
-    return [StayAlive(Group(agent_id)).create_task(task_cls=OngoingTask)
+    return [bp.StayAlive(Group(agent_id)).create_task(task_cls=OngoingTask)
             for agent_id in agent_list]
 
   if test_mode == 'no_task':
@@ -130,3 +131,61 @@ def make_stay_alive_eval(subject: Group, test_mode=None):
     stay_alive_eval.__code__, globals(), f"StayAlive_fn_{str(subject.agents)}",
     closure=stay_alive_eval.__closure__
   )
+
+# TODO: a lot to improve here.
+
+REWARD_TO = ['agent', 'team']
+VALID_TARGET = ['left_team', 'right_team', 'left_team_leader', 'right_team_leader']
+
+def make_team_tasks(teams, task_spec) -> List[Task]:
+  """
+    task_spec: a list of tuples (reward_to, eval_fn, **kwargs)
+    
+    each tuple is assigned to the teams
+  """
+  tasks = []
+  team_list = list(teams.keys())
+  team_helper = TeamHelper(teams)
+  for idx in range(min(len(team_list), len(task_spec))):
+    team_id = team_list[idx]
+    reward_to, pred_cls, kwargs = task_spec[team_id]
+
+    assert reward_to in REWARD_TO, 'Wrong reward target'
+
+    if 'task_cls' in kwargs:
+      task_cls = kwargs.pop('task_cls')
+    else:
+      task_cls = Task
+
+    # reserve 'target' for relative agent mapping
+    if 'target' in kwargs:
+      target = kwargs.pop('target')
+      assert target in VALID_TARGET, 'Invalid target'
+      # translate target to specific agent ids using team_helper
+      target = team_helper.get_target_agent(team_id, target)
+      kwargs['target'] = target #tuple(target,) if isinstance(target, int) else tuple(target)
+
+    # handle some special cases and instantiate the predicate first
+    predicate = None
+    if pred_cls in [bp.AllDead]:
+      kwargs.pop('target') # remove target
+      predicate = pred_cls(Group(target), **kwargs)
+
+    # create the task
+    if reward_to == 'team':
+      assignee = team_helper.teams[team_id]
+      if predicate is None:
+        tasks.append(pred_cls(Group(assignee), **kwargs).create_task(task_cls=task_cls))
+      else:
+        tasks.append(predicate.create_task(assignee=assignee, task_cls=task_cls))
+
+    elif reward_to == 'agent':
+      agent_list = team_helper.teams[team_id]
+      if predicate is None:
+        tasks += [pred_cls(Group(agent_id), **kwargs).create_task(task_cls=task_cls)
+                  for agent_id in agent_list]
+      else:
+        tasks += [predicate.create_task(assignee=agent_id, task_cls=task_cls)
+                  for agent_id in agent_list]
+
+  return tasks

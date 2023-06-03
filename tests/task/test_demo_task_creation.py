@@ -6,6 +6,7 @@ from nmmo.core.env import Env
 from nmmo.lib.log import EventCode
 from nmmo.systems import skill
 from nmmo.task import predicate_api as p
+from nmmo.task import task_api as t
 from nmmo.task import base_predicates as bp
 from nmmo.task.game_state import GameState
 from nmmo.task.group import Group
@@ -207,6 +208,51 @@ class TestDemoTask(unittest.TestCase):
     self.assertTrue(env.tasks[0].completed) # because progress >= 1
 
     # DONE
+
+  def test_make_team_tasks_inside_reset(self):
+    # NOTE: len(teams) and len(task_spec) don't need to match
+    teams = {0:[1, 2, 3], 1:[4, 5], 2:[6, 7], 3:[8, 9], 4:[10, 11, 12]}
+
+    """ task_spec is a list of tuple (reward_to, predicate class, kwargs)
+
+        each tuple in the task_spec will create tasks for a team in teams
+
+        reward_to: must be in ['team', 'agent']
+          * 'team' create a single team task, in which all team members get rewarded
+          * 'agent' create a task for each agent, in which only the agent gets rewarded
+
+        predicate class from the base predicates or custom predicates like above
+
+        kwargs are the additional args that go into predicate. There are also special keys
+          * 'target' must be ['left_team', 'right_team', 'left_team_leader', 'right_team_leader']
+             these str will be translated into the actual agent ids
+          * 'task_cls' is optional. If not provided, the standard Task is used. """
+    task_spec = [ # (reward_to, predicate class, kwargs)
+      ('team', bp.CountEvent, {'event': 'PLAYER_KILL', 'N': 1}), # one task
+      ('agent', bp.CountEvent, {'event': 'PLAYER_KILL', 'N': 2}),
+      ('agent', bp.AllDead, {'target': 'left_team'}),
+      ('team', bp.CanSeeAgent, {'target': 'right_team_leader', 'task_cls': t.OngoingTask})]
+
+    config = ScriptedAgentTestConfig()
+    env = Env(config)
+
+    env.reset(task_spec=task_spec, teams=teams)
+
+    self.assertEqual(len(env.tasks), 6) # 6 tasks were created
+    self.assertEqual(env.tasks[0].name, # team 0 task assigned to agents 1,2,3
+                     '(Task_eval_fn:(CountEvent_(1,2,3)_event:PLAYER_KILL_N:1)_assignee:(1,2,3))')
+    self.assertEqual(env.tasks[1].name, # agent task assigned to agent 4
+                     '(Task_eval_fn:(CountEvent_(4,)_event:PLAYER_KILL_N:2)_assignee:(4,))')
+    self.assertEqual(env.tasks[2].name, # agent task assigned to agent 4
+                     '(Task_eval_fn:(CountEvent_(5,)_event:PLAYER_KILL_N:2)_assignee:(5,))')
+    self.assertEqual(env.tasks[3].name, # agent 6 task, left_team became agents 4,5 (team 1)
+                     '(Task_eval_fn:(AllDead_(4,5))_assignee:(6,))')
+    self.assertEqual(env.tasks[5].name, # team 3 task, right_team became agent 8,9 (team 4)
+                     '(OngoingTask_eval_fn:(CanSeeAgent_(8,9)_target:6)_assignee:(8,9))')
+    # no task for team 4
+
+    for _ in range(2):
+      env.step({})
 
 if __name__ == '__main__':
   unittest.main()

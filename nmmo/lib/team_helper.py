@@ -23,3 +23,14 @@ class TeamHelper():
 
   def is_agent_in_team(self, agent_id:int , team_id: int) -> bool:
     return agent_id in self.teams[team_id]
+
+  def get_target_agent(self, team_id: int, target: str):
+    if target == 'left_team':
+      return self.teams[(team_id-1) % self.num_teams]
+    if target == 'left_team_leader':
+      return self.teams[(team_id-1) % self.num_teams][0]
+    if target == 'right_team':
+      return self.teams[(team_id+1) % self.num_teams]
+    if target == 'right_team_leader':
+      return self.teams[(team_id-1) % self.num_teams][0]
+    return None

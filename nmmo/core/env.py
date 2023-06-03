@@ -1,6 +1,6 @@
 import functools
 import random
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 from ordered_set import OrderedSet
 
 import gym
@@ -15,7 +15,7 @@ from nmmo.core.tile import Tile
 from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
 from nmmo.task.game_state import GameStateGenerator
-from nmmo.task.task_api import Task, nmmo_default_task
+from nmmo.task.task_api import Task, nmmo_default_task, make_team_tasks
 from scripted.baselines import Scripted
 
 class Env(ParallelEnv):
@@ -118,14 +118,19 @@ class Env(ParallelEnv):
   # TODO: This doesn't conform to the PettingZoo API
   # pylint: disable=arguments-renamed
   def reset(self, map_id=None, seed=None, options=None,
-            new_tasks: List[Task]=None):
+            new_tasks: List[Task]=None,
+            task_spec: List[Tuple]=None,
+            teams: Dict[int,List[int]]=None):
     '''OpenAI Gym API reset function
 
     Loads a new game map and returns initial observations
 
     Args:
-        idx: Map index to load. Selects a random map by default
-
+        map_id: Map index to load. Selects a random map by default
+        seed: random seed to use
+        new_tasks: A list of instantiated tasks
+        task_spec: A list of task spec to instantiate inside reset()
+        teams: team info to map agent references in the task_spec
 
     Returns:
         observations, as documented by _compute_observations()
@@ -152,14 +157,18 @@ class Env(ParallelEnv):
     self.obs = self._compute_observations()
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
 
-    # CHECK ME: How the tasks are provided to the env?
-    #   If the provided task instances are mapped to the individual agents, this is enough
-    #   If not, we need to map the tasks to the agents using TeamHelper, in change_task perhaps
-    if new_tasks is None:
-      self.tasks = nmmo_default_task(self.possible_agents)
-    else:
+    """Two methods to define tasks.
+         * new_tasks: a list of instantiated tasks. This method has precedence
+         * task_spec and teams: these are used to instantiate tasks here
+       If these are all None, then use the default task
+    """
+    if new_tasks is not None:
       # providing an empty new_tasks [] is also possible
       self.tasks = new_tasks
+    elif task_spec is not None and teams is not None:
+      self.tasks = make_team_tasks(teams, task_spec)
+    else:
+      self.tasks = nmmo_default_task(self.possible_agents)
 
     return {a: o.to_gym() for a,o in self.obs.items()}
 

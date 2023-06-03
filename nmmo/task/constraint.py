@@ -8,6 +8,8 @@ from abc import ABC, abstractmethod
 from nmmo.systems import skill, item
 from nmmo.lib import material
 from nmmo.core.config import Config
+
+# TODO: remove this TeamHelper
 from nmmo.task.team_helper import TeamHelper
 
 class InvalidConstraint(Exception):
@@ -118,9 +120,8 @@ MATERIAL_CONSTRAINT = DiscreteConstraint(space=list(material.All.materials),
 HABITABLE_CONSTRAINT = DiscreteConstraint(space=list(material.Habitable.materials),
                                          systems=['TERRAIN_SYSTEM_ENABLED'])
 combat_skills = [skill.Melee, skill.Mage, skill.Range]
-basic_skills = [skill.Water, skill.Food]
 harvest_skills = [skill.Fishing, skill.Herbalism, skill.Prospecting, skill.Alchemy, skill.Carving]
-SKILL_CONSTRAINT = DiscreteConstraint(space=combat_skills+basic_skills+harvest_skills,
+SKILL_CONSTRAINT = DiscreteConstraint(space=combat_skills+harvest_skills,
                                       systems=['PROFESSION_SYSTEM_ENABLED'])
 COMBAT_SKILL_CONSTRAINT = DiscreteConstraint(space=combat_skills,
                                       systems=['PROFESSION_SYSTEM_ENABLED'])

@@ -43,6 +43,11 @@ def StayAlive(gs: GameState,
   """True if all subjects are alive.
   """
   return count(subject.health > 0) == len(subject)
+  # The below is for speed testing (bypass GroupView)
+  # agent = gs.entity_or_none(subject.agents[0])
+  # if agent is None:
+  #   return False
+  # return agent.health > 0
 
 @define_predicate
 def AllDead(gs: GameState,
