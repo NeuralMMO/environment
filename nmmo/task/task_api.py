@@ -4,7 +4,7 @@ from types import FunctionType
 from abc import ABC
 
 from nmmo.task.group import Group
-from nmmo.task.predicate_api import define_predicate, arg_to_string
+from nmmo.task.predicate_api import Predicate, define_predicate, arg_to_string
 from nmmo.task import base_predicates as bp
 from nmmo.lib.team_helper import TeamHelper
 
@@ -98,41 +98,40 @@ class OngoingTask(Task):
 
 ######################################################################
 
+# The same task is assigned each agent in agent_list individually
+#   with the agent as the predicate subject and task assignee
+def make_same_task(predicate: Union[Predicate, Callable],
+                   agent_list: Iterable[int],
+                   task_cls = Task, **kwargs) -> List[Task]:
+  if isinstance(predicate, type): # predicate is class, assuming Predicate
+    return [predicate(Group(agent_id),**kwargs).create_task(task_cls=task_cls)
+            for agent_id in agent_list]
+  
+  # eval_fn is a function to turn into predicate
+  pred_cls = define_predicate(predicate)
+  return [pred_cls(Group(agent_id),**kwargs).create_task(task_cls=task_cls)
+          for agent_id in agent_list]
+
 def nmmo_default_task(agent_list: Iterable[int], test_mode=None) -> List[Task]:
   if test_mode is None:
     # use the full predicate system
-    return [bp.StayAlive(Group(agent_id)).create_task(task_cls=OngoingTask)
-            for agent_id in agent_list]
+    return make_same_task(bp.StayAlive, agent_list, task_cls=OngoingTask)
 
   if test_mode == 'no_task':
     return []
 
   if test_mode == 'dummy_eval_fn':
-    return [OngoingTask(eval_fn=make_stay_alive_eval(Group(agent_id), test_mode),
-                        assignee=agent_id) for agent_id in agent_list]
+    # pylint: disable=unused-argument
+    return make_same_task(lambda gs, subject: True, agent_list, task_cls=OngoingTask)
 
   # use the function-based eval
-  return [OngoingTask(eval_fn=make_stay_alive_eval(Group(agent_id)),
-                      assignee=agent_id) for agent_id in agent_list]
+  def stay_alive_eval(gs, subject):
+    return all(agent_id in gs.alive_agents for agent_id in subject.agents)
 
-# for speed testing, function-based eval
-def make_stay_alive_eval(subject: Group, test_mode=None):
-  if test_mode is None:
-    def stay_alive_eval(gs):
-      return all(agent_id in gs.alive_agents for agent_id in subject.agents)
-  else:
-    # use dummy eval function for speed testing
-    def stay_alive_eval(gs):
-      # pylint: disable=unused-argument
-      return True
+  return make_same_task(stay_alive_eval, agent_list, task_cls=OngoingTask)
 
-  # change function name for each agent
-  return FunctionType(
-    stay_alive_eval.__code__, globals(), f"StayAlive_fn_{str(subject.agents)}",
-    closure=stay_alive_eval.__closure__
-  )
-
-# TODO: a lot to improve here.
+######################################################################
+# TODO: a lot to improve below
 
 REWARD_TO = ['agent', 'team']
 VALID_TARGET = ['left_team', 'right_team', 'left_team_leader', 'right_team_leader']
@@ -185,8 +184,7 @@ def make_team_tasks(teams, task_spec) -> List[Task]:
     elif reward_to == 'agent':
       agent_list = team_helper.teams[team_id]
       if predicate is None:
-        tasks += [pred_cls(Group(agent_id), **kwargs).create_task(task_cls=task_cls)
-                  for agent_id in agent_list]
+        tasks += make_same_task(pred_cls, agent_list, task_cls=task_cls, **kwargs)
       else:
         tasks += [predicate.create_task(assignee=agent_id, task_cls=task_cls)
                   for agent_id in agent_list]

@@ -160,14 +160,17 @@ class TestTaskAPI(unittest.TestCase):
     config = ScriptedAgentTestConfig()
     env = Env(config)
 
-    dafault_tasks = nmmo_default_task(env.possible_agents)
-    env.reset(new_tasks=dafault_tasks)
-    for _ in range(3):
-      env.step({})
+    for test_mode in [None, 'no_task', 'func_eval', 'dummy_eval_fn']:
+      dafault_tasks = nmmo_default_task(env.possible_agents, test_mode)
+      env.reset(new_tasks=dafault_tasks)
+      for _ in range(3):
+        env.step({})
 
-    for agent_id in env.possible_agents:
-      self.assertTrue('StayAlive' in env.tasks[agent_id-1].name) # default task
-      self.assertTrue(f'assignee:({agent_id},)' in env.tasks[agent_id-1].name)
+      for agent_id in env.possible_agents:
+        if test_mode is None:
+          self.assertTrue('StayAlive' in env.tasks[agent_id-1].name) # default task
+        if test_mode != 'no_task':
+          self.assertTrue(f'assignee:({agent_id},)' in env.tasks[agent_id-1].name)
 
     # DONE
 
