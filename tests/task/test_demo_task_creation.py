@@ -250,9 +250,9 @@ class TestDemoTask(unittest.TestCase):
                      '(Task_eval_fn:(CountEvent_(4,)_event:PLAYER_KILL_N:2)_assignee:(4,))')
     self.assertEqual(env.tasks[2].name, # team 1, agent task assigned to agent 5
                      '(Task_eval_fn:(CountEvent_(5,)_event:PLAYER_KILL_N:2)_assignee:(5,))')
-    self.assertEqual(env.tasks[3].name, # team 2, agent 6 task, left_team is team 1 (agents 4,5)
-                     '(Task_eval_fn:(AllDead_(4,5))_assignee:(6,))')
-    self.assertEqual(env.tasks[5].name, # team 3 task, right_team is team 4 (agents 8,9)
+    self.assertEqual(env.tasks[3].name, # team 2, agent 6 task, left_team is team 3 (agents 8,9)
+                     '(Task_eval_fn:(AllDead_(8,9))_assignee:(6,))')
+    self.assertEqual(env.tasks[5].name, # team 3 task, right_team is team 2 (6,7), leader 6
                      '(OngoingTask_eval_fn:(CanSeeAgent_(8,9)_target:6)_assignee:(8,9))')
     self.assertEqual(env.tasks[6].name, # team 4 task, based on a predicate function
                      '(Task_eval_fn:(custom_predicate_func_(10,11)_test:1)_assignee:(10,11))')
