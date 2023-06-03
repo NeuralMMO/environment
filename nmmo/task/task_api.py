@@ -106,7 +106,7 @@ def make_same_task(predicate: Union[Predicate, Callable],
   if isinstance(predicate, type): # predicate is class, assuming Predicate
     return [predicate(Group(agent_id),**kwargs).create_task(task_cls=task_cls)
             for agent_id in agent_list]
-  
+
   # eval_fn is a function to turn into predicate
   pred_cls = define_predicate(predicate)
   return [pred_cls(Group(agent_id),**kwargs).create_task(task_cls=task_cls)

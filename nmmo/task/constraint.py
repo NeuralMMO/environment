@@ -2,15 +2,12 @@ from __future__ import annotations
 
 import random
 from numbers import Number
-from typing import Union, Callable
+from typing import Union, Callable, Dict
 from abc import ABC, abstractmethod
 
 from nmmo.systems import skill, item
 from nmmo.lib import material
 from nmmo.core.config import Config
-
-# TODO: remove this TeamHelper
-from nmmo.task.team_helper import TeamHelper
 
 class InvalidConstraint(Exception):
   pass
@@ -45,11 +42,18 @@ class Constraint(ABC):
   def __str__(self):
     return self.__class__.__name__
 
+# This is a dummy function for GroupConstraint
+# NOTE: config does not have team info
+def sample_one_big_team(config):
+  from nmmo.task.group import Group
+  team = list(range(1, config.PLAYER_N+1))
+  return [Group(team, 'All')]
+
 class GroupConstraint(Constraint):
   """ Ensures that all agents of a group exist in a config
   """
   def __init__(self,
-               sample_fn = lambda c: TeamHelper.generate_from_config(c).all_teams,
+               sample_fn = sample_one_big_team,
                systems = None):
     """
     Params
@@ -69,6 +73,11 @@ class GroupConstraint(Constraint):
 
   def sample(self, config):
     return random.choice(self._sample_fn(config))
+
+  def sample_from_teams(self, teams: Dict[int, Dict]):
+    from nmmo.task.group import Group
+    team_id = random.choice(list(teams.keys()))
+    return Group(teams[team_id], str(team_id))
 
 class ScalarConstraint(Constraint):
   def __init__(self,
@@ -111,7 +120,7 @@ class DiscreteConstraint(Constraint):
 
 # Group Constraints
 TEAM_GROUPS = GroupConstraint()
-INDIVIDUAL_GROUPS=GroupConstraint(sample_fn=lambda c:TeamHelper.generate_from_config(c).all_agents)
+INDIVIDUAL_GROUPS=GroupConstraint()
 
 # System Constraints
 MATERIAL_CONSTRAINT = DiscreteConstraint(space=list(material.All.materials),
@@ -151,3 +160,5 @@ COORDINATE_CONSTRAINT = ScalarConstraint(high = lambda c: c.MAP_CENTER)
 PROGRESSION_CONSTRAINT = ScalarConstraint(high = lambda c: c.PROGRESSION_LEVEL_MAX+1)
 INVENTORY_CONSTRAINT = ScalarConstraint(high=lambda c: c.ITEM_INVENTORY_CAPACITY+1)
 AGENT_NUMBER_CONSTRAINT = ScalarConstraint(low = 1, high = lambda c: c.PLAYER_N+1)
+EVENT_NUMBER_CONSTRAINT = ScalarConstraint(low = 1, high = 50) # arbitrary
+GOLD_CONSTRAINT = ScalarConstraint(low = 1, high = 100) # arbitrary

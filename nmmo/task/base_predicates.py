@@ -124,7 +124,7 @@ def AttainSkill(gs: GameState,
 def CountEvent(gs: GameState,
                subject: Group               = constraint.TEAM_GROUPS,
                event: str                   = constraint.EVENTCODE_CONSTRAINT,
-               N: int                       = constraint.ScalarConstraint()):
+               N: int                       = constraint.EVENT_NUMBER_CONSTRAINT):
   """True if the number of events occured in subject corresponding
       to event >= N
   """
@@ -134,7 +134,7 @@ def CountEvent(gs: GameState,
 def ScoreHit(gs: GameState,
              subject: Group                 = constraint.TEAM_GROUPS,
              combat_style: type[Skill]      = constraint.COMBAT_SKILL_CONSTRAINT,
-             N: int                         = constraint.ScalarConstraint()):
+             N: int                         = constraint.EVENT_NUMBER_CONSTRAINT):
   """True if the number of hits scored in style
   combat_style >= count
   """
@@ -144,7 +144,7 @@ def ScoreHit(gs: GameState,
 @define_predicate
 def HoardGold(gs: GameState,
               subject: Group                = constraint.TEAM_GROUPS,
-              amount: int                   = constraint.ScalarConstraint()):
+              amount: int                   = constraint.GOLD_CONSTRAINT):
   """True iff the summed gold of all teammate is greater than or equal to amount.
   """
   return subject.gold.sum() / amount
@@ -152,7 +152,7 @@ def HoardGold(gs: GameState,
 @define_predicate
 def EarnGold(gs: GameState,
              subject: Group                 = constraint.TEAM_GROUPS,
-             amount: int                    = constraint.ScalarConstraint()):
+             amount: int                    = constraint.GOLD_CONSTRAINT):
   """ True if the total amount of gold earned is greater than or equal to amount.
   """
   return subject.event.EARN_GOLD.gold.sum() / amount
@@ -160,7 +160,7 @@ def EarnGold(gs: GameState,
 @define_predicate
 def SpendGold(gs: GameState,
               subject: Group                = constraint.TEAM_GROUPS,
-              amount: int                   = constraint.ScalarConstraint()):
+              amount: int                   = constraint.GOLD_CONSTRAINT):
   """ True if the total amount of gold spent is greater than or equal to amount.
   """
   return subject.event.BUY_ITEM.gold.sum() / amount
@@ -168,7 +168,7 @@ def SpendGold(gs: GameState,
 @define_predicate
 def MakeProfit(gs: GameState,
               subject: Group                = constraint.TEAM_GROUPS,
-              amount: int                   = constraint.ScalarConstraint()):
+              amount: int                   = constraint.GOLD_CONSTRAINT):
   """ True if the total amount of gold earned-spent is greater than or equal to amount.
   """
   profits = subject.event.EARN_GOLD.gold.sum()
@@ -178,7 +178,7 @@ def MakeProfit(gs: GameState,
 @define_predicate
 def InventorySpaceGE(gs: GameState,
                      subject: Group         = constraint.TEAM_GROUPS,
-                     space: int             = constraint.ScalarConstraint()):
+                     space: int             = constraint.INVENTORY_CONSTRAINT):
   """True if the inventory space of every subjects is greater than or equal to
        the space. Otherwise false.
   """
@@ -247,7 +247,7 @@ def ConsumeItem(gs: GameState,
                 subject: Group              = constraint.TEAM_GROUPS,
                 item: type[Item]            = constraint.CONSUMABLE_CONSTRAINT,
                 level: int                  = constraint.PROGRESSION_CONSTRAINT,
-                quantity: int               = constraint.ScalarConstraint()):
+                quantity: int               = constraint.EVENT_NUMBER_CONSTRAINT):
   """True if total quantity consumed of item type above level is >= quantity
   """
   type_flt = subject.event.CONSUME_ITEM.type == item.ITEM_TYPE_ID
@@ -259,7 +259,7 @@ def HarvestItem(gs: GameState,
                 subject: Group              = constraint.TEAM_GROUPS,
                 item: type[Item]            = constraint.ITEM_CONSTRAINT,
                 level: int                  = constraint.PROGRESSION_CONSTRAINT,
-                quantity: int               = constraint.ScalarConstraint()):
+                quantity: int               = constraint.EVENT_NUMBER_CONSTRAINT):
   """True if total quantity harvested of item type above level is >= quantity
   """
   type_flt = subject.event.HARVEST_ITEM.type == item.ITEM_TYPE_ID
@@ -271,7 +271,7 @@ def ListItem(gs: GameState,
              subject: Group                 = constraint.TEAM_GROUPS,
              item: type[Item]               = constraint.ITEM_CONSTRAINT,
              level: int                     = constraint.PROGRESSION_CONSTRAINT,
-             quantity: int                  = constraint.ScalarConstraint()):
+             quantity: int                  = constraint.EVENT_NUMBER_CONSTRAINT):
   """True if total quantity listed of item type above level is >= quantity
   """
   type_flt = subject.event.LIST_ITEM.type == item.ITEM_TYPE_ID
@@ -283,7 +283,7 @@ def BuyItem(gs: GameState,
             subject: Group                  = constraint.TEAM_GROUPS,
             item: type[Item]                = constraint.ITEM_CONSTRAINT,
             level: int                      = constraint.PROGRESSION_CONSTRAINT,
-            quantity: int                   = constraint.ScalarConstraint()):
+            quantity: int                   = constraint.EVENT_NUMBER_CONSTRAINT):
   """True if total quantity purchased of item type above level is >= quantity
   """
   type_flt = subject.event.BUY_ITEM.type == item.ITEM_TYPE_ID
