@@ -211,7 +211,11 @@ class TestDemoTask(unittest.TestCase):
 
   def test_make_team_tasks_inside_reset(self):
     # NOTE: len(teams) and len(task_spec) don't need to match
-    teams = {0:[1, 2, 3], 1:[4, 5], 2:[6, 7], 3:[8, 9], 4:[10, 11, 12]}
+    teams = {0:[1,2,3], 1:[4,5], 2:[6,7], 3:[8,9], 4:[10,11]}
+
+    # custom function to turn into predicate inside reset
+    def custom_predicate_func(gs, subject, test):
+      return True
 
     """ task_spec is a list of tuple (reward_to, predicate class, kwargs)
 
@@ -231,14 +235,15 @@ class TestDemoTask(unittest.TestCase):
       ('team', bp.CountEvent, {'event': 'PLAYER_KILL', 'N': 1}), # one task
       ('agent', bp.CountEvent, {'event': 'PLAYER_KILL', 'N': 2}),
       ('agent', bp.AllDead, {'target': 'left_team'}),
-      ('team', bp.CanSeeAgent, {'target': 'right_team_leader', 'task_cls': t.OngoingTask})]
+      ('team', bp.CanSeeAgent, {'target': 'right_team_leader', 'task_cls': t.OngoingTask}),
+      ('team', custom_predicate_func, {'test': 1})]
 
     config = ScriptedAgentTestConfig()
     env = Env(config)
 
     env.reset(task_spec=task_spec, teams=teams)
 
-    self.assertEqual(len(env.tasks), 6) # 6 tasks were created
+    self.assertEqual(len(env.tasks), 7) # 7 tasks were created
     self.assertEqual(env.tasks[0].name, # team 0 task assigned to agents 1,2,3
                      '(Task_eval_fn:(CountEvent_(1,2,3)_event:PLAYER_KILL_N:1)_assignee:(1,2,3))')
     self.assertEqual(env.tasks[1].name, # agent task assigned to agent 4
@@ -249,7 +254,8 @@ class TestDemoTask(unittest.TestCase):
                      '(Task_eval_fn:(AllDead_(4,5))_assignee:(6,))')
     self.assertEqual(env.tasks[5].name, # team 3 task, right_team became agent 8,9 (team 4)
                      '(OngoingTask_eval_fn:(CanSeeAgent_(8,9)_target:6)_assignee:(8,9))')
-    # no task for team 4
+    self.assertEqual(env.tasks[6].name, # team 4 task, based on a predicate function
+                     '(Task_eval_fn:(custom_predicate_func_(10,11)_test:1)_assignee:(10,11))')
 
     for _ in range(2):
       env.step({})

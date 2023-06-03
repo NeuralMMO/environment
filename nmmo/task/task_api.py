@@ -4,7 +4,7 @@ from types import FunctionType
 from abc import ABC
 
 from nmmo.task.group import Group
-from nmmo.task.predicate_api import Predicate, arg_to_string
+from nmmo.task.predicate_api import define_predicate, arg_to_string
 from nmmo.task import base_predicates as bp
 from nmmo.lib.team_helper import TeamHelper
 
@@ -167,6 +167,9 @@ def make_team_tasks(teams, task_spec) -> List[Task]:
 
     # handle some special cases and instantiate the predicate first
     predicate = None
+    if not isinstance(pred_cls, type):
+      # if a function is provided as a predicate
+      pred_cls = define_predicate(pred_cls)
     if pred_cls in [bp.AllDead]:
       kwargs.pop('target') # remove target
       predicate = pred_cls(Group(target), **kwargs)
