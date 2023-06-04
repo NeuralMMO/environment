@@ -1,6 +1,7 @@
 import functools
 import random
 from typing import Any, Dict, List, Tuple
+from collections import defaultdict
 from ordered_set import OrderedSet
 
 import gym
@@ -408,16 +409,20 @@ class Env(ParallelEnv):
           entity identified by ent_id.
     '''
     # Initialization
-    infos = {}
-    for agent_id in agents:
-      infos[agent_id] = {}
-      infos[agent_id]['task'] = {}
-    rewards = {agent_id: 0 for agent_id in agents}
+
+    infos = {agent_id: {'task': {}} for agent_id in agents}
+    rewards = defaultdict(int)
+    agents = set(agents)
+    reward_cache = {}
 
     # Compute Rewards and infos
     self.game_state = self._gamestate_generator.generate(self.realm, self.obs)
     for task in self.tasks:
-      task_rewards, task_infos = task.compute_rewards(self.game_state)
+      if task in reward_cache:
+        task_rewards, task_infos = reward_cache[task]
+      else:
+        task_rewards, task_infos = task.compute_rewards(self.game_state)
+        reward_cache[task] = (task_rewards, task_infos)
       for agent_id, reward in task_rewards.items():
         if agent_id in agents and agent_id not in dones:
           rewards[agent_id] = rewards.get(agent_id,0) + reward
