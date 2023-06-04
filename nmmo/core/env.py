@@ -1,8 +1,8 @@
 import functools
 import random
 from typing import Any, Dict, List, Tuple
-from ordered_set import OrderedSet
 from collections import defaultdict
+from ordered_set import OrderedSet
 
 import gym
 import numpy as np
