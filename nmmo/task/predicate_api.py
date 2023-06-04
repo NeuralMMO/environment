@@ -26,10 +26,9 @@ class Predicate(ABC):
                **kwargs):
     self.name = self._make_name(self.__class__.__name__, args, kwargs)
 
-    def is_group(x):
-      return isinstance(x, Group)
-    self._groups: List[Group] = list(filter(is_group, args))
-    self._groups = self._groups + list(filter(is_group, kwargs.values()))
+    self._groups: List[Group] = [x for x in list(args) + list(kwargs.values())
+                                 if isinstance(x, Group)]
+
     self._groups.append(subject)
 
     self._args = args
@@ -54,12 +53,12 @@ class Predicate(ABC):
     for group in self._groups:
       group.update(gs)
     # Calculate score
-    cache = gs.cache_result
-    if self.name in cache:
-      progress = cache[self.name]
+    # cache = gs.cache_result
+    if self.name in gs.cache_result:
+      progress = gs.cache_result[self.name]
     else:
       progress = max(min(self._evaluate(gs)*1.0,1.0),0.0)
-      cache[self.name] = progress
+      gs.cache_result[self.name] = progress
     return progress
 
   def _reset(self, config: Config):
