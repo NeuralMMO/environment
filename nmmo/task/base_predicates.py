@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 from numpy import count_nonzero as count
 
-from nmmo.task.predicate_api import POR, define_predicate
+from nmmo.task.predicate_api import OR, define_predicate
 from nmmo.task.group import Group
 from nmmo.task.game_state import GameState
 from nmmo.task import constraint
@@ -43,11 +43,6 @@ def StayAlive(gs: GameState,
   """True if all subjects are alive.
   """
   return count(subject.health > 0) == len(subject)
-  # The below is for speed testing (bypass GroupView)
-  # agent = gs.entity_or_none(subject.agents[0])
-  # if agent is None:
-  #   return False
-  # return agent.health > 0
 
 @define_predicate
 def AllDead(gs: GameState,
@@ -92,7 +87,7 @@ def CanSeeGroup(gs: GameState,
                 target: Group               = constraint.TEAM_GROUPS):
   """ Returns True if subject can see any of target
   """
-  return POR(*(CanSeeAgent(subject, agent) for agent in target.agents))
+  return OR(*(CanSeeAgent(subject, agent) for agent in target.agents))
 
 @define_predicate
 def DistanceTraveled(gs: GameState,

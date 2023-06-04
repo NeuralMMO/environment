@@ -52,28 +52,17 @@ class TestTaskAPI(unittest.TestCase):
     pred3 = SUCCESS & ~ FAILURE & SUCCESS
     self.assertTrue(pred3(mock_gs))
 
-    pred4 = SUCCESS >> SUCCESS
-    self.assertTrue(pred4(mock_gs))
-
-    pred5 = SUCCESS >> ~ SUCCESS
-    self.assertFalse(pred5(mock_gs))
-
-    pred6 = (FAILURE >> FAILURE) & SUCCESS
-    self.assertTrue(pred6(mock_gs))
-    self.assertEqual(pred6.name,
-                     "(PAND_(IMPLY_(Failure_(0,))_(Failure_(0,)))_(Success_(0,)))")
-
     # predicate math
-    pred7 = 0.1 * SUCCESS + 0.3
-    self.assertEqual(pred7(mock_gs), 0.4)
-    self.assertEqual(pred7.name,
-                     "(PADD_(PMUL_(Success_(0,))_0.1)_0.3)")
+    pred4 = 0.1 * SUCCESS + 0.3
+    self.assertEqual(pred4(mock_gs), 0.4)
+    self.assertEqual(pred4.name,
+                     "(ADD_(MUL_(Success_(0,))_0.1)_0.3)")
 
-    pred8 = 0.3 * SUCCESS - 1
-    self.assertEqual(pred8(mock_gs), 0.0) # cannot go below 0
+    pred5 = 0.3 * SUCCESS - 1
+    self.assertEqual(pred5(mock_gs), 0.0) # cannot go below 0
 
-    pred9 = 0.3 * SUCCESS + 1
-    self.assertEqual(pred9(mock_gs), 1.0) # cannot go over 1
+    pred6 = 0.3 * SUCCESS + 1
+    self.assertEqual(pred6(mock_gs), 1.0) # cannot go over 1
 
   def test_team_assignment(self):
     team =  Group([1, 2, 8, 9], "TeamFoo")
@@ -90,10 +79,10 @@ class TestTaskAPI(unittest.TestCase):
     SUCCESS = Success(Group([0,2]))
     FAILURE = Failure(Group(0))
     fake_pred = Fake(Group(2), 1, Item.Hat, Action.Melee)
-    combination = (SUCCESS & ~ (FAILURE | fake_pred)) | (FAILURE >> fake_pred)
+    combination = (SUCCESS & ~ (FAILURE | fake_pred)) | (FAILURE * fake_pred + .3) - .4
     self.assertEqual(combination.name,
-      "(POR_(PAND_(Success_(0,2))_(PNOT_(POR_(Failure_(0,))_(Fake_(2,)_1_Hat_Melee))))_"+\
-      "(IMPLY_(Failure_(0,))_(Fake_(2,)_1_Hat_Melee)))")
+      "(OR_(AND_(Success_(0,2))_(NOT_(OR_(Failure_(0,))_(Fake_(2,)_1_Hat_Melee))))_"+\
+      "(SUB_(ADD_(MUL_(Failure_(0,))_(Fake_(2,)_1_Hat_Melee))_0.3)_0.4))")
 
   def test_constraint(self):
     # pylint: disable=not-callable,no-value-for-parameter
@@ -115,7 +104,7 @@ class TestTaskAPI(unittest.TestCase):
     # pylint: disable=no-value-for-parameter,expression-not-assigned
     predicate = CanSeeGroup() & TickGE()
     self.assertEqual(predicate.name,
-                     "(PAND_(CanSeeGroup_subject:GroupConstraint_target:GroupConstraint)_"+\
+                     "(AND_(CanSeeGroup_subject:GroupConstraint_target:GroupConstraint)_"+\
                      "(TickGE_subject:GroupConstraint_num_tick:ScalarConstraint))")
     config = nmmo.config.Default()
     TickGE().sample(config)
@@ -161,8 +150,10 @@ class TestTaskAPI(unittest.TestCase):
     env = Env(config)
 
     for test_mode in [None, 'no_task', 'func_eval', 'dummy_eval_fn']:
-      dafault_tasks = nmmo_default_task(env.possible_agents, test_mode)
-      env.reset(new_tasks=dafault_tasks)
+      #dafault_tasks = nmmo_default_task(env.possible_agents, test_mode)
+      env.reset(make_task_fn=nmmo_default_task,
+                make_task_fn_kwargs={'agent_list': env.possible_agents,
+                                     'test_mode': test_mode})
       for _ in range(3):
         env.step({})
 

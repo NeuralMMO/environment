@@ -10,6 +10,7 @@ from nmmo.task import task_api as t
 from nmmo.task import base_predicates as bp
 from nmmo.task.game_state import GameState
 from nmmo.task.group import Group
+from nmmo.task.task_api import make_team_tasks
 
 
 def rollout(env, tasks, steps=5):
@@ -63,9 +64,9 @@ class TestDemoTask(unittest.TestCase):
     @p.define_predicate
     def CombatSkill(gs, subject, lvl):
       # using predicate OR
-      return p.POR(bp.AttainSkill(subject, skill.Melee, lvl, 1),
-                    bp.AttainSkill(subject, skill.Range, lvl, 1),
-                    bp.AttainSkill(subject, skill.Mage, lvl, 1))
+      return p.OR(bp.AttainSkill(subject, skill.Melee, lvl, 1),
+                  bp.AttainSkill(subject, skill.Range, lvl, 1),
+                  bp.AttainSkill(subject, skill.Mage, lvl, 1))
 
     combat = [ # (predicate, reward_multiplier)
       (CombatSkill, {'lvl': 2}, Tier.EASY),
@@ -74,11 +75,11 @@ class TestDemoTask(unittest.TestCase):
 
     @p.define_predicate
     def ForageSkill(gs, subject, lvl):
-      return p.POR(bp.AttainSkill(subject, skill.Fishing, lvl, 1),
-                    bp.AttainSkill(subject, skill.Herbalism, lvl, 1),
-                    bp.AttainSkill(subject, skill.Prospecting, lvl, 1),
-                    bp.AttainSkill(subject, skill.Carving, lvl, 1),
-                    bp.AttainSkill(subject, skill.Alchemy, lvl, 1))
+      return p.OR(bp.AttainSkill(subject, skill.Fishing, lvl, 1),
+                  bp.AttainSkill(subject, skill.Herbalism, lvl, 1),
+                  bp.AttainSkill(subject, skill.Prospecting, lvl, 1),
+                  bp.AttainSkill(subject, skill.Carving, lvl, 1),
+                  bp.AttainSkill(subject, skill.Alchemy, lvl, 1))
 
     foraging = [ # (predicate, reward_multiplier)
       (ForageSkill, {'lvl': 2}, Tier.EASY),
@@ -241,7 +242,8 @@ class TestDemoTask(unittest.TestCase):
     config = ScriptedAgentTestConfig()
     env = Env(config)
 
-    env.reset(task_spec=task_spec, teams=teams)
+    env.reset(make_task_fn=make_team_tasks,
+              make_task_fn_kwargs={'task_spec':task_spec, 'teams':teams})
 
     self.assertEqual(len(env.tasks), 7) # 7 tasks were created
     self.assertEqual(env.tasks[0].name, # team 0 task assigned to agents 1,2,3

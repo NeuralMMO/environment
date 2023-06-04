@@ -69,7 +69,9 @@ class Task(ABC):
     """
     reward = self._map_progress_to_reward(gs) * self._reward_multiplier
     rewards = {int(ent_id): reward for ent_id in self._assignee}
-    infos = {int(ent_id): {'reward': reward, 'progress': self._progress}
+    infos = {int(ent_id): {'reward': reward,
+                           'progress': self._progress,
+                           'completed': self._completed}
              for ent_id in self._assignee}
 
     # NOTE: tasks do not know whether assignee agents are alive or dead

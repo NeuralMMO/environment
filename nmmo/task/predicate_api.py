@@ -144,25 +144,23 @@ class Predicate(ABC):
     return task_cls(eval_fn=self, assignee=assignee, reward_multiplier=reward_multiplier)
 
   def __and__(self, other):
-    return PAND(self, other)
+    return AND(self, other)
   def __or__(self, other):
-    return POR(self, other)
+    return OR(self, other)
   def __invert__(self):
-    return PNOT(self)
-  def __rshift__(self, other):
-    return IMPLY(self, other)
+    return NOT(self)
   def __add__(self, other):
-    return PADD(self, other)
+    return ADD(self, other)
   def __radd__(self, other):
-    return PADD(self, other)
+    return ADD(self, other)
   def __sub__(self, other):
-    return PSUB(self, other)
+    return SUB(self, other)
   def __rsub__(self, other):
-    return PSUB(self, other)
+    return SUB(self, other)
   def __mul__(self, other):
-    return PMUL(self, other)
+    return MUL(self, other)
   def __rmul__(self, other):
-    return PMUL(self, other)
+    return MUL(self, other)
 
 # _make_name helper functions
 def arg_to_string(arg):
@@ -250,57 +248,47 @@ class PredicateOperator(Predicate):
                   else p(None) for p in self._predicates]
     return cls(*predicates, subject=subject)
 
-class POR(PredicateOperator, Predicate):
+class OR(PredicateOperator, Predicate):
   def __init__(self, *predicates: Predicate, subject: Group=None):
     super().__init__(lambda n: n>0, *predicates, subject=subject)
   def _evaluate(self, gs: GameState) -> float:
     return any(p(gs) == 1 for p in self._predicates)*1.0
   def sample(self, config: Config, **kwargs):
-    return super().sample(config, POR, **kwargs)
+    return super().sample(config, OR, **kwargs)
 
-class PAND(PredicateOperator, Predicate):
+class AND(PredicateOperator, Predicate):
   def __init__(self, *predicates: Predicate, subject: Group=None):
     super().__init__(lambda n: n>0, *predicates, subject=subject)
   def _evaluate(self, gs: GameState) -> float:
     return all(p(gs) == 1 for p in self._predicates)*1.0
   def sample(self, config: Config, **kwargs):
-    return super().sample(config, PAND, **kwargs)
+    return super().sample(config, AND, **kwargs)
 
-class PNOT(PredicateOperator, Predicate):
+class NOT(PredicateOperator, Predicate):
   def __init__(self, predicate: Predicate, subject: Group=None):
     super().__init__(lambda n: n==1, predicate, subject=subject)
   def _evaluate(self, gs: GameState) -> float:
     return 1.0 - self._predicates[0](gs)
   def sample(self, config: Config, **kwargs):
-    return super().sample(config, PNOT, **kwargs)
+    return super().sample(config, NOT, **kwargs)
 
-class IMPLY(PredicateOperator, Predicate):
-  def __init__(self, p: Predicate, q: Predicate, subject: Group=None):
-    super().__init__(lambda n: n==2, p,q, subject=subject)
-  def _evaluate(self, gs: GameState) -> float:
-    if self._predicates[0](gs) == 1:
-      return self._predicates[1](gs)*1.0
-    return True
-  def sample(self, config: Config, **kwargs):
-    return super().sample(config, IMPLY, **kwargs)
-
-class PADD(PredicateOperator, Predicate):
+class ADD(PredicateOperator, Predicate):
   def __init__(self, *predicate: Union[Predicate, Real], subject: Group=None):
     super().__init__(lambda n: n>0, *predicate, subject=subject)
   def _evaluate(self, gs: GameState) -> float:
     return max(min(sum(p(gs) for p in self._predicates),1.0),0.0)
   def sample(self, config: Config, **kwargs):
-    return super().sample(config, PADD, **kwargs)
+    return super().sample(config, ADD, **kwargs)
 
-class PSUB(PredicateOperator, Predicate):
+class SUB(PredicateOperator, Predicate):
   def __init__(self, p: Predicate, q: Union[Predicate, Real], subject: Group=None):
     super().__init__(lambda n: n==2, p,q, subject=subject)
   def _evaluate(self, gs: GameState) -> float:
     return max(min(self._predicates[0](gs)-self._predicates[1](gs),1.0),0.0)
   def sample(self, config: Config, **kwargs):
-    return super().sample(config, PSUB, **kwargs)
+    return super().sample(config, SUB, **kwargs)
 
-class PMUL(PredicateOperator, Predicate):
+class MUL(PredicateOperator, Predicate):
   def __init__(self, *predicate: Union[Predicate, Real], subject: Group=None):
     super().__init__(lambda n: n>0, *predicate, subject=subject)
   def _evaluate(self, gs: GameState) -> float:
@@ -309,4 +297,4 @@ class PMUL(PredicateOperator, Predicate):
       result = result * p(gs)
     return max(min(result,1.0),0.0)
   def sample(self, config: Config, **kwargs):
-    return super().sample(config, PMUL, **kwargs)
+    return super().sample(config, MUL, **kwargs)
