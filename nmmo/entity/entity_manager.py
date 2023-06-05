@@ -60,7 +60,6 @@ class EntityGroup(Mapping):
     self.entities[ent_id] = entity
 
   def cull(self):
-    self.dead = {}
     for ent_id in list(self.entities):
       player = self.entities[ent_id]
       if not player.alive:
