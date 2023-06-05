@@ -18,7 +18,7 @@ class EntityGroup(Mapping):
     self.config = realm.config
 
     self.entities: Dict[int, Entity] = {}
-    self.dead: Dict[int, Entity] = {}
+    self.dead_this_tick: Dict[int, Entity] = {}
 
   def __len__(self):
     return len(self.entities)
@@ -37,7 +37,7 @@ class EntityGroup(Mapping):
 
   @property
   def corporeal(self):
-    return {**self.entities, **self.dead}
+    return {**self.entities, **self.dead_this_tick}
 
   @property
   def packet(self):
@@ -52,7 +52,7 @@ class EntityGroup(Mapping):
       ent.datastore_record.delete()
 
     self.entities = {}
-    self.dead = {}
+    self.dead_this_tick = {}
 
   def spawn(self, entity):
     pos, ent_id = entity.pos, entity.id.val
@@ -60,12 +60,13 @@ class EntityGroup(Mapping):
     self.entities[ent_id] = entity
 
   def cull(self):
+    self.dead_this_tick = {}
     for ent_id in list(self.entities):
       player = self.entities[ent_id]
       if not player.alive:
         r, c  = player.pos
         ent_id = player.ent_id
-        self.dead[ent_id] = player
+        self.dead_this_tick[ent_id] = player
 
         self.realm.map.tiles[r, c].remove_entity(ent_id)
 
@@ -78,7 +79,7 @@ class EntityGroup(Mapping):
         self.entities[ent_id].datastore_record.delete()
         del self.entities[ent_id]
 
-    return self.dead
+    return self.dead_this_tick
 
   def update(self, actions):
     for entity in self.entities.values():
