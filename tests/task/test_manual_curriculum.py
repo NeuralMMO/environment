@@ -277,9 +277,10 @@ if __name__ == '__main__':
     config = nmmo.config.Default()
     env = nmmo.Env(config)
     for idx, single_spec in enumerate(spec_list):
-      sample_task = make_team_tasks(teams, [single_spec])
+      # pylint: disable=cell-var-from-loop
+      test_task = make_team_tasks(teams, [single_spec])
       try:
-        env.reset(new_tasks=sample_task)
+        env.reset(make_task_fn=lambda: test_task)
         for _ in range(3):
           env.step({})
       except:

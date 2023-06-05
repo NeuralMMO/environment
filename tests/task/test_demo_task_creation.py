@@ -12,7 +12,7 @@ from nmmo.task.game_state import GameState
 from nmmo.task.group import Group
 
 def rollout(env, tasks, steps=5):
-  env.reset(new_tasks=tasks)
+  env.reset(make_task_fn=lambda: tasks)
   for _ in range(steps):
     env.step({})
   return env.step({})
@@ -150,7 +150,7 @@ class TestDemoTask(unittest.TestCase):
                   for agent_id in env.possible_agents]
 
     # Test Reward
-    env.reset(new_tasks=kill_tasks)
+    env.reset(make_task_fn=lambda: kill_tasks)
     players = env.realm.players
     code = EventCode.PLAYER_KILL
     env.realm.event_log.record(code, players[1], target=players[3])
@@ -192,7 +192,7 @@ class TestDemoTask(unittest.TestCase):
     task_for_agent_1 = pred_math_cls(Group(1)).create_task()
 
     # Test Reward
-    env.reset(new_tasks=[task_for_agent_1])
+    env.reset(make_task_fn=lambda: [task_for_agent_1])
     code = EventCode.PLAYER_KILL
     players = env.realm.players
     env.realm.event_log.record(code, players[1], target=players[2])
@@ -237,8 +237,7 @@ class TestDemoTask(unittest.TestCase):
     config = ScriptedAgentTestConfig()
     env = Env(config)
 
-    env.reset(make_task_fn=t.make_team_tasks,
-              make_task_fn_kwargs={'task_spec':task_spec, 'teams':teams})
+    env.reset(make_task_fn=lambda: t.make_team_tasks(teams, task_spec))
 
     self.assertEqual(len(env.tasks), 6) # 6 tasks were created
     self.assertEqual(env.tasks[0].name, # team 0 task assigned to agents 1,2,3

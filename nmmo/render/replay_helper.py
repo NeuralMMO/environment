@@ -37,6 +37,7 @@ class FileReplayHelper(ReplayHelper):
     self.packets = []
     self.map = None
     self._i = 0
+    self.update() # to capture the initial packet
 
   def __len__(self):
     return len(self.packets)

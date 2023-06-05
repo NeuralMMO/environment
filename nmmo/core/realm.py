@@ -103,7 +103,6 @@ class Realm:
 
     if self._replay_helper is not None:
       self._replay_helper.reset()
-      self._replay_helper.update() # capture the initial packet
 
   def packet(self):
     """Client packet"""

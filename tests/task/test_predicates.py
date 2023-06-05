@@ -38,11 +38,11 @@ class TestBasePredicate(unittest.TestCase):
     config.IMMORTAL = True
 
     # OngoingTask keeps evaluating and returns progress as the reward
-    #   vs. Task stops evaluating once the task is completed
-    tasks = [OngoingTask(pred, assignee) for pred, assignee in test_preds]
+    #   vs. Task stops evaluating once the task is completed, returns reward = delta(progress)
+    test_tasks = [OngoingTask(pred, assignee) for pred, assignee in test_preds]
 
     env = Env(config)
-    env.reset(new_tasks=tasks)
+    env.reset(make_task_fn=lambda: test_tasks)
 
     if grass_map:
       MS = env.config.MAP_SIZE
@@ -83,7 +83,6 @@ class TestBasePredicate(unittest.TestCase):
     tickge_pred_cls = make_predicate(bp.TickGE)
     stay_alive_pred_cls = make_predicate(bp.StayAlive)
     all_dead_pred_cls = make_predicate(bp.AllDead)
-
 
     tick_true = 5
     death_note = [1, 2, 3]

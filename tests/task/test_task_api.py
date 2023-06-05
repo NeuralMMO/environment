@@ -198,14 +198,13 @@ class TestTaskAPI(unittest.TestCase):
 
     # create the test task from the task spec
     teams = {0:[1,2,3], 1:[4,5], 2:[6,7], 3:[8,9], 4:[10,11]}
-    test_task = make_team_tasks(teams, [task_spec])
 
     config = ScriptedAgentTestConfig()
     config.PLAYERS =[Sleeper]
     config.IMMORTAL = True
 
     env = Env(config)
-    env.reset(new_tasks=test_task)
+    env.reset(make_task_fn=lambda: make_team_tasks(teams, [task_spec]))
 
     # move agent 2, 3 to agent 1's pos
     for agent_id in [2,3]:
@@ -218,22 +217,20 @@ class TestTaskAPI(unittest.TestCase):
       if tick < 10:
         self.assertAlmostEqual(rewards[1], 1/goal_tick)
         self.assertAlmostEqual((1+tick)/goal_tick,
-                               infos[1]['task'][test_task[0].name]['progress'])
+                               infos[1]['task'][env.tasks[0].name]['progress'])
       else:
         # tick 11, task should be completed
         self.assertEqual(rewards[1], 0)
-        self.assertEqual(infos[1]['task'][test_task[0].name]['progress'], 1)
-        self.assertEqual(infos[1]['task'][test_task[0].name]['completed'], True)
+        self.assertEqual(infos[1]['task'][env.tasks[0].name]['progress'], 1)
+        self.assertEqual(infos[1]['task'][env.tasks[0].name]['completed'], True)
 
   def test_nmmo_default_task(self):
     config = ScriptedAgentTestConfig()
     env = Env(config)
 
     for test_mode in [None, 'no_task', 'func_eval', 'dummy_eval_fn']:
-      #dafault_tasks = nmmo_default_task(env.possible_agents, test_mode)
-      env.reset(make_task_fn=nmmo_default_task,
-                make_task_fn_kwargs={'agent_list': env.possible_agents,
-                                     'test_mode': test_mode})
+      # pylint: disable=cell-var-from-loop
+      env.reset(make_task_fn=lambda: nmmo_default_task(env.possible_agents, test_mode))
       for _ in range(3):
         env.step({})
 
@@ -264,31 +261,31 @@ class TestTaskAPI(unittest.TestCase):
       success_pred_cls(Group(same_team))] # task 4
 
     # tasks can be created directly from predicate instances
-    tasks = [pred.create_task() for pred in predicates]
+    test_tasks = [pred.create_task() for pred in predicates]
 
     # tasks are all instantiated with the agent ids
-    env.reset(new_tasks=tasks)
+    env.reset(make_task_fn=lambda: test_tasks)
     _, _, _, infos = env.step({})
 
     # agent 1: assigned only task 1, which is always True
-    self.assertEqual(infos[1]['task'][tasks[0].name]['reward'], 1.0)
+    self.assertEqual(infos[1]['task'][env.tasks[0].name]['reward'], 1.0)
     for i in [1, 2]: # task 2 and 3
-      self.assertTrue(tasks[i].name not in infos[1]['task'])
+      self.assertTrue(env.tasks[i].name not in infos[1]['task'])
 
     # agent 2: assigned task 2 (Failure) and task 4 (Success)
-    self.assertEqual(infos[2]['task'][tasks[1].name]['reward'], 0.0) # task 2
-    self.assertEqual(infos[2]['task'][tasks[3].name]['reward'], 1.0) # task 4
+    self.assertEqual(infos[2]['task'][env.tasks[1].name]['reward'], 0.0) # task 2
+    self.assertEqual(infos[2]['task'][env.tasks[3].name]['reward'], 1.0) # task 4
 
     # agent 3 assigned task 3, Fake(), which is always False (0)
-    self.assertEqual(infos[3]['task'][tasks[2].name]['reward'], 0.0) # task 3
+    self.assertEqual(infos[3]['task'][env.tasks[2].name]['reward'], 0.0) # task 3
 
     # all agents in the same team with agent 2 have SUCCESS
     # other agents don't have any tasks assigned
     for ent_id in env.possible_agents:
       if ent_id in same_team:
-        self.assertEqual(infos[ent_id]['task'][tasks[3].name]['reward'], 1.0)
+        self.assertEqual(infos[ent_id]['task'][env.tasks[3].name]['reward'], 1.0)
       else:
-        self.assertTrue(tasks[3].name not in infos[ent_id]['task'])
+        self.assertTrue(env.tasks[3].name not in infos[ent_id]['task'])
 
     # DONE
 

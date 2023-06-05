@@ -16,7 +16,7 @@ from nmmo.core.tile import Tile
 from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
 from nmmo.task.game_state import GameStateGenerator
-from nmmo.task.task_api import Task, nmmo_default_task
+from nmmo.task import task_api
 from scripted.baselines import Scripted
 
 class Env(ParallelEnv):
@@ -40,7 +40,7 @@ class Env(ParallelEnv):
 
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
     self.game_state = None
-    self.tasks = nmmo_default_task(self.possible_agents)
+    self.tasks = task_api.nmmo_default_task(self.possible_agents)
 
   # pylint: disable=method-cache-max-size-none
   @functools.lru_cache(maxsize=None)
@@ -119,9 +119,7 @@ class Env(ParallelEnv):
   # TODO: This doesn't conform to the PettingZoo API
   # pylint: disable=arguments-renamed
   def reset(self, map_id=None, seed=None, options=None,
-            new_tasks: List[Task]=None,
-            make_task_fn: Callable=None,
-            make_task_fn_kwargs: Dict[str, Any]=None):
+            make_task_fn: Callable=None):
     '''OpenAI Gym API reset function
 
     Loads a new game map and returns initial observations
@@ -129,9 +127,7 @@ class Env(ParallelEnv):
     Args:
         map_id: Map index to load. Selects a random map by default
         seed: random seed to use
-        new_tasks: A list of instantiated tasks
-        make_task_fn: A function to instantiate tasks
-        make_task_fn_kwargs: Keyword arguments to pass to make_task_fn
+        make_task_fn: A function to make tasks
 
     Returns:
         observations, as documented by _compute_observations()
@@ -158,16 +154,8 @@ class Env(ParallelEnv):
     self.obs = self._compute_observations()
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
 
-    """Two methods to define tasks.
-         * new_tasks: a list of instantiated tasks. This method has precedence
-         * make_task_fn & kwargs: a task maker fn and its kwargs to instantiate tasks
-       If these are all None, then use the default task
-    """
-    if new_tasks is not None:
-      # providing an empty new_tasks [] is also possible
-      self.tasks = new_tasks
-    elif make_task_fn is not None:
-      self.tasks = make_task_fn(**make_task_fn_kwargs)
+    if make_task_fn is not None:
+      self.tasks = make_task_fn()
     else:
       for task in self.tasks:
         task.reset()
@@ -427,10 +415,6 @@ class Env(ParallelEnv):
         if agent_id in agents and agent_id not in dones:
           rewards[agent_id] = rewards.get(agent_id,0) + reward
           infos[agent_id]['task'][task.name] = task_infos[agent_id] # progress
-
-    # Remove rewards for dead agents
-    for agent_id in dones:
-      rewards[agent_id] = -1
 
     return rewards, infos
 
