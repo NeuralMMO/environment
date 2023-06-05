@@ -76,9 +76,6 @@ class Realm:
     self.log_helper.reset()
     self.event_log.reset()
 
-    if self._replay_helper is not None:
-      self._replay_helper.reset()
-
     self.map.reset(map_id or np.random.randint(self.config.MAP_N) + 1)
 
     # EntityState and ItemState tables must be empty after players/npcs.reset()
@@ -103,6 +100,10 @@ class Realm:
     # Global item registry
     Item.INSTANCE_ID = 0
     self.items = {}
+
+    if self._replay_helper is not None:
+      self._replay_helper.reset()
+      self._replay_helper.update() # capture the initial packet
 
   def packet(self):
     """Client packet"""

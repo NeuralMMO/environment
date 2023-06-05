@@ -155,7 +155,7 @@ for amount in TEAM_NUMBER_GOAL:
 
 # managing inventory space
 def PracticeInventoryManagement(gs, subject, space, num_tick):
-  return bp.AllMembersWithinRange(gs, subject, space) * bp.TickGE(gs, subject, num_tick)
+  return bp.InventorySpaceGE(gs, subject, space) * bp.TickGE(gs, subject, num_tick)
 for space in [2, 4, 8]:
   task_spec += [('agent', PracticeInventoryManagement, {'space': space, 'num_tick': num_tick})
                 for num_tick in STAY_ALIVE_GOAL]
