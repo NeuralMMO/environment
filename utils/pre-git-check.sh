@@ -5,7 +5,14 @@ echo "Checking pylint, xcxc, pytest without touching git"
 echo
 
 # Check the number of physical cores only
-cores=$(lscpu -b -p=Core,Socket | grep -v '^#' | sort -u | wc -l)
+if command -v lscpu &> /dev/null
+then
+    # lscpu is available
+    cores=$(lscpu -b -p=Core,Socket | grep -v '^#' | sort -u | wc -l)
+else
+    # lscpu is not available, use sysctl instead
+    cores=$(sysctl -n hw.physicalcpu)
+fi
 
 # Run linter
 echo "--------------------------------------------------------------------"
