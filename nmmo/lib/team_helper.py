@@ -1,6 +1,5 @@
 from typing import Dict, List
 
-
 class TeamHelper():
   def __init__(self, teams: Dict[int, List[int]]):
     self.teams = teams
@@ -33,4 +32,6 @@ class TeamHelper():
       return self.teams[(team_id-1) % self.num_teams]
     if target == 'right_team_leader':
       return self.teams[(team_id-1) % self.num_teams][0]
+    if target == 'my_team_leader':
+      return self.teams[team_id][0]
     return None

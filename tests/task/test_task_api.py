@@ -1,28 +1,29 @@
 # pylint: disable=unused-argument,invalid-name
 import unittest
+from types import FunctionType
 
 import nmmo
 from nmmo.core.env import Env
-from nmmo.task.predicate_api import define_predicate
-from nmmo.task.task_api import Task, nmmo_default_task
+from nmmo.task.predicate_api import make_predicate, Predicate
+from nmmo.task.task_api import Task, nmmo_default_task, make_team_tasks
 from nmmo.task.group import Group
 from nmmo.task.constraint import InvalidConstraint, ScalarConstraint
-from nmmo.task.base_predicates import TickGE, CanSeeGroup
+from nmmo.task.base_predicates import TickGE, CanSeeGroup, AllMembersWithinRange
 
 from nmmo.systems import item as Item
 from nmmo.core import action as Action
 
-from tests.testhelpers import ScriptedAgentTestConfig
+from scripted.baselines import Sleeper
+from tests.testhelpers import ScriptedAgentTestConfig, change_spawn_pos
 
-@define_predicate
+# define predicates in the function form
+#   with the required signatures: gs, subject
 def Success(gs, subject: Group):
   return True
 
-@define_predicate
 def Failure(gs, subject: Group):
   return False
 
-@define_predicate
 def Fake(gs, subject, a,b,c):
   return False
 
@@ -38,11 +39,25 @@ class TestTaskAPI(unittest.TestCase):
     # pylint: disable=unsupported-binary-operation,invalid-unary-operand-type
     # pylint: disable=no-value-for-parameter,not-callable,no-member
 
-    mock_gs = MockGameState()
-    SUCCESS = Success(Group(0))
-    FAILURE = Failure(Group(0))
+    self.assertTrue(isinstance(Success, FunctionType))
+    self.assertTrue(isinstance(Failure, FunctionType))
 
-    # AND (&), OR (|), NOT (~), IMPLY (>>)
+    # make predicate class from function
+    success_pred_cls = make_predicate(Success)
+    failure_pred_cls = make_predicate(Failure)
+    self.assertTrue(isinstance(success_pred_cls, type)) # class
+    self.assertTrue(isinstance(failure_pred_cls, type))
+
+    # then instantiate predicates
+    SUCCESS = success_pred_cls(Group(0))
+    FAILURE = failure_pred_cls(Group(0))
+    self.assertTrue(isinstance(SUCCESS, Predicate))
+    self.assertTrue(isinstance(FAILURE, Predicate))
+
+    # NOTE: only the instantiated predicate can be used with operators like below
+    mock_gs = MockGameState()
+
+    # AND (&), OR (|), NOT (~)
     pred1 = SUCCESS & FAILURE
     self.assertFalse(pred1(mock_gs))
 
@@ -76,9 +91,15 @@ class TestTaskAPI(unittest.TestCase):
 
   def test_predicate_name(self):
     # pylint: disable=no-value-for-parameter,no-member
-    SUCCESS = Success(Group([0,2]))
-    FAILURE = Failure(Group(0))
-    fake_pred = Fake(Group(2), 1, Item.Hat, Action.Melee)
+    # make predicate class from function
+    success_pred_cls = make_predicate(Success)
+    failure_pred_cls = make_predicate(Failure)
+    fake_pred_cls = make_predicate(Fake)
+
+    # instantiate the predicates
+    SUCCESS = success_pred_cls(Group([0,2]))
+    FAILURE = failure_pred_cls(Group(0))
+    fake_pred = fake_pred_cls(Group(2), 1, Item.Hat, Action.Melee)
     combination = (SUCCESS & ~ (FAILURE | fake_pred)) | (FAILURE * fake_pred + .3) - .4
     self.assertEqual(combination.name,
       "(OR_(AND_(Success_(0,2))_(NOT_(OR_(Failure_(0,))_(Fake_(2,)_1_Hat_Melee))))_"+\
@@ -86,9 +107,16 @@ class TestTaskAPI(unittest.TestCase):
 
   def test_constraint(self):
     # pylint: disable=not-callable,no-value-for-parameter
+    # define predicate classes from functions
+
+    # make predicate class from function
+    success_pred_cls = make_predicate(Success)
+    tickge_pred_cls = make_predicate(TickGE)
+    self.assertTrue(isinstance(TickGE, FunctionType))
+
     mock_gs = MockGameState()
-    good = Success(Group(0))
-    bad = Success(Group(99999))
+    good = success_pred_cls(Group(0))
+    bad = success_pred_cls(Group(99999))
     good(mock_gs)
     self.assertRaises(InvalidConstraint,lambda: bad(mock_gs))
 
@@ -97,25 +125,39 @@ class TestTaskAPI(unittest.TestCase):
       self.assertTrue(scalar.sample(mock_gs.config)<10)
       self.assertTrue(scalar.sample(mock_gs.config)>=-10)
 
-    bad = TickGE(Group(0), -1)
+    bad = tickge_pred_cls(Group(0), -1)
     self.assertRaises(InvalidConstraint, lambda: bad(mock_gs))
 
   def test_sample_predicate(self):
     # pylint: disable=no-value-for-parameter,expression-not-assigned
-    predicate = CanSeeGroup() & TickGE()
+    # make predicate class from function
+    canseegrp_pred_cls = make_predicate(CanSeeGroup)
+    tickge_pred_cls = make_predicate(TickGE)
+
+    # if the predicate class is instantiated without the subject,
+    mock_gs = MockGameState()
+    predicate = canseegrp_pred_cls() & tickge_pred_cls()
     self.assertEqual(predicate.name,
-                     "(AND_(CanSeeGroup_subject:GroupConstraint_target:GroupConstraint)_"+\
+                     "(AND_(CanSeeGroup_subject:GroupConstraint_target:AgentListConstraint)_"+\
                      "(TickGE_subject:GroupConstraint_num_tick:ScalarConstraint))")
+
+    # this predicate cannot calculate progress becuase it has no subject
+    with self.assertRaises(AttributeError):
+      predicate(mock_gs)
+
+    # this predicate supports sampling with valid arguments
     config = nmmo.config.Default()
-    TickGE().sample(config)
+    tickge_pred_cls().sample(config)
     predicate.sample(config).name
 
     # DONE
 
   def test_task_api_with_predicate(self):
     # pylint: disable=no-value-for-parameter,no-member
+    fake_pred_cls = make_predicate(Fake)
+
     mock_gs = MockGameState()
-    predicate = Fake(Group(2), 1, Item.Hat, Action.Melee)
+    predicate = fake_pred_cls(Group(2), 1, Item.Hat, Action.Melee)
     assignee = [1,2,3] # list of agent ids
     task = predicate.create_task(assignee=assignee)
     rewards, infos = task.compute_rewards(mock_gs)
@@ -145,6 +187,44 @@ class TestTaskAPI(unittest.TestCase):
       self.assertEqual(infos[agent_id]['progress'], 1) # progress (True -> 1)
       self.assertTrue(task.completed)
 
+  def test_predicate_fn_using_other_predicate_fn(self):
+    # define a predicate: to form a tight formation, for a certain number of ticks
+    def PracticeFormation(gs, subject, dist, num_tick):
+      return AllMembersWithinRange(gs, subject, dist) * TickGE(gs, subject, num_tick)
+
+    # team should stay together within 1 tile for 10 ticks
+    goal_tick = 10
+    task_spec = ('team', PracticeFormation, {'dist': 1, 'num_tick': goal_tick})
+
+    # create the test task from the task spec
+    teams = {0:[1,2,3], 1:[4,5], 2:[6,7], 3:[8,9], 4:[10,11]}
+    test_task = make_team_tasks(teams, [task_spec])
+
+    config = ScriptedAgentTestConfig()
+    config.PLAYERS =[Sleeper]
+    config.IMMORTAL = True
+
+    env = Env(config)
+    env.reset(new_tasks=test_task)
+
+    # move agent 2, 3 to agent 1's pos
+    for agent_id in [2,3]:
+      change_spawn_pos(env.realm, agent_id,
+                       env.realm.players[1].pos)
+
+    for tick in range(goal_tick+2):
+      _, rewards, _, infos = env.step({})
+
+      if tick < 10:
+        self.assertAlmostEqual(rewards[1], 1/goal_tick)
+        self.assertAlmostEqual((1+tick)/goal_tick,
+                               infos[1]['task'][test_task[0].name]['progress'])
+      else:
+        # tick 11, task should be completed
+        self.assertEqual(rewards[1], 0)
+        self.assertEqual(infos[1]['task'][test_task[0].name]['progress'], 1)
+        self.assertEqual(infos[1]['task'][test_task[0].name]['completed'], True)
+
   def test_nmmo_default_task(self):
     config = ScriptedAgentTestConfig()
     env = Env(config)
@@ -170,14 +250,20 @@ class TestTaskAPI(unittest.TestCase):
     config = ScriptedAgentTestConfig()
     env = Env(config)
 
+    # make predicate class from function
+    success_pred_cls = make_predicate(Success)
+    failure_pred_cls = make_predicate(Failure)
+    fake_pred_cls = make_predicate(Fake)
+
+    # instantiate the predicates
     same_team = [1, 2, 3, 4]
     predicates = [
-      Success(Group(1)), # task 1
-      Failure(Group(2)), # task 2
-      Fake(Group(3), 1, Item.Hat, Action.Melee), # task 3
-      Success(Group(same_team))] # task 4
+      success_pred_cls(Group(1)), # task 1
+      failure_pred_cls(Group(2)), # task 2
+      fake_pred_cls(Group(3), 1, Item.Hat, Action.Melee), # task 3
+      success_pred_cls(Group(same_team))] # task 4
 
-    # in this case the task assignees are the same as the predicate subjects
+    # tasks can be created directly from predicate instances
     tasks = [pred.create_task() for pred in predicates]
 
     # tasks are all instantiated with the agent ids

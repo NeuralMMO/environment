@@ -171,10 +171,8 @@ def arg_to_string(arg):
 
 ################################################
 
-def define_predicate(fn: Callable) -> type[Predicate]:
-  """ Syntactic sugar API for defining predicates
-
-  See examples at base_predicates.py
+def make_predicate(fn: Callable) -> type[Predicate]:
+  """ Syntactic sugar API for defining predicates from function
   """
   signature = inspect.signature(fn)
   for i, param in enumerate(signature.parameters.values()):
@@ -251,7 +249,8 @@ class OR(PredicateOperator, Predicate):
   def __init__(self, *predicates: Predicate, subject: Group=None):
     super().__init__(lambda n: n>0, *predicates, subject=subject)
   def _evaluate(self, gs: GameState) -> float:
-    return any(p(gs) == 1 for p in self._predicates)*1.0
+    # using max as OR for the [0,1] float
+    return max(p(gs) for p in self._predicates)
   def sample(self, config: Config, **kwargs):
     return super().sample(config, OR, **kwargs)
 
@@ -259,7 +258,8 @@ class AND(PredicateOperator, Predicate):
   def __init__(self, *predicates: Predicate, subject: Group=None):
     super().__init__(lambda n: n>0, *predicates, subject=subject)
   def _evaluate(self, gs: GameState) -> float:
-    return all(p(gs) == 1 for p in self._predicates)*1.0
+    # using min as AND for the [0,1] float
+    return min(p(gs) for p in self._predicates)
   def sample(self, config: Config, **kwargs):
     return super().sample(config, AND, **kwargs)
 

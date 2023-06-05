@@ -4,7 +4,7 @@ from types import FunctionType
 from abc import ABC
 
 from nmmo.task.group import Group
-from nmmo.task.predicate_api import Predicate, define_predicate, arg_to_string
+from nmmo.task.predicate_api import Predicate, make_predicate, arg_to_string
 from nmmo.task import base_predicates as bp
 from nmmo.lib.team_helper import TeamHelper
 
@@ -110,7 +110,7 @@ def make_same_task(predicate: Union[Predicate, Callable],
             for agent_id in agent_list]
 
   # eval_fn is a function to turn into predicate
-  pred_cls = define_predicate(predicate)
+  pred_cls = make_predicate(predicate)
   return [pred_cls(Group(agent_id),**kwargs).create_task(task_cls=task_cls)
           for agent_id in agent_list]
 
@@ -136,7 +136,9 @@ def nmmo_default_task(agent_list: Iterable[int], test_mode=None) -> List[Task]:
 # TODO: a lot to improve below
 
 REWARD_TO = ['agent', 'team']
-VALID_TARGET = ['left_team', 'right_team', 'left_team_leader', 'right_team_leader']
+VALID_TARGET = ['left_team', 'left_team_leader',
+                'right_team', 'right_team_leader',
+                'my_team_leader']
 
 def make_team_tasks(teams, task_spec) -> List[Task]:
   """
@@ -149,7 +151,7 @@ def make_team_tasks(teams, task_spec) -> List[Task]:
   team_helper = TeamHelper(teams)
   for idx in range(min(len(team_list), len(task_spec))):
     team_id = team_list[idx]
-    reward_to, pred_cls, kwargs = task_spec[team_id]
+    reward_to, pred_fn, kwargs = task_spec[team_id]
 
     assert reward_to in REWARD_TO, 'Wrong reward target'
 
@@ -168,10 +170,15 @@ def make_team_tasks(teams, task_spec) -> List[Task]:
 
     # handle some special cases and instantiate the predicate first
     predicate = None
-    if not isinstance(pred_cls, type):
+    if isinstance(pred_fn, FunctionType):
       # if a function is provided as a predicate
-      pred_cls = define_predicate(pred_cls)
-    if pred_cls in [bp.AllDead]:
+      pred_cls = make_predicate(pred_fn)
+
+    # TODO: should create a test for these
+    if pred_fn in [bp.AllDead]:
+      kwargs.pop('target') # remove target
+      predicate = pred_cls(Group(target), **kwargs)
+    if pred_fn in [bp.StayAlive] and 'target' in kwargs:
       kwargs.pop('target') # remove target
       predicate = pred_cls(Group(target), **kwargs)
 
