@@ -67,7 +67,7 @@ if __name__ == '__main__':
   # test_func = [
   #   '_make_move_mask()', # 0.170 -> 0.022
   #   '_make_attack_mask()', # 0.060 -> 0.037
-  #   '_make_use_mask()',
+  #   '_make_use_mask()', # 0.0036 ->
   #   '_make_sell_mask()',
   #   '_make_give_target_mask()',
   #   '_make_destroy_item_mask()',
@@ -80,3 +80,8 @@ if __name__ == '__main__':
 
   # for func in test_func:
   #   print(func, timeit(f'obs[1].{func}', number=1000, globals=globals()))
+
+  # # without ActionTargets: 0.97 (before) -> 0.26 (after)
+  # # with ActionTargets: 3.23 (before) -> 2.45 (after)
+  # print('obs._to_gym()', timeit(lambda: {a: o.to_gym() for a,o in obs.items()},
+  #                               number=100, globals=globals()))

@@ -115,33 +115,28 @@ class Observation:
   def to_gym(self):
     '''Convert the observation to a format that can be used by OpenAI Gym'''
 
+    tiles = np.zeros((self.config.MAP_N_OBS, self.tiles.shape[1]))
+    tiles[:self.tiles.shape[0],:] = self.tiles
+
+    entities = np.zeros((self.config.PLAYER_N_OBS, self.entities.values.shape[1]))
+    entities[:self.entities.values.shape[0],:] = self.entities.values
+
     gym_obs = {
       "CurrentTick": np.array([self.current_tick]),
       "AgentId": np.array([self.agent_id]),
-      "Tile": np.vstack([
-        self.tiles,
-        np.zeros((self.config.MAP_N_OBS - self.tiles.shape[0], self.tiles.shape[1]))
-      ]),
-      "Entity": np.vstack([
-        self.entities.values, np.zeros((
-          self.config.PLAYER_N_OBS - self.entities.values.shape[0],
-          self.entities.values.shape[1]))
-      ])
+      "Tile": tiles,
+      "Entity": entities,
     }
 
     if self.config.ITEM_SYSTEM_ENABLED:
-      gym_obs["Inventory"] = np.vstack([
-        self.inventory.values, np.zeros((
-          self.config.INVENTORY_N_OBS - self.inventory.values.shape[0],
-          self.inventory.values.shape[1]))
-      ])
+      inventory = np.zeros((self.config.INVENTORY_N_OBS, self.inventory.values.shape[1]))
+      inventory[:self.inventory.values.shape[0],:] = self.inventory.values
+      gym_obs["Inventory"] = inventory
 
     if self.config.EXCHANGE_SYSTEM_ENABLED:
-      gym_obs["Market"] = np.vstack([
-        self.market.values, np.zeros((
-          self.config.MARKET_N_OBS - self.market.values.shape[0],
-          self.market.values.shape[1]))
-      ])
+      market = np.zeros((self.config.MARKET_N_OBS, self.market.values.shape[1]))
+      market[:self.market.values.shape[0],:] = self.market.values
+      gym_obs["Market"] = market
 
     if self.config.PROVIDE_ACTION_TARGETS:
       gym_obs["ActionTargets"] = self._make_action_targets()
@@ -240,8 +235,9 @@ class Observation:
 
   def _make_use_mask(self):
     # empty inventory -- nothing to use
+    use_mask = np.zeros(self.config.INVENTORY_N_OBS, dtype=np.int8)
     if not (self.config.ITEM_SYSTEM_ENABLED and self.inventory.len > 0) or self.agent_in_combat:
-      return np.zeros(self.config.INVENTORY_N_OBS, dtype=np.int8)
+      return use_mask
 
     item_skill = self._item_skill()
 
@@ -256,8 +252,8 @@ class Observation:
     item_level = np.tile(np.transpose(np.atleast_2d(item_level)), (1, len(item_skill)))
     level_satisfied = np.any((item_type==type_flt) & (item_level<=level_flt), axis=1)
 
-    return np.concatenate([not_listed & level_satisfied,
-      np.zeros(self.config.INVENTORY_N_OBS - self.inventory.len, dtype=np.int8)])
+    use_mask[:self.inventory.len] = not_listed & level_satisfied
+    return use_mask
 
   def _item_skill(self):
     agent = self.agent()
@@ -286,20 +282,22 @@ class Observation:
     }
 
   def _make_destroy_item_mask(self):
+    destroy_mask = np.zeros(self.config.INVENTORY_N_OBS, dtype=np.int8)
     # empty inventory -- nothing to destroy
     if not (self.config.ITEM_SYSTEM_ENABLED and self.inventory.len > 0) or self.agent_in_combat:
-      return np.zeros(self.config.INVENTORY_N_OBS, dtype=np.int8)
-
-    not_equipped = self.inventory.values[:,ItemState.State.attr_name_to_col["equipped"]] == 0
+      return destroy_mask
 
     # not equipped items in the inventory can be destroyed
-    return np.concatenate([not_equipped,
-      np.zeros(self.config.INVENTORY_N_OBS - self.inventory.len, dtype=np.int8)])
+    not_equipped = self.inventory.values[:,ItemState.State.attr_name_to_col["equipped"]] == 0
+
+    destroy_mask[:self.inventory.len] = not_equipped
+    return destroy_mask
 
   def _make_give_target_mask(self):
+    give_mask = np.zeros(self.config.PLAYER_N_OBS, dtype=np.int8)
     # empty inventory -- nothing to give
     if not (self.config.ITEM_SYSTEM_ENABLED and self.inventory.len > 0) or self.agent_in_combat:
-      return np.zeros(self.config.PLAYER_N_OBS, dtype=np.int8)
+      return give_mask
 
     agent = self.agent()
     entities_pos = self.entities.values[:,[EntityState.State.attr_name_to_col["row"],
@@ -308,7 +306,6 @@ class Observation:
     not_me = self.entities.ids != self.agent_id
     player = (self.entities.values[:,EntityState.State.attr_name_to_col["npc_type"]] == 0)
 
-    give_mask = np.zeros(self.config.PLAYER_N_OBS, dtype=np.int8)
     give_mask[:self.entities.len] = same_tile & player & not_me
     return give_mask
 
@@ -322,20 +319,22 @@ class Observation:
     return mask
 
   def _make_sell_mask(self):
+    sell_mask = np.zeros(self.config.INVENTORY_N_OBS, dtype=np.int8)
     # empty inventory -- nothing to sell
     if not (self.config.EXCHANGE_SYSTEM_ENABLED and self.inventory.len > 0) \
       or self.agent_in_combat:
-      return np.zeros(self.config.INVENTORY_N_OBS, dtype=np.int8)
+      return sell_mask
 
     not_equipped = self.inventory.values[:,ItemState.State.attr_name_to_col["equipped"]] == 0
     not_listed = self.inventory.values[:,ItemState.State.attr_name_to_col["listed_price"]] == 0
 
-    return np.concatenate([not_equipped & not_listed,
-      np.zeros(self.config.INVENTORY_N_OBS - self.inventory.len, dtype=np.int8)])
+    sell_mask[:self.inventory.len] = not_equipped & not_listed
+    return sell_mask
 
   def _make_buy_mask(self):
+    buy_mask = np.zeros(self.config.MARKET_N_OBS, dtype=np.int8)
     if not self.config.EXCHANGE_SYSTEM_ENABLED or self.agent_in_combat:
-      return np.zeros(self.config.MARKET_N_OBS, dtype=np.int8)
+      return buy_mask
 
     agent = self.agent()
     market_items = self.market.values
@@ -350,7 +349,6 @@ class Observation:
       not_mine &= exist_ammo_listings
 
     enough_gold = market_items[:,ItemState.State.attr_name_to_col["listed_price"]] <= agent.gold
-    buy_mask = np.zeros(self.config.MARKET_N_OBS, dtype=np.int8)
     buy_mask[:self.market.len] = not_mine & enough_gold
     return buy_mask
 
