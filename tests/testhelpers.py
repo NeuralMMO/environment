@@ -2,6 +2,7 @@ import logging
 import unittest
 
 from copy import deepcopy
+from timeit import timeit
 import numpy as np
 
 import nmmo
@@ -366,3 +367,27 @@ class ScriptedTestTemplate(unittest.TestCase):
         actions[ent_id] = { action.Buy: { action.MarketItem: mkt_idx } }
 
     return actions
+
+# pylint: disable=unnecessary-lambda,bad-builtin
+def profile_env_step(action_target=True):
+  config = nmmo.config.Default()
+  config.PLAYERS = [baselines.Sleeper] # the scripted agents doing nothing
+  config.IMMORTAL = True # otherwise the agents will die
+  config.PROVIDE_ACTION_TARGETS = action_target
+  env = nmmo.Env(config)
+  env.reset(seed=0)
+  for _ in range(3):
+    env.step({})
+
+  obs = env._compute_observations()
+
+  test_func = [
+    ('env.step({})', lambda: env.step({})),
+    ('env.realm.step()', lambda: env.realm.step({})),
+    ('env._compute_observations()', lambda: env._compute_observations()),
+    ('obs.to_gym()', lambda: {a: o.to_gym() for a,o in obs.items()}),
+    ('env._compute_rewards()', lambda: env._compute_rewards(obs.keys(), {}))
+  ]
+
+  for name, func in test_func:
+    print(name, timeit(func, number=100, globals=globals()))
