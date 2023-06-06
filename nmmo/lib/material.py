@@ -80,7 +80,7 @@ class Ore(Material):
 
     if config.PROFESSION_SYSTEM_ENABLED:
       self.capacity = config.PROFESSION_ORE_CAPACITY
-      self.respawn  = config.PROFESSION_ORE_CAPACITY
+      self.respawn  = config.PROFESSION_ORE_RESPAWN
 
   tool    = item.Pickaxe
   deplete = Slag
