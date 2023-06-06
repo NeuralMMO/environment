@@ -9,6 +9,8 @@ from nmmo.core.observation import Observation
 from nmmo.core import action as Action
 from nmmo.lib import material as Material
 
+TileAttr = TileState.State.attr_name_to_col
+
 class TestActionTargets(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
@@ -19,8 +21,7 @@ class TestActionTargets(unittest.TestCase):
       cls.env.step({})
 
   def test_tile_attr(self):
-    self.assertDictEqual(TileState.State.attr_name_to_col,
-                         {'row': 0, 'col': 1, 'material_id': 2})
+    self.assertDictEqual(TileAttr, {'row': 0, 'col': 1, 'material_id': 2})
 
   def test_move_mask_correctness(self):
     obs = self.env._compute_observations()
@@ -35,12 +36,12 @@ class TestActionTargets(unittest.TestCase):
 
     for agent_obs in obs.values():
       # check if the coord conversion is correct
-      x_map = agent_obs.tiles[:,0].reshape(tile_dim,tile_dim)
-      y_map = agent_obs.tiles[:,1].reshape(tile_dim,tile_dim)
-      mat_map = agent_obs.tiles[:,2].reshape(tile_dim,tile_dim)
+      row_map = agent_obs.tiles[:,TileAttr['row']].reshape(tile_dim,tile_dim)
+      col_map = agent_obs.tiles[:,TileAttr['col']].reshape(tile_dim,tile_dim)
+      mat_map = agent_obs.tiles[:,TileAttr['material_id']].reshape(tile_dim,tile_dim)
       agent = agent_obs.agent()
-      self.assertEqual(agent.row, x_map[center,center])
-      self.assertEqual(agent.col, y_map[center,center])
+      self.assertEqual(agent.row, row_map[center,center])
+      self.assertEqual(agent.col, col_map[center,center])
       self.assertEqual(agent_obs.tile(0,0).material_id, mat_map[center,center])
 
       mask_ref = correct_move_mask(agent_obs)
