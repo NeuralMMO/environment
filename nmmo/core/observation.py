@@ -144,8 +144,6 @@ class Observation:
     return gym_obs
 
   def _make_action_targets(self):
-    # TODO(kywch): return all-0 masks for buy/sell/give during combat
-
     masks = {}
     masks[action.Move] = {
       action.Direction: self._make_move_mask()
