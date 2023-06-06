@@ -1,5 +1,4 @@
 from functools import lru_cache
-from types import SimpleNamespace
 
 import numpy as np
 
@@ -91,10 +90,11 @@ class Observation:
     center = self.config.PLAYER_VISION_RADIUS
     tile_dim = self.config.PLAYER_VISION_DIAMETER
     mat_map = self.tiles[:,2].reshape(tile_dim,tile_dim)
-    if (0 <= agent.row + r_delta < self.config.MAP_SIZE) & \
-       (0 <= agent.col + c_delta < self.config.MAP_SIZE):
-      return SimpleNamespace(**{'row': agent.row+r_delta, 'col': agent.col+c_delta,
-                                'material_id': mat_map[center+r_delta,center+c_delta]})
+    new_row = agent.row + r_delta
+    new_col = agent.col + c_delta
+    if (0 <= new_row < self.config.MAP_SIZE) & \
+       (0 <= new_col < self.config.MAP_SIZE):
+      return TileState.parse_array([new_row, new_col, mat_map[center+r_delta,center+c_delta]])
 
     # return a dummy void tile at (inf, inf)
     return TileState.parse_array([np.inf, np.inf, material.Void.index])
@@ -189,17 +189,8 @@ class Observation:
 
   def _make_move_mask(self):
     # pylint: disable=not-an-iterable
-    center = self.config.PLAYER_VISION_RADIUS
-    tile_dim = self.config.PLAYER_VISION_DIAMETER
-    mat = self.tiles[:,2].reshape(tile_dim,tile_dim)
-
-    # action.Direction.edges: [North, South, East, West, Stay]
-    move_mask = np.ones(len(action.Direction.edges), dtype=np.int8)
-    move_mask[0] = mat[center-1,center] in material.Habitable # North
-    move_mask[1] = mat[center+1,center] in material.Habitable # South
-    move_mask[2] = mat[center,center+1] in material.Habitable # East
-    move_mask[3] = mat[center,center-1] in material.Habitable # West
-    return move_mask
+    return np.array([self.tile(*d.delta).material_id in material.Habitable.indices
+                     for d in action.Direction.edges], dtype=np.int8)
 
   def _make_attack_mask(self):
     # NOTE: Currently, all attacks have the same range

@@ -7,32 +7,34 @@ import nmmo
 from nmmo.core.tile import TileState
 from nmmo.core.observation import Observation
 from nmmo.core import action as Action
-from nmmo.lib import material as Material
 
 TileAttr = TileState.State.attr_name_to_col
 
-class TestActionTargets(unittest.TestCase):
+class TestObservationTile(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
     cls.config = nmmo.config.Default()
     cls.env = nmmo.Env(cls.config)
-    cls.env.reset()
+    cls.env.reset(seed=1)
     for _ in range(3):
       cls.env.step({})
 
   def test_tile_attr(self):
     self.assertDictEqual(TileAttr, {'row': 0, 'col': 1, 'material_id': 2})
 
-  def test_move_mask_correctness(self):
+  def test_tile_correctness(self):
     obs = self.env._compute_observations()
-
     center = self.config.PLAYER_VISION_RADIUS
     tile_dim = self.config.PLAYER_VISION_DIAMETER
 
-    def correct_move_mask(agent_obs: Observation):
-      # pylint: disable=not-an-iterable
-      return np.array([agent_obs.tile(*d.delta).material_id in Material.Habitable
-                       for d in Action.Direction.edges], dtype=np.int8)
+    # pylint: disable=inconsistent-return-statements
+    def correct_tile(agent_obs: Observation, r_delta, c_delta):
+      agent = agent_obs.agent()
+      if (0 <= agent.row + r_delta < self.config.MAP_SIZE) & \
+        (0 <= agent.col + c_delta < self.config.MAP_SIZE):
+        r_cond = (agent_obs.tiles[:,TileState.State.attr_name_to_col["row"]] == agent.row+r_delta)
+        c_cond = (agent_obs.tiles[:,TileState.State.attr_name_to_col["col"]] == agent.col+c_delta)
+        return TileState.parse_array(agent_obs.tiles[r_cond & c_cond][0])
 
     for agent_obs in obs.values():
       # check if the coord conversion is correct
@@ -44,17 +46,22 @@ class TestActionTargets(unittest.TestCase):
       self.assertEqual(agent.col, col_map[center,center])
       self.assertEqual(agent_obs.tile(0,0).material_id, mat_map[center,center])
 
-      mask_ref = correct_move_mask(agent_obs)
-      self.assertTrue(np.array_equal(agent_obs._make_move_mask(), mask_ref))
+      # pylint: disable=not-an-iterable
+      for d in Action.Direction.edges:
+        self.assertTrue(np.array_equal(correct_tile(agent_obs, *d.delta),
+                                      agent_obs.tile(*d.delta)))
 
-    # pylint: disable=unnecessary-lambda
-    print('reference:', timeit(lambda: correct_move_mask(agent_obs),
-                               number=1000, globals=globals()))
-    print('implemented:', timeit(lambda: agent_obs._make_move_mask(),
-                                 number=1000, globals=globals()))
+    print('---test_correct_tile---')
+    print('reference:', timeit(lambda: correct_tile(agent_obs, *d.delta),
+                              number=1000, globals=globals()))
+    print('implemented:', timeit(lambda: agent_obs.tile(*d.delta),
+                                number=1000, globals=globals()))
 
 if __name__ == '__main__':
   unittest.main()
+
+  # from tests.testhelpers import profile_env_step
+  # profile_env_step()
 
   # config = nmmo.config.Default()
   # env = nmmo.Env(config)
@@ -64,8 +71,9 @@ if __name__ == '__main__':
 
   # obs = env._compute_observations()
 
+  # NOTE: the most of performance gain in _make_move_mask comes from the improved tile
   # test_func = [
-  #   '_make_move_mask()', # 0.170 -> 0.022
+  #   '_make_move_mask()', # 0.170 -> 0.012
   #   '_make_attack_mask()', # 0.060 -> 0.037
   #   '_make_use_mask()', # 0.0036 ->
   #   '_make_sell_mask()',
@@ -80,8 +88,3 @@ if __name__ == '__main__':
 
   # for func in test_func:
   #   print(func, timeit(f'obs[1].{func}', number=1000, globals=globals()))
-
-  # # without ActionTargets: 0.97 (before) -> 0.26 (after)
-  # # with ActionTargets: 3.23 (before) -> 2.45 (after)
-  # print('obs._to_gym()', timeit(lambda: {a: o.to_gym() for a,o in obs.items()},
-  #                               number=100, globals=globals()))
