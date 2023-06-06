@@ -1,4 +1,5 @@
 from functools import lru_cache
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -87,11 +88,13 @@ class Observation:
         Vector corresponding to the specified tile
     '''
     agent = self.agent()
+    center = self.config.PLAYER_VISION_RADIUS
+    tile_dim = self.config.PLAYER_VISION_DIAMETER
+    mat_map = self.tiles[:,2].reshape(tile_dim,tile_dim)
     if (0 <= agent.row + r_delta < self.config.MAP_SIZE) & \
        (0 <= agent.col + c_delta < self.config.MAP_SIZE):
-      r_cond = (self.tiles[:,TileState.State.attr_name_to_col["row"]] == agent.row + r_delta)
-      c_cond = (self.tiles[:,TileState.State.attr_name_to_col["col"]] == agent.col + c_delta)
-      return TileState.parse_array(self.tiles[r_cond & c_cond][0])
+      return SimpleNamespace(**{'row': agent.row+r_delta, 'col': agent.col+c_delta,
+                                'material_id': mat_map[center+r_delta,center+c_delta]})
 
     # return a dummy void tile at (inf, inf)
     return TileState.parse_array([np.inf, np.inf, material.Void.index])
@@ -193,9 +196,17 @@ class Observation:
 
   def _make_move_mask(self):
     # pylint: disable=not-an-iterable
-    return np.array(
-      [self.tile(*d.delta).material_id in material.Habitable
-       for d in action.Direction.edges], dtype=np.int8)
+    center = self.config.PLAYER_VISION_RADIUS
+    tile_dim = self.config.PLAYER_VISION_DIAMETER
+    mat = self.tiles[:,2].reshape(tile_dim,tile_dim)
+
+    # action.Direction.edges: [North, South, East, West, Stay]
+    move_mask = np.ones(len(action.Direction.edges), dtype=np.int8)
+    move_mask[0] = mat[center-1,center] in material.Habitable # North
+    move_mask[1] = mat[center+1,center] in material.Habitable # South
+    move_mask[2] = mat[center,center+1] in material.Habitable # East
+    move_mask[3] = mat[center,center-1] in material.Habitable # West
+    return move_mask
 
   def _make_attack_mask(self):
     # NOTE: Currently, all attacks have the same range
@@ -208,9 +219,9 @@ class Observation:
     attack_range = self.config.COMBAT_MELEE_REACH
 
     agent = self.agent()
-    entities_pos = self.entities.values[:, [EntityState.State.attr_name_to_col["row"],
-                                            EntityState.State.attr_name_to_col["col"]]]
-    within_range = utils.linf(entities_pos, (agent.row, agent.col)) <= attack_range
+    entities_pos = self.entities.values[:,[EntityState.State.attr_name_to_col["row"],
+                                           EntityState.State.attr_name_to_col["col"]]]
+    within_range = utils.linf(entities_pos,(agent.row, agent.col)) <= attack_range
 
     immunity = self.config.COMBAT_SPAWN_IMMUNITY
     if 0 < immunity < agent.time_alive:
@@ -218,14 +229,14 @@ class Observation:
       spawn_immunity = (self.entities.ids > 0) & \
         (self.entities.values[:,EntityState.State.attr_name_to_col["time_alive"]] < immunity)
     else:
-      spawn_immunity = np.ones(self.entities.len, dtype=np.int8)
+      spawn_immunity = np.ones(self.entities.len, dtype=bool)
 
     # allow friendly fire but no self shooting
-    not_me = np.ones(self.entities.len, dtype=np.int8)
-    not_me[self.entities.index(agent.id)] = 0 # mask self
+    not_me = self.entities.ids != agent.id
 
-    return np.concatenate([within_range & not_me & spawn_immunity,
-      np.zeros(self.config.PLAYER_N_OBS - self.entities.len, dtype=np.int8)])
+    attack_mask = np.zeros(self.config.PLAYER_N_OBS, dtype=np.int8)
+    attack_mask[:self.entities.len] = within_range & not_me & spawn_immunity
+    return attack_mask
 
   def _make_use_mask(self):
     # empty inventory -- nothing to use
@@ -239,11 +250,11 @@ class Observation:
     item_level = self.inventory.values[:,ItemState.State.attr_name_to_col["level"]]
 
     # level limits are differently applied depending on item types
-    type_flt = np.tile ( np.array(list(item_skill.keys())), (self.inventory.len,1) )
-    level_flt = np.tile ( np.array(list(item_skill.values())), (self.inventory.len,1) )
-    item_type = np.tile( np.transpose(np.atleast_2d(item_type)), (1, len(item_skill)))
-    item_level = np.tile( np.transpose(np.atleast_2d(item_level)), (1, len(item_skill)))
-    level_satisfied = np.any((item_type == type_flt) & (item_level <= level_flt), axis=1)
+    type_flt = np.tile(np.array(list(item_skill.keys())), (self.inventory.len,1))
+    level_flt = np.tile(np.array(list(item_skill.values())), (self.inventory.len,1))
+    item_type = np.tile(np.transpose(np.atleast_2d(item_type)), (1, len(item_skill)))
+    item_level = np.tile(np.transpose(np.atleast_2d(item_level)), (1, len(item_skill)))
+    level_satisfied = np.any((item_type==type_flt) & (item_level<=level_flt), axis=1)
 
     return np.concatenate([not_listed & level_satisfied,
       np.zeros(self.config.INVENTORY_N_OBS - self.inventory.len, dtype=np.int8)])
@@ -291,15 +302,15 @@ class Observation:
       return np.zeros(self.config.PLAYER_N_OBS, dtype=np.int8)
 
     agent = self.agent()
-    entities_pos = self.entities.values[:, [EntityState.State.attr_name_to_col["row"],
-                                            EntityState.State.attr_name_to_col["col"]]]
+    entities_pos = self.entities.values[:,[EntityState.State.attr_name_to_col["row"],
+                                           EntityState.State.attr_name_to_col["col"]]]
     same_tile = utils.linf(entities_pos, (agent.row, agent.col)) == 0
     not_me = self.entities.ids != self.agent_id
     player = (self.entities.values[:,EntityState.State.attr_name_to_col["npc_type"]] == 0)
 
-    return np.concatenate([
-      (same_tile & player & not_me),
-      np.zeros(self.config.PLAYER_N_OBS - self.entities.len, dtype=np.int8)])
+    give_mask = np.zeros(self.config.PLAYER_N_OBS, dtype=np.int8)
+    give_mask[:self.entities.len] = same_tile & player & not_me
+    return give_mask
 
   def _make_give_gold_mask(self):
     gold = int(self.agent().gold)
@@ -326,24 +337,22 @@ class Observation:
     if not self.config.EXCHANGE_SYSTEM_ENABLED or self.agent_in_combat:
       return np.zeros(self.config.MARKET_N_OBS, dtype=np.int8)
 
-    market_flt = np.ones(self.market.len, dtype=np.int8)
-    full_inventory = self.inventory.len >= self.config.ITEM_INVENTORY_CAPACITY
+    agent = self.agent()
+    market_items = self.market.values
+    not_mine = market_items[:,ItemState.State.attr_name_to_col["owner_id"]] != self.agent_id
 
     # if the inventory is full, one can only buy existing ammo stack
     #   otherwise, one can buy anything owned by other, having enough money
-    if full_inventory:
+    if self.inventory.len >= self.config.ITEM_INVENTORY_CAPACITY:
       exist_ammo_listings = self._existing_ammo_listings()
       if not np.any(exist_ammo_listings):
         return np.zeros(self.config.MARKET_N_OBS, dtype=np.int8)
-      market_flt = exist_ammo_listings
+      not_mine &= exist_ammo_listings
 
-    agent = self.agent()
-    market_items = self.market.values
     enough_gold = market_items[:,ItemState.State.attr_name_to_col["listed_price"]] <= agent.gold
-    not_mine = market_items[:,ItemState.State.attr_name_to_col["owner_id"]] != self.agent_id
-
-    return np.concatenate([market_flt & enough_gold & not_mine,
-      np.zeros(self.config.MARKET_N_OBS - self.market.len, dtype=np.int8)])
+    buy_mask = np.zeros(self.config.MARKET_N_OBS, dtype=np.int8)
+    buy_mask[:self.market.len] = not_mine & enough_gold
+    return buy_mask
 
   def _existing_ammo_listings(self):
     sig_col = (ItemState.State.attr_name_to_col["type_id"],
@@ -352,7 +361,7 @@ class Observation:
               [item_system.Whetstone, item_system.Arrow, item_system.Runes]]
 
     # search ammo stack from the inventory
-    type_flt = np.tile( np.array(ammo_id), (self.inventory.len,1))
+    type_flt = np.tile(np.array(ammo_id), (self.inventory.len,1))
     item_type = np.tile(
       np.transpose(np.atleast_2d(self.inventory.values[:,sig_col[0]])),
       (1, len(ammo_id)))
@@ -360,16 +369,16 @@ class Observation:
 
     # self does not have ammo
     if exist_ammo.shape[0] == 0:
-      return np.zeros(self.market.len, dtype=np.int8)
+      return np.zeros(self.market.len, dtype=bool)
 
     # search the existing ammo stack from the market that's not mine
-    type_flt = np.tile( np.array(exist_ammo[:,sig_col[0]]), (self.market.len,1))
-    level_flt = np.tile( np.array(exist_ammo[:,sig_col[1]]), (self.market.len,1))
-    item_type = np.tile( np.transpose(np.atleast_2d(self.market.values[:,sig_col[0]])),
-      (1, exist_ammo.shape[0]))
-    item_level = np.tile( np.transpose(np.atleast_2d(self.market.values[:,sig_col[1]])),
-      (1, exist_ammo.shape[0]))
-    exist_ammo_listings = np.any((item_type == type_flt) & (item_level == level_flt), axis=1)
+    type_flt = np.tile(np.array(exist_ammo[:,sig_col[0]]), (self.market.len,1))
+    level_flt = np.tile(np.array(exist_ammo[:,sig_col[1]]), (self.market.len,1))
+    item_type = np.tile(np.transpose(np.atleast_2d(self.market.values[:,sig_col[0]])),
+                        (1, exist_ammo.shape[0]))
+    item_level = np.tile(np.transpose(np.atleast_2d(self.market.values[:,sig_col[1]])),
+                         (1, exist_ammo.shape[0]))
+    exist_ammo_listings = np.any((item_type==type_flt) & (item_level==level_flt), axis=1)
 
     not_mine = self.market.values[:,ItemState.State.attr_name_to_col["owner_id"]] != self.agent_id
 
