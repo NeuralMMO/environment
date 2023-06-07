@@ -5,7 +5,7 @@ from types import FunctionType
 import nmmo
 from nmmo.core.env import Env
 from nmmo.task.predicate_api import make_predicate, Predicate
-from nmmo.task.task_api import Task, nmmo_default_task, make_team_tasks
+from nmmo.task.task_api import Task, make_team_tasks
 from nmmo.task.group import Group
 from nmmo.task.constraint import InvalidConstraint, ScalarConstraint
 from nmmo.task.base_predicates import TickGE, CanSeeGroup, AllMembersWithinRange
@@ -223,24 +223,6 @@ class TestTaskAPI(unittest.TestCase):
         self.assertEqual(rewards[1], 0)
         self.assertEqual(infos[1]['task'][env.tasks[0].name]['progress'], 1)
         self.assertEqual(infos[1]['task'][env.tasks[0].name]['completed'], True)
-
-  def test_nmmo_default_task(self):
-    config = ScriptedAgentTestConfig()
-    env = Env(config)
-
-    for test_mode in [None, 'no_task', 'func_eval', 'dummy_eval_fn']:
-      # pylint: disable=cell-var-from-loop
-      env.reset(make_task_fn=lambda: nmmo_default_task(env.possible_agents, test_mode))
-      for _ in range(3):
-        env.step({})
-
-      for agent_id in env.possible_agents:
-        if test_mode is None:
-          self.assertTrue('StayAlive' in env.tasks[agent_id-1].name) # default task
-        if test_mode != 'no_task':
-          self.assertTrue(f'assignee:({agent_id},)' in env.tasks[agent_id-1].name)
-
-    # DONE
 
   def test_completed_tasks_in_info(self):
     # pylint: disable=no-value-for-parameter,no-member

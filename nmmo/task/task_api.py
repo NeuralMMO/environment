@@ -115,22 +115,18 @@ def make_same_task(predicate: Union[Predicate, Callable],
           for agent_id in agent_list]
 
 def nmmo_default_task(agent_list: Iterable[int], test_mode=None) -> List[Task]:
-  if test_mode is None:
-    # use the full predicate system
-    return make_same_task(bp.StayAlive, agent_list, task_cls=OngoingTask)
-
+  # (almost) no overhead in env._compute_rewards()
   if test_mode == 'no_task':
     return []
 
+  # eval function on Predicate class, but does not use Group during eval
   if test_mode == 'dummy_eval_fn':
     # pylint: disable=unused-argument
     return make_same_task(lambda gs, subject: True, agent_list, task_cls=OngoingTask)
 
-  # use the function-based eval
-  def stay_alive_eval(gs, subject):
-    return all(agent_id in gs.alive_agents for agent_id in subject.agents)
-
-  return make_same_task(stay_alive_eval, agent_list, task_cls=OngoingTask)
+  # the default is to use the predicate class
+  pred_cls = make_predicate(bp.StayAlive)
+  return make_same_task(pred_cls, agent_list, task_cls=OngoingTask)
 
 ######################################################################
 # TODO: a lot to improve below
