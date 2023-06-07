@@ -45,13 +45,13 @@ def pathfind(config, ob, actions, rr, cc):
 
 def meander(config, ob, actions):
    cands = []
-   if ob.tile(-1, 0).material_id in material.Habitable:
+   if ob.tile(-1, 0).material_id in material.Habitable.indices:
       cands.append((-1, 0))
-   if ob.tile(1, 0).material_id in material.Habitable:
+   if ob.tile(1, 0).material_id in material.Habitable.indices:
       cands.append((1, 0))
-   if ob.tile(0, -1).material_id in material.Habitable:
+   if ob.tile(0, -1).material_id in material.Habitable.indices:
       cands.append((0, -1))
-   if ob.tile(0, 1).material_id in material.Habitable:
+   if ob.tile(0, 1).material_id in material.Habitable.indices:
       cands.append((0, 1))
    if not cands:
       return (-1, 0)
@@ -112,7 +112,7 @@ def forageDijkstra(config, ob: Observation, actions, food_max, water_max, cutoff
          tile     = ob.tile(*nxt)
          matl     = tile.material_id
 
-         if not matl in material.Habitable:
+         if not matl in material.Habitable.indices:
             continue
 
          food, water = reward[cur]
@@ -211,7 +211,7 @@ def gatherBFS(config, ob: Observation, actions, resource, cutoff=100):
                 backtrace[nxt] = cur
                 break
 
-            if not tile.material_id in material.Habitable:
+            if not tile.material_id in material.Habitable.indices:
                 continue
 
             if matl in (e.index for e in resource):
@@ -285,11 +285,11 @@ def aStar(config, ob: Observation, actions, rr, cc, cutoff=100):
          tile     = ob.tile(*nxt)
          matl     = tile.material_id
 
-         if not matl in material.Habitable:
+         if not matl in material.Habitable.indices:
            continue
 
          #Omitted water from the original implementation. Seems key
-         if matl in material.Impassible:
+         if matl in material.Impassible.indices:
             continue
 
          newCost = cost[cur] + 1

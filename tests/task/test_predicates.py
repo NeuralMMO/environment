@@ -156,18 +156,19 @@ class TestBasePredicate(unittest.TestCase):
     env = self._get_taskenv(test_preds, grass_map=True)
 
     # Two corners to the target materials
-    MS = env.config.MAP_SIZE
-    tile = env.realm.map.tiles[0,MS-2]
+    BORDER = env.config.MAP_BORDER
+    MS = env.config.MAP_CENTER + BORDER
+    tile = env.realm.map.tiles[BORDER,MS-2]
     tile.material = Material.Foilage
     tile.material_id.update(Material.Foilage.index)
 
-    tile = env.realm.map.tiles[MS-1,0]
+    tile = env.realm.map.tiles[MS-1,BORDER]
     tile.material = Material.Water
     tile.material_id.update(Material.Water.index)
 
     # All agents to one corner
     for ent_id in env.realm.players:
-      change_agent_pos(env.realm,ent_id,(0,0))
+      change_agent_pos(env.realm,ent_id,(BORDER,BORDER))
 
     env.obs = env._compute_observations()
     _, _, _, infos = env.step({})
@@ -177,8 +178,8 @@ class TestBasePredicate(unittest.TestCase):
     self._check_result(env, test_preds, infos, true_task)
 
     # Team one to foilage, team two to water
-    change_agent_pos(env.realm,1,(0,MS-2)) # agent 1, team 0, foilage
-    change_agent_pos(env.realm,2,(MS-2,0)) # agent 2, team 1, water
+    change_agent_pos(env.realm,1,(BORDER,MS-2)) # agent 1, team 0, foilage
+    change_agent_pos(env.realm,2,(MS-2,BORDER)) # agent 2, team 1, water
     env.obs = env._compute_observations()
 
     _, _, _, infos = env.step({})
@@ -203,11 +204,12 @@ class TestBasePredicate(unittest.TestCase):
     env = self._get_taskenv(test_preds, grass_map=True)
 
     # All agents to one corner
+    BORDER = env.config.MAP_BORDER
+    MS = env.config.MAP_CENTER + BORDER
     for ent_id in env.realm.players:
-      change_agent_pos(env.realm,ent_id,(0,0))
+      change_agent_pos(env.realm,ent_id,(BORDER,BORDER)) # the map border
 
     # Teleport agent 1 to the opposite corner
-    MS = env.config.MAP_SIZE
     change_agent_pos(env.realm,1,(MS-2,MS-2))
     env.obs = env._compute_observations()
 

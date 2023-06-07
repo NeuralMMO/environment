@@ -145,7 +145,7 @@ class Config(Template):
     return hasattr(self, name)
 
 
-  PROVIDE_ACTION_TARGETS       = False
+  PROVIDE_ACTION_TARGETS       = True
   '''Flag used to provide action targets mask'''
 
   PLAYERS                      = [Agent]
