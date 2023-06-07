@@ -135,5 +135,4 @@ def get_team_spawn_positions(config, num_teams):
       idx = int(len(side)*(i+1)/(teams_per_sides + 1))
       team_spawn_positions.append(side[idx])
 
-  np.random.shuffle(team_spawn_positions)
   return team_spawn_positions

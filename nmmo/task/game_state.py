@@ -43,7 +43,7 @@ class GameState:
   def entity_or_none(self, ent_id):
     flt_ent = self.entity_data[:, EntityAttr['id']] == ent_id
     if np.any(flt_ent):
-      return EntityAttr.parse_array(self.entity_data[flt_ent][0])
+      return EntityState.parse_array(self.entity_data[flt_ent][0])
 
     return None
 

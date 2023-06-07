@@ -369,25 +369,29 @@ class ScriptedTestTemplate(unittest.TestCase):
     return actions
 
 # pylint: disable=unnecessary-lambda,bad-builtin
-def profile_env_step(action_target=True):
+def profile_env_step(action_target=True, tasks=None, condition=None):
   config = nmmo.config.Default()
   config.PLAYERS = [baselines.Sleeper] # the scripted agents doing nothing
   config.IMMORTAL = True # otherwise the agents will die
   config.PROVIDE_ACTION_TARGETS = action_target
   env = nmmo.Env(config)
-  env.reset(seed=0)
+  if tasks is None:
+    tasks = []
+  env.reset(seed=0, make_task_fn=lambda: tasks)
   for _ in range(3):
     env.step({})
 
   obs = env._compute_observations()
 
   test_func = [
-    ('env.step({})', lambda: env.step({})),
-    ('env.realm.step()', lambda: env.realm.step({})),
-    ('env._compute_observations()', lambda: env._compute_observations()),
-    ('obs.to_gym()', lambda: {a: o.to_gym() for a,o in obs.items()}),
-    ('env._compute_rewards()', lambda: env._compute_rewards(obs.keys(), {}))
+    ('env.step({}):', lambda: env.step({})),
+    ('env.realm.step():', lambda: env.realm.step({})),
+    ('env._compute_observations():', lambda: env._compute_observations()),
+    ('obs.to_gym(), ActionTarget:', lambda: {a: o.to_gym() for a,o in obs.items()}),
+    ('env._compute_rewards():', lambda: env._compute_rewards(obs.keys(), {}))
   ]
 
+  if condition:
+    print('=== Test condition:', condition, '===')
   for name, func in test_func:
-    print(name, timeit(func, number=100, globals=globals()))
+    print(' -', name, timeit(func, number=100, globals=globals()))

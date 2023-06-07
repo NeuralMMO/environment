@@ -265,12 +265,12 @@ class Water(HarvestSkill):
     if not config.RESOURCE_SYSTEM_ENABLED:
       return
 
+    if config.IMMORTAL:
+      return
+
     depletion = config.RESOURCE_DEPLETION_RATE
     water = self.entity.resources.water
     water.decrement(depletion)
-
-    if self.config.IMMORTAL:
-      return
 
     if not self.harvest_adjacent(material.Water, deplete=False):
       return
@@ -286,6 +286,9 @@ class Food(HarvestSkill):
   def update(self):
     config = self.config
     if not config.RESOURCE_SYSTEM_ENABLED:
+      return
+
+    if config.IMMORTAL:
       return
 
     depletion = config.RESOURCE_DEPLETION_RATE

@@ -1,4 +1,3 @@
-
 import unittest
 from typing import List
 
@@ -18,10 +17,8 @@ from scripted import baselines
 # 30 seems to be enough to test variety of agent actions
 TEST_HORIZON = 30
 RANDOM_SEED = random.randint(0, 10000)
-# TODO: We should check that milestones have been reached, to make
-# sure that the agents aren't just dying
+
 class Config(nmmo.config.Small, nmmo.config.AllGameSystems):
-  RENDER = False
   SPECIALIZE = True
   PLAYERS = [
     baselines.Fisher, baselines.Herbalist, baselines.Prospector,
