@@ -210,7 +210,7 @@ class TestDemoTask(unittest.TestCase):
 
     # DONE
 
-  def test_make_team_tasks_inside_reset(self):
+  def test_make_team_tasks_using_task_spec(self):
     # NOTE: len(teams) and len(task_spec) don't need to match
     teams = {0:[1,2,3], 1:[4,5], 2:[6,7], 3:[8,9], 4:[10,11]}
 
