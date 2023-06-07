@@ -105,13 +105,11 @@ class OngoingTask(Task):
 def make_same_task(predicate: Union[Predicate, Callable],
                    agent_list: Iterable[int],
                    task_cls = Task, **kwargs) -> List[Task]:
-  if isinstance(predicate, type): # predicate is class, assuming Predicate
-    return [predicate(Group(agent_id),**kwargs).create_task(task_cls=task_cls)
-            for agent_id in agent_list]
+  # if a function is provided, make it a predicate class
+  if isinstance(predicate, FunctionType):
+    predicate = make_predicate(predicate)
 
-  # eval_fn is a function to turn into predicate
-  pred_cls = make_predicate(predicate)
-  return [pred_cls(Group(agent_id),**kwargs).create_task(task_cls=task_cls)
+  return [predicate(Group(agent_id),**kwargs).create_task(task_cls=task_cls)
           for agent_id in agent_list]
 
 def nmmo_default_task(agent_list: Iterable[int], test_mode=None) -> List[Task]:
@@ -125,8 +123,7 @@ def nmmo_default_task(agent_list: Iterable[int], test_mode=None) -> List[Task]:
     return make_same_task(lambda gs, subject: True, agent_list, task_cls=OngoingTask)
 
   # the default is to use the predicate class
-  pred_cls = make_predicate(bp.StayAlive)
-  return make_same_task(pred_cls, agent_list, task_cls=OngoingTask)
+  return make_same_task(bp.StayAlive, agent_list, task_cls=OngoingTask)
 
 ######################################################################
 # TODO: a lot to improve below
@@ -162,7 +159,7 @@ def make_team_tasks(teams, task_spec) -> List[Task]:
       assert target in VALID_TARGET, 'Invalid target'
       # translate target to specific agent ids using team_helper
       target = team_helper.get_target_agent(team_id, target)
-      kwargs['target'] = target #tuple(target,) if isinstance(target, int) else tuple(target)
+      kwargs['target'] = target
 
     # handle some special cases and instantiate the predicate first
     predicate = None
@@ -184,6 +181,7 @@ def make_team_tasks(teams, task_spec) -> List[Task]:
       if predicate is None:
         tasks.append(pred_cls(Group(assignee), **kwargs).create_task(task_cls=task_cls))
       else:
+        # this branch is for the cases like AllDead, StayAlive
         tasks.append(predicate.create_task(assignee=assignee, task_cls=task_cls))
 
     elif reward_to == 'agent':
@@ -191,6 +189,7 @@ def make_team_tasks(teams, task_spec) -> List[Task]:
       if predicate is None:
         tasks += make_same_task(pred_cls, agent_list, task_cls=task_cls, **kwargs)
       else:
+        # this branch is for the cases like AllDead, StayAlive
         tasks += [predicate.create_task(assignee=agent_id, task_cls=task_cls)
                   for agent_id in agent_list]
 

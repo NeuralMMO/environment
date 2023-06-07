@@ -1,14 +1,15 @@
 import unittest
 
+import nmmo
 from nmmo.core.env import Env
 from nmmo.task.task_api import Task, nmmo_default_task
-from tests.testhelpers import profile_env_step, ScriptedAgentTestConfig
+from tests.testhelpers import profile_env_step
 
 PROFILE_PERF = False
 
 class TestTaskSystemPerf(unittest.TestCase):
   def test_nmmo_default_task(self):
-    config = ScriptedAgentTestConfig()
+    config = nmmo.config.Default()
     env = Env(config)
     agent_list = env.possible_agents
 
@@ -46,31 +47,31 @@ if __name__ == '__main__':
   unittest.main()
 
   # """ Tested on Win 11, docker
-  # === Test condition: default ===
-  # - env.step({}): 12.302560470998287
-  # - env.realm.step(): 3.8562550359929446
-  # - env._compute_observations(): 3.3712658310032566
-  # - obs.to_gym(), ActionTarget: 2.477421684998262
-  # - env._compute_rewards(): 1.4060252049966948
+  # === Test condition: default (StayAlive-based Predicate) ===
+  # - env.step({}): 13.398321460997977
+  # - env.realm.step(): 3.6524868449996575
+  # - env._compute_observations(): 3.2038183499971638
+  # - obs.to_gym(), ActionTarget: 2.30746804500086
+  # - env._compute_rewards(): 2.7206644940015394
 
   # === Test condition: no_task ===
-  # - env.step({}): 10.818232985999202
-  # - env.realm.step(): 3.79689467499702
-  # - env._compute_observations(): 3.3100888289991417
-  # - obs.to_gym(), ActionTarget: 2.409053840994602
-  # - env._compute_rewards(): 0.00781778599775862
+  # - env.step({}): 10.576253965999058
+  # - env.realm.step(): 3.674701832998835
+  # - env._compute_observations(): 3.260661373002222
+  # - obs.to_gym(), ActionTarget: 2.313872797996737
+  # - env._compute_rewards(): 0.009020475001307204
 
-  # === Test condition: dummy_eval_fn, using Predicate class ===
-  # - env.step({}): 11.989140973004396
-  # - env.realm.step(): 3.8649445789997117
-  # - env._compute_observations(): 3.344463708999683
-  # - obs.to_gym(), ActionTarget: 2.431279453005118
-  # - env._compute_rewards(): 1.119989460996294
+  # === Test condition: dummy_eval_fn -based Predicate ===
+  # - env.step({}): 12.797982947995479
+  # - env.realm.step(): 3.604593793003005
+  # - env._compute_observations(): 3.2095355240016943
+  # - obs.to_gym(), ActionTarget: 2.313207338003849
+  # - env._compute_rewards(): 2.266267291997792
 
-  # === Test condition: pure_func_eval, WITHOUT Predicate class ===
-  # - env.step({}): 11.032341518002795
-  # - env.realm.step(): 3.8636899659977644
-  # - env._compute_observations(): 3.3460479429995758
-  # - obs.to_gym(), ActionTarget: 2.498140270996373
-  # - env._compute_rewards(): 0.055145307997008786
+  # === Test condition: pure_func_eval WITHOUT Predicate ===
+  # - env.step({}): 10.637560240997118
+  # - env.realm.step(): 3.633970066999609
+  # - env._compute_observations(): 3.2308093659958104
+  # - obs.to_gym(), ActionTarget: 2.331246039000689
+  # - env._compute_rewards(): 0.0988905300037004
   # """
