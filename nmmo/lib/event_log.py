@@ -113,8 +113,8 @@ class EventLogger(EventCode):
 
     if event_code in [EventCode.CONSUME_ITEM, EventCode.HARVEST_ITEM, EventCode.EQUIP_ITEM]:
       # CHECK ME: item types should be checked. For example,
-      #   Only Ration and Poultice can be consumed
-      #   Only Ration, Poultice, Scrap, Shaving, Shard can be produced
+      #   Only Ration and Potion can be consumed
+      #   Only Ration, Potion, Whetstone, Arrow, Runes can be produced
       #   The quantity should be 1 for all of these events
       if ('item' in kwargs and isinstance(kwargs['item'], Item)):
         item = kwargs['item']

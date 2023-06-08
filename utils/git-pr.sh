@@ -1,5 +1,5 @@
 #!/bin/bash
-MASTER_BRANCH="v1.6"
+MASTER_BRANCH="2.0"
 
 # check if in master branch
 current_branch=$(git rev-parse --abbrev-ref HEAD)

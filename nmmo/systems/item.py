@@ -109,6 +109,8 @@ class Item(ItemState):
     realm.items[self.id.val] = self
 
   def destroy(self):
+    # NOTE: we may want to track the item lifecycle and
+    #   and see how many high-level items are wasted
     if self.owner_id.val in self.realm.players:
       self.realm.players[self.owner_id.val].inventory.remove(self)
     self.realm.items.pop(self.id.val, None)
@@ -131,7 +133,7 @@ class Item(ItemState):
             }
 
   def _level(self, entity):
-    # this is for armors, ration, and poultice
+    # this is for armors, ration, and potion
     # weapons and tools must override this with specific skills
     return entity.level
 
@@ -243,7 +245,7 @@ class Weapon(Equipment):
   def _slot(self, entity):
     return entity.inventory.equipment.held
 
-class Sword(Weapon):
+class Spear(Weapon):
   ITEM_TYPE_ID = 5
 
   def __init__(self, realm, level, **kwargs):
@@ -296,11 +298,11 @@ class Pickaxe(Tool):
   ITEM_TYPE_ID = 10
   def _level(self, entity):
     return entity.skills.prospecting.level.val
-class Chisel(Tool):
+class Axe(Tool):
   ITEM_TYPE_ID = 11
   def _level(self, entity):
     return entity.skills.carving.level.val
-class Arcane(Tool):
+class Chisel(Tool):
   ITEM_TYPE_ID = 12
   def _level(self, entity):
     return entity.skills.alchemy.level.val
@@ -329,7 +331,7 @@ class Ammunition(Equipment, Stack):
 
     return self.damage
 
-class Scrap(Ammunition):
+class Whetstone(Ammunition):
   ITEM_TYPE_ID = 13
 
   def __init__(self, realm, level, **kwargs):
@@ -343,7 +345,7 @@ class Scrap(Ammunition):
   def damage(self):
     return self.melee_attack.val
 
-class Shaving(Ammunition):
+class Arrow(Ammunition):
   ITEM_TYPE_ID = 14
 
   def __init__(self, realm, level, **kwargs):
@@ -357,7 +359,7 @@ class Shaving(Ammunition):
   def damage(self):
     return self.range_attack.val
 
-class Shard(Ammunition):
+class Runes(Ammunition):
   ITEM_TYPE_ID = 15
 
   def __init__(self, realm, level, **kwargs):
@@ -372,7 +374,7 @@ class Shard(Ammunition):
     return self.mage_attack.val
 
 
-# NOTE: Each consumable item (ration, poultice) cannot be stacked,
+# NOTE: Each consumable item (ration, potion) cannot be stacked,
 #   so each item takes 1 inventory space
 class Consumable(Item):
   def use(self, entity) -> bool:
@@ -406,7 +408,7 @@ class Ration(Consumable):
     entity.resources.food.increment(self.resource_restore.val)
     entity.resources.water.increment(self.resource_restore.val)
 
-class Poultice(Consumable):
+class Potion(Consumable):
   ITEM_TYPE_ID = 17
 
   def __init__(self, realm, level, **kwargs):

@@ -2,7 +2,7 @@
 import random
 
 from nmmo.entity import entity
-from nmmo.io import action as Action
+from nmmo.core import action as Action
 from nmmo.systems import combat, droptable
 from nmmo.systems.ai import policy
 from nmmo.systems import item as Item
@@ -77,9 +77,6 @@ class NPC(entity.Entity):
     source.gold.increment(self.gold.val)
     self.gold.update(0)
 
-    # TODO(kywch): make source receive the highest-level items first
-    #   because source cannot take it if the inventory is full
-    #   Also, destroy the remaining items if the source cannot take those
     for item in self.droptable.roll(self.realm, self.attack_level):
       if source.is_player and source.inventory.space:
         source.inventory.receive(item)
@@ -149,7 +146,7 @@ class NPC(entity.Entity):
       ent.droptable.add(random.choice(armor))
 
     if config.PROFESSION_SYSTEM_ENABLED:
-      tools =  [Item.Rod, Item.Gloves, Item.Pickaxe, Item.Chisel, Item.Arcane]
+      tools =  [Item.Rod, Item.Gloves, Item.Pickaxe, Item.Axe, Item.Chisel]
       ent.droptable.add(random.choice(tools))
 
     return ent

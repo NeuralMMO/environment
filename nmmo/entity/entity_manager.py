@@ -18,7 +18,7 @@ class EntityGroup(Mapping):
     self.config = realm.config
 
     self.entities: Dict[int, Entity] = {}
-    self.dead: Dict[int, Entity] = {}
+    self.dead_this_tick: Dict[int, Entity] = {}
 
   def __len__(self):
     return len(self.entities)
@@ -37,7 +37,7 @@ class EntityGroup(Mapping):
 
   @property
   def corporeal(self):
-    return {**self.entities, **self.dead}
+    return {**self.entities, **self.dead_this_tick}
 
   @property
   def packet(self):
@@ -45,10 +45,14 @@ class EntityGroup(Mapping):
 
   def reset(self):
     for ent in self.entities.values():
+      # destroy the items
+      if self.config.ITEM_SYSTEM_ENABLED:
+        for item in list(ent.inventory.items):
+          item.destroy()
       ent.datastore_record.delete()
 
     self.entities = {}
-    self.dead = {}
+    self.dead_this_tick = {}
 
   def spawn(self, entity):
     pos, ent_id = entity.pos, entity.id.val
@@ -56,19 +60,26 @@ class EntityGroup(Mapping):
     self.entities[ent_id] = entity
 
   def cull(self):
-    self.dead = {}
+    self.dead_this_tick = {}
     for ent_id in list(self.entities):
       player = self.entities[ent_id]
       if not player.alive:
         r, c  = player.pos
         ent_id = player.ent_id
-        self.dead[ent_id] = player
+        self.dead_this_tick[ent_id] = player
 
         self.realm.map.tiles[r, c].remove_entity(ent_id)
+
+        # destroy the remaining items (of starved/dehydrated players)
+        #    of the agents who don't go through receive_damage()
+        if self.config.ITEM_SYSTEM_ENABLED:
+          for item in list(player.inventory.items):
+            item.destroy()
+
         self.entities[ent_id].datastore_record.delete()
         del self.entities[ent_id]
 
-    return self.dead
+    return self.dead_this_tick
 
   def update(self, actions):
     for entity in self.entities.values():
@@ -129,25 +140,27 @@ class NPCManager(EntityGroup):
 class PlayerManager(EntityGroup):
   def __init__(self, realm):
     super().__init__(realm)
-    self.loader  = self.realm.config.PLAYER_LOADER
-    self.agents = None
+    self.loader_class = self.realm.config.PLAYER_LOADER
+    self._agent_loader: spawn.SequentialLoader = None
     self.spawned = None
 
   def reset(self):
     super().reset()
-    self.agents  = self.loader(self.config)
+    self._agent_loader = self.loader_class(self.config)
     self.spawned = OrderedSet()
 
   def spawn_individual(self, r, c, idx):
-    agent = next(self.agents)
+    agent = next(self._agent_loader)
     agent      = agent(self.config, idx)
     player     = Player(self.realm, (r, c), agent)
     super().spawn(player)
+    self.spawned.add(idx)
 
   def spawn(self):
     idx = 0
-    for r, c in spawn.spawn_concurrent(self.config, self.realm):
+    while idx < self.config.PLAYER_N:
       idx += 1
+      r, c = self._agent_loader.get_spawn_position(idx)
 
       if idx in self.entities:
         continue
@@ -155,5 +168,4 @@ class PlayerManager(EntityGroup):
       if idx in self.spawned:
         continue
 
-      self.spawned.add(idx)
       self.spawn_individual(r, c, idx)

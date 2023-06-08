@@ -6,7 +6,7 @@ from nmmo.lib.event_log import EventState, EventLogger
 from nmmo.lib.log import EventCode
 from nmmo.entity.entity import Entity
 from nmmo.systems.item import ItemState
-from nmmo.systems.item import Scrap, Ration, Hat
+from nmmo.systems.item import Whetstone, Ration, Hat
 from nmmo.systems import skill as Skill
 
 
@@ -55,7 +55,7 @@ class TestEventLog(unittest.TestCase):
     event_log.record(EventCode.GIVE_ITEM, MockEntity(4))
     event_log.record(EventCode.DESTROY_ITEM, MockEntity(5))
     event_log.record(EventCode.HARVEST_ITEM, MockEntity(6),
-                     item=Scrap(mock_realm, 3))
+                     item=Whetstone(mock_realm, 3))
 
     mock_realm.tick = 2
     event_log.record(EventCode.GIVE_GOLD, MockEntity(7))
@@ -63,7 +63,7 @@ class TestEventLog(unittest.TestCase):
                      item=Ration(mock_realm, 5), price=11)
     event_log.record(EventCode.EARN_GOLD, MockEntity(9), amount=15)
     event_log.record(EventCode.BUY_ITEM, MockEntity(10),
-                     item=Scrap(mock_realm, 7), price=21)
+                     item=Whetstone(mock_realm, 7), price=21)
     #event_log.record(EventCode.SPEND_GOLD, env.realm.players[11], amount=25)
 
     mock_realm.tick = 3

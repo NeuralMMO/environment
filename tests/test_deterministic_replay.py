@@ -44,8 +44,8 @@ def make_actions_picklable(actions: Dict[int, Dict[str, Dict[str, Any]]]):
   for eid in actions:
     for atn, args in actions[eid].items():
       for arg, val in args.items():
-        if arg == nmmo.io.action.Price and not isinstance(val, int):
-          # <class 'nmmo.io.action.Price'>: <class 'nmmo.io.action.Discrete_1'>
+        if arg == nmmo.action.Price and not isinstance(val, int):
+          # <class 'nmmo.action.Price'>: <class 'nmmo.action.Discrete_1'>
           # convert Discrete_1 to 1
           actions[eid][atn][arg] = val.val
   return actions

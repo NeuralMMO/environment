@@ -4,9 +4,8 @@ from .version import __version__
 
 from .lib import material, spawn
 from .render.overlay import Overlay, OverlayRegistry
-from .io import action
-from .io.action import Action
-from .core import config, agent
+from .core import config, agent, action
+from .core.action import Action
 from .core.agent import Agent
 from .core.env import Env
 from .core.terrain import MapGenerator, Terrain

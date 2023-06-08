@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict,  Iterable, TYPE_CHECKING
+from typing import Dict, Union, Iterable, TYPE_CHECKING
 from collections import OrderedDict
 from collections.abc import Set, Sequence
 
@@ -10,9 +10,11 @@ class Group(Sequence, Set):
   ''' An immutable, ordered, unique group of agents involved in a task
   '''
   def __init__(self,
-               agents: Iterable[int],
+               agents: Union(Iterable[int], int),
                name: str=None):
 
+    if isinstance(agents, int):
+      agents = (agents,)
     assert len(agents) > 0, "Team must have at least one agent"
     self.name = name if name else f"Agent({','.join([str(e) for e in agents])})"
     # Remove duplicates

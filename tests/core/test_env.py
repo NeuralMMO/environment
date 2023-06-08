@@ -1,4 +1,3 @@
-
 import unittest
 from typing import List
 
@@ -18,10 +17,8 @@ from scripted import baselines
 # 30 seems to be enough to test variety of agent actions
 TEST_HORIZON = 30
 RANDOM_SEED = random.randint(0, 10000)
-# TODO: We should check that milestones have been reached, to make
-# sure that the agents aren't just dying
+
 class Config(nmmo.config.Small, nmmo.config.AllGameSystems):
-  RENDER = False
   SPECIALIZE = True
   PLAYERS = [
     baselines.Fisher, baselines.Herbalist, baselines.Prospector,
@@ -45,6 +42,7 @@ class TestEnv(unittest.TestCase):
 
     self.assertEqual(obs.keys(), self.env.realm.players.keys())
 
+    dead_agents = set()
     for _ in tqdm(range(TEST_HORIZON)):
       entity_locations = [
         [ev.row.val, ev.col.val, e] for e, ev in self.env.realm.players.entities.items()
@@ -58,7 +56,16 @@ class TestEnv(unittest.TestCase):
             player_id, player_obs, self.env.realm, entity_locations)
         self._validate_inventory(player_id, player_obs, self.env.realm)
         self._validate_market(player_obs, self.env.realm)
-      obs, _, _, _ = self.env.step({})
+      obs, _, dones, _ = self.env.step({})
+
+      # make sure dead agents return proper dones=True
+      self.assertEqual(len(self.env.agents), len(self.env.realm.players))
+      self.assertEqual(len(self.env.possible_agents),
+                       len(self.env.realm.players) + len(self.env._dead_agents))
+      if len(self.env._dead_agents) > len(dead_agents):
+        for dead_id in self.env._dead_agents - dead_agents:
+          self.assertTrue(dones[dead_id])
+          dead_agents.add(dead_id)
 
   def _validate_tiles(self, obs, realm: Realm):
     for tile_obs in obs["Tile"]:
@@ -91,12 +98,10 @@ class TestEnv(unittest.TestCase):
     # Make sure that we see entities IFF they are in our vision radius
     row = realm.players.entities[player_id].row.val
     col = realm.players.entities[player_id].col.val
+    vision = realm.config.PLAYER_VISION_RADIUS
     visible_entities = {
       e for r, c, e in entity_locations
-      if r >= row - realm.config.PLAYER_VISION_RADIUS
-      and c >= col - realm.config.PLAYER_VISION_RADIUS
-      and r <= row + realm.config.PLAYER_VISION_RADIUS
-      and c <= col + realm.config.PLAYER_VISION_RADIUS
+      if row - vision <= r <= row + vision and col - vision <= c <= col + vision
     }
     self.assertSetEqual(visible_entities, observed_entities,
       f"Mismatch between observed: {observed_entities} " \
@@ -138,16 +143,10 @@ class TestEnv(unittest.TestCase):
 
     # items are referenced in the realm.items, which must be empty
     self.assertTrue(len(new_env.realm.items) == 0)
-
-    # items are referenced in the exchange
     self.assertTrue(len(new_env.realm.exchange._item_listings) == 0)
     self.assertTrue(len(new_env.realm.exchange._listings_queue) == 0)
 
-    # TODO(kywch): ItemState table is not empty after players/npcs.reset()
-    #   but should be. Will fix this while debugging the item system.
-    # So for now, ItemState table is cleared manually here, just to pass this test 
-    ItemState.State.table(new_env.realm.datastore).reset()
-
+    # item state table must be empty after reset
     self.assertTrue(ItemState.State.table(new_env.realm.datastore).is_empty())
 
 if __name__ == '__main__':

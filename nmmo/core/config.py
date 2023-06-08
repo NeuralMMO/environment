@@ -145,10 +145,7 @@ class Config(Template):
     return hasattr(self, name)
 
 
-  SAVE_REPLAY                  = False
-  '''Flag used to save replays'''
-
-  PROVIDE_ACTION_TARGETS       = False
+  PROVIDE_ACTION_TARGETS       = True
   '''Flag used to provide action targets mask'''
 
   PLAYERS                      = [Agent]
@@ -220,7 +217,7 @@ class Config(Template):
   ############################################################################
   ### Agent Parameters
   IMMORTAL = False
-  '''Debug parameter: prevents agents from dying except by lava'''
+  '''Debug parameter: prevents agents from dying except by void'''
 
   BASE_HEALTH                = 10
   '''Initial Constitution level and agent health'''
@@ -260,7 +257,7 @@ class Config(Template):
   '''Size of each map (number of tiles along each side)'''
 
   MAP_BORDER                   = 16
-  '''Number of lava border tiles surrounding each side of the map'''
+  '''Number of void border tiles surrounding each side of the map'''
 
   @property
   def MAP_SIZE(self):
@@ -329,8 +326,8 @@ class Terrain:
   TERRAIN_TILES_PER_OCTAVE     = 8
   '''Number of octaves sampled from log2 spaced TERRAIN_FREQUENCY range'''
 
-  TERRAIN_LAVA                 = 0.0
-  '''Noise threshold for lava generation'''
+  TERRAIN_VOID                 = 0.0
+  '''Noise threshold for void generation'''
 
   TERRAIN_WATER                = 0.30
   '''Noise threshold for water generation'''
@@ -338,8 +335,8 @@ class Terrain:
   TERRAIN_GRASS                = 0.70
   '''Noise threshold for grass'''
 
-  TERRAIN_FOREST               = 0.85
-  '''Noise threshold for forest'''
+  TERRAIN_FOILAGE              = 0.85
+  '''Noise threshold for foilage (food tile)'''
 
 
 class Resource:
@@ -349,7 +346,7 @@ class Resource:
   '''Game system flag'''
 
   RESOURCE_BASE                       = 100
-  '''Initial level and capacity for Hunting + Fishing resource skills'''
+  '''Initial level and capacity for food and water'''
 
   RESOURCE_DEPLETION_RATE             = 5
   '''Depletion rate for food and water'''
@@ -360,11 +357,11 @@ class Resource:
   RESOURCE_DEHYDRATION_RATE           = 10
   '''Damage per tick without water'''
 
-  RESOURCE_FOREST_CAPACITY            = 1
-  '''Maximum number of harvests before a forest tile decays'''
+  RESOURCE_FOILAGE_CAPACITY            = 1
+  '''Maximum number of harvests before a foilage tile decays'''
 
-  RESOURCE_FOREST_RESPAWN             = 0.025
-  '''Probability that a harvested forest tile will regenerate each tick'''
+  RESOURCE_FOILAGE_RESPAWN             = 0.025
+  '''Probability that a harvested foilage tile will regenerate each tick'''
 
   RESOURCE_HARVEST_RESTORE_FRACTION   = 1.0
   '''Fraction of maximum capacity restored upon collecting a resource'''
@@ -432,6 +429,9 @@ class Progression:
 
   PROGRESSION_CONSUMABLE_XP_SCALE   = 5
   '''Multiplier on top of XP_SCALE for Fishing and Herbalism'''
+
+  PROGRESSION_BASE_LEVEL            = 1
+  '''Initial skill level'''
 
   PROGRESSION_LEVEL_MAX             = 10
   '''Max skill level'''
@@ -603,6 +603,9 @@ class Exchange:
 
   EXCHANGE_SYSTEM_ENABLED             = True
   '''Game system flag'''
+
+  EXCHANGE_BASE_GOLD                  = 1
+  '''Initial gold amount'''
 
   EXCHANGE_LISTING_DURATION           = 5
   '''The number of ticks, during which the item is listed for sale'''

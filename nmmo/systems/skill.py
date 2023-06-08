@@ -80,7 +80,7 @@ class CombatSkill(Skill):
 class NonCombatSkill(Skill):
   def __init__(self, skill_group: SkillGroup):
     super().__init__(skill_group)
-    self._level = Lvl(1)
+    self._level = DummyLevel()
 
   @property
   def level(self):
@@ -93,6 +93,8 @@ class HarvestSkill(NonCombatSkill):
 
     entity = self.entity
 
+    # harvest without tool will only yield level-1 item even with high skill level
+    # for example, fishing level=5 without rod will only yield level-1 ration
     level = 1
     tool  = entity.equipment.held
     if matl.tool is not None and isinstance(tool, matl.tool):
@@ -250,8 +252,8 @@ Mage.weakness  = Range
 
 ### Individual Skills ###
 
-class Lvl:
-  def __init__(self, val):
+class DummyLevel:
+  def __init__(self, val=0):
     self.val = val
 
   def update(self, val):
@@ -263,12 +265,12 @@ class Water(HarvestSkill):
     if not config.RESOURCE_SYSTEM_ENABLED:
       return
 
+    if config.IMMORTAL:
+      return
+
     depletion = config.RESOURCE_DEPLETION_RATE
     water = self.entity.resources.water
     water.decrement(depletion)
-
-    if self.config.IMMORTAL:
-      return
 
     if not self.harvest_adjacent(material.Water, deplete=False):
       return
@@ -281,20 +283,19 @@ class Water(HarvestSkill):
 
 
 class Food(HarvestSkill):
-  def __init__(self, skill_group):
-    self._level = Lvl(1)
-    super().__init__(skill_group)
-
   def update(self):
     config = self.config
     if not config.RESOURCE_SYSTEM_ENABLED:
+      return
+
+    if config.IMMORTAL:
       return
 
     depletion = config.RESOURCE_DEPLETION_RATE
     food = self.entity.resources.food
     food.decrement(depletion)
 
-    if not self.harvest(material.Forest):
+    if not self.harvest(material.Foilage):
       return
 
     restore = np.floor(config.RESOURCE_BASE

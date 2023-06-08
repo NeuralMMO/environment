@@ -19,7 +19,7 @@ def validTarget(ent, targ, rng):
 
 def validResource(ent, tile, rng):
    return tile is not None and tile.state.tex in (
-      'forest', 'water') and distance(ent, tile) <= rng
+      'foilage', 'water') and distance(ent, tile) <= rng
 
 
 def directionTowards(ent, targ):

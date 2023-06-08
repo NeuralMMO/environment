@@ -11,19 +11,20 @@ class MockRealm:
     self.config = nmmo.config.Small()
 
 class MockEntity():
-  def __init__(self, id):
-    self.ent_id = id
+  def __init__(self, ent_id):
+    self.ent_id = ent_id
 
 class TestTile(unittest.TestCase):
+  # pylint: disable=no-member
   def test_tile(self):
     mock_realm = MockRealm()
     tile = Tile(mock_realm, 10, 20)
 
-    tile.reset(material.Forest, nmmo.config.Small())
+    tile.reset(material.Foilage, nmmo.config.Small())
 
     self.assertEqual(tile.row.val, 10)
     self.assertEqual(tile.col.val, 20)
-    self.assertEqual(tile.material_id.val, material.Forest.index)
+    self.assertEqual(tile.material_id.val, material.Foilage.index)
 
     tile.add_entity(MockEntity(1))
     tile.add_entity(MockEntity(2))
@@ -36,4 +37,4 @@ class TestTile(unittest.TestCase):
     self.assertEqual(tile.material_id.val, material.Scrub.index)
 
 if __name__ == '__main__':
-    unittest.main()
+  unittest.main()

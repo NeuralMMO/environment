@@ -20,8 +20,8 @@ class Material:
   def harvest(self):
     return self.__class__.table
 
-class Lava(Material):
-  tex   = 'lava'
+class Void(Material):
+  tex   = 'void'
   index = 0
 
 class Water(Material):
@@ -42,8 +42,8 @@ class Scrub(Material):
   tex   = 'scrub'
   index = 3
 
-class Forest(Material):
-  tex   = 'forest'
+class Foilage(Material):
+  tex   = 'foilage'
   index = 4
 
   deplete = Scrub
@@ -51,8 +51,8 @@ class Forest(Material):
 
   def __init__(self, config):
     if config.RESOURCE_SYSTEM_ENABLED:
-      self.capacity = config.RESOURCE_FOREST_CAPACITY
-      self.respawn  = config.RESOURCE_FOREST_RESPAWN
+      self.capacity = config.RESOURCE_FOILAGE_CAPACITY
+      self.respawn  = config.RESOURCE_FOILAGE_RESPAWN
 
 class Stone(Material):
   tex   = 'stone'
@@ -73,14 +73,14 @@ class Ore(Material):
     cls = self.__class__
     if cls.table is None:
       cls.table = droptable.Standard()
-      cls.table.add(item.Scrap)
+      cls.table.add(item.Whetstone)
 
       if config.EQUIPMENT_SYSTEM_ENABLED:
         cls.table.add(item.Wand, prob=config.WEAPON_DROP_PROB)
 
     if config.PROFESSION_SYSTEM_ENABLED:
       self.capacity = config.PROFESSION_ORE_CAPACITY
-      self.respawn  = config.PROFESSION_ORE_CAPACITY
+      self.respawn  = config.PROFESSION_ORE_RESPAWN
 
   tool    = item.Pickaxe
   deplete = Slag
@@ -94,15 +94,15 @@ class Tree(Material):
   index = 9
 
   deplete = Stump
-  tool    = item.Chisel
+  tool    = item.Axe
 
   def __init__(self, config):
     cls = self.__class__
     if cls.table is None:
       cls.table = droptable.Standard()
-      cls.table.add(item.Shaving)
+      cls.table.add(item.Arrow)
       if config.EQUIPMENT_SYSTEM_ENABLED:
-        cls.table.add(item.Sword, prob=config.WEAPON_DROP_PROB)
+        cls.table.add(item.Spear, prob=config.WEAPON_DROP_PROB)
 
     if config.PROFESSION_SYSTEM_ENABLED:
       self.capacity = config.PROFESSION_TREE_CAPACITY
@@ -117,13 +117,13 @@ class Crystal(Material):
   index = 11
 
   deplete = Fragment
-  tool    = item.Arcane
+  tool    = item.Chisel
 
   def __init__(self, config):
     cls = self.__class__
     if cls.table is None:
       cls.table = droptable.Standard()
-      cls.table.add(item.Shard)
+      cls.table.add(item.Runes)
       if config.EQUIPMENT_SYSTEM_ENABLED:
         cls.table.add(item.Bow, prob=config.WEAPON_DROP_PROB)
 
@@ -143,7 +143,7 @@ class Herb(Material):
   tool    = item.Gloves
 
   table   = droptable.Standard()
-  table.add(item.Poultice)
+  table.add(item.Potion)
 
   def __init__(self, config):
     if config.PROFESSION_SYSTEM_ENABLED:
@@ -188,18 +188,18 @@ class Meta(type):
 class All(metaclass=Meta):
   '''List of all materials'''
   materials = {
-    Lava, Water, Grass, Scrub, Forest,
+    Void, Water, Grass, Scrub, Foilage,
     Stone, Slag, Ore, Stump, Tree,
     Fragment, Crystal, Weeds, Herb, Ocean, Fish}
 
 class Impassible(metaclass=Meta):
   '''Materials that agents cannot walk through'''
-  materials = {Lava, Water, Stone, Ocean, Fish}
+  materials = {Void, Water, Stone, Ocean, Fish}
 
 class Habitable(metaclass=Meta):
   '''Materials that agents cannot walk on'''
-  materials = {Grass, Scrub, Forest, Ore, Slag, Tree, Stump, Crystal, Fragment, Herb, Weeds}
+  materials = {Grass, Scrub, Foilage, Ore, Slag, Tree, Stump, Crystal, Fragment, Herb, Weeds}
 
 class Harvestable(metaclass=Meta):
   '''Materials that agents can harvest'''
-  materials = {Water, Forest, Ore, Tree, Crystal, Herb, Fish}
+  materials = {Water, Foilage, Ore, Tree, Crystal, Herb, Fish}

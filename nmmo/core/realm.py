@@ -10,9 +10,9 @@ import nmmo
 from nmmo.core.log_helper import LogHelper
 from nmmo.core.map import Map
 from nmmo.core.tile import TileState
+from nmmo.core.action import Action, Buy
 from nmmo.entity.entity import EntityState
 from nmmo.entity.entity_manager import NPCManager, PlayerManager
-from nmmo.io.action import Action, Buy
 from nmmo.datastore.numpy_datastore import NumpyDatastore
 from nmmo.systems.exchange import Exchange
 from nmmo.systems.item import Item, ItemState
@@ -62,7 +62,7 @@ class Realm:
     self.items = {}
 
     # Replay helper
-    self._replay_helper = ReplayHelper.create(self)
+    self._replay_helper = None
 
     # Initialize actions
     nmmo.Action.init(config)
@@ -75,27 +75,25 @@ class Realm:
     """
     self.log_helper.reset()
     self.event_log.reset()
-    self._replay_helper.reset()
-    self.map.reset(map_id or np.random.randint(self.config.MAP_N) + 1)
+
+    map_id = map_id or np.random.randint(self.config.MAP_N) + 1
+    self.map.reset(map_id)
+    self.tick = 0
 
     # EntityState and ItemState tables must be empty after players/npcs.reset()
     self.players.reset()
     self.npcs.reset()
-
-    # TODO: track down entity/item leaks
-    EntityState.State.table(self.datastore).reset()
     assert EntityState.State.table(self.datastore).is_empty(), \
         "EntityState table is not empty"
+    assert ItemState.State.table(self.datastore).is_empty(), \
+        "ItemState table is not empty"
 
-    # TODO(kywch): ItemState table is not empty after players/npcs.reset()
-    #   but should be. Will fix this while debugging the item system.
-    # assert ItemState.State.table(self.datastore).is_empty(), \
-    #     "ItemState table is not empty"
+    # DataStore id allocator must be reset to be deterministic
+    EntityState.State.table(self.datastore).reset()
     ItemState.State.table(self.datastore).reset()
 
     self.players.spawn()
     self.npcs.spawn()
-    self.tick = 0
 
     # Global item exchange
     self.exchange = Exchange(self)
@@ -103,6 +101,9 @@ class Realm:
     # Global item registry
     Item.INSTANCE_ID = 0
     self.items = {}
+
+    if self._replay_helper is not None:
+      self._replay_helper.reset()
 
   def packet(self):
     """Client packet"""
@@ -184,7 +185,8 @@ class Realm:
     self.map.step()
     self.exchange.step(self.tick)
     self.log_helper.update(dead)
-    self._replay_helper.update()
+    if self._replay_helper is not None:
+      self._replay_helper.update()
 
     self.tick += 1
 
@@ -201,11 +203,8 @@ class Realm:
       else:
         logging.info("Milestone: %s %s %s", category, value, message)
 
-  def save_replay(self, save_path, compress=True):
-    self._replay_helper.save(save_path, compress)
+  def record_replay(self, replay_helper: ReplayHelper) -> ReplayHelper:
+    self._replay_helper = replay_helper
+    self._replay_helper.set_realm(self)
 
-  def get_replay(self):
-    return {
-      'map': self._replay_helper.map,
-      'packets': self._replay_helper.packets 
-    }
+    return replay_helper
