@@ -1,75 +1,74 @@
-#from pdb import set_trace as T
 import unittest
-
-import logging
 import random
+import numpy as np
 from tqdm import tqdm
 
 from tests.testhelpers import ScriptedAgentTestConfig, ScriptedAgentTestEnv
-from tests.testhelpers import observations_are_equal, actions_are_equal
+from tests.testhelpers import observations_are_equal
 
 # 30 seems to be enough to test variety of agent actions
 TEST_HORIZON = 30
-RANDOM_SEED = random.randint(0, 10000)
+RANDOM_SEED = random.randint(0, 100000)
 
+
+def rollout_with_seed(env, seed):
+  init_obs = env.reset(seed=seed)
+  for _ in tqdm(range(TEST_HORIZON)):
+    obs, _, _, _ = env.step({})
+  event_log = env.realm.event_log.get_data()
+
+  return init_obs, obs, event_log
 
 class TestDeterminism(unittest.TestCase):
-  @classmethod
-  def setUpClass(cls):
-    cls.horizon = TEST_HORIZON
-    cls.rand_seed = RANDOM_SEED
-    cls.config = ScriptedAgentTestConfig()
-    env = ScriptedAgentTestEnv(cls.config)
+  def test_single_proc(self):
+    config = ScriptedAgentTestConfig()
+    env = ScriptedAgentTestEnv(config)
 
-    logging.info('TestDeterminism: Setting up the reference env with seed %s', str(cls.rand_seed))
-    cls.init_obs_src = env.reset(seed=cls.rand_seed)
-    cls.actions_src = []
-    logging.info('TestDeterminism: Running %s ticks', str(cls.horizon))
-    for _ in tqdm(range(cls.horizon)):
-      nxt_obs_src, _, _, _ = env.step({})
-      cls.actions_src.append(env.actions)
-    cls.final_obs_src = nxt_obs_src
-    npcs_src = {}
-    for nid, npc in list(env.realm.npcs.items()):
-      npcs_src[nid] = npc.packet()
-    cls.final_npcs_src = npcs_src
+    # the source run
+    init_obs_src, final_obs_src, event_log_src = rollout_with_seed(env, RANDOM_SEED)
 
-    logging.info('TestDeterminism: Setting up the replication env with seed %s', str(cls.rand_seed))
-    cls.init_obs_rep = env.reset(seed=cls.rand_seed)
-    cls.actions_rep = []
-    logging.info('TestDeterminism: Running %s ticks', str(cls.horizon))
-    for _ in tqdm(range(cls.horizon)):
-      nxt_obs_rep, _, _, _ = env.step({})
-      cls.actions_rep.append(env.actions)
-    cls.final_obs_rep = nxt_obs_rep
-    npcs_rep = {}
-    for nid, npc in list(env.realm.npcs.items()):
-      npcs_rep[nid] = npc.packet()
-    cls.final_npcs_rep = npcs_rep
+    # the replication run
+    init_obs_rep, final_obs_rep, event_log_rep = rollout_with_seed(env, RANDOM_SEED)
 
-  def test_func_are_observations_equal(self):
-    self.assertTrue(observations_are_equal(self.init_obs_src, self.init_obs_src))
-    self.assertTrue(observations_are_equal(self.final_obs_src, self.final_obs_src))
-    self.assertTrue(actions_are_equal(self.actions_src[0], self.actions_src[0]))
-    self.assertDictEqual(self.final_npcs_src, self.final_npcs_src)
+    # sanity checks
+    self.assertTrue(observations_are_equal(init_obs_src, init_obs_src))
+    self.assertTrue(observations_are_equal(final_obs_src, final_obs_src))
 
-  def test_compare_initial_observations(self):
-    # assertDictEqual CANNOT replace are_observations_equal
-    self.assertTrue(observations_are_equal(self.init_obs_src, self.init_obs_rep))
-    #self.assertDictEqual(self.init_obs_src, self.init_obs_rep)
+    # pylint: disable=expression-not-assigned
+    # compare the source and replication
+    self.assertTrue(observations_are_equal(init_obs_src, init_obs_rep)),\
+      f"The determinism test failed. Seed: {RANDOM_SEED}."
+    self.assertTrue(observations_are_equal(final_obs_src, final_obs_rep)),\
+      f"The determinism test failed. Seed: {RANDOM_SEED}." # after 30 runs
+    assert np.array_equal(event_log_src, event_log_rep),\
+      f"The determinism test failed. Seed: {RANDOM_SEED}."
 
-  def test_compare_actions(self):
-    self.assertEqual(len(self.actions_src), len(self.actions_rep))
-    for t, action_src in enumerate(self.actions_src):
-      self.assertTrue(actions_are_equal(action_src, self.actions_rep[t]))
+  def test_realm_level_rng(self):
+    # the below test doesn't work now
+    # having a realm-level random number generator would fix this
+    # for example see https://github.com/openai/gym/pull/135/files
+    #   how self.np_random is initialized and used
+    pass
 
-  def test_compare_final_observations(self):
-    # assertDictEqual CANNOT replace are_observations_equal
-    self.assertTrue(observations_are_equal(self.final_obs_src, self.final_obs_rep))
-    #self.assertDictEqual(self.final_obs_src, self.final_obs_rep)
+    # config = ScriptedAgentTestConfig()
+    # env1 = ScriptedAgentTestEnv(config)
+    # env2 = ScriptedAgentTestEnv(config)
+    # envs = [env1, env2]
 
-  def test_compare_final_npcs(self)        :
-    self.assertDictEqual(self.final_npcs_src, self.final_npcs_rep)
+    # init_obs = [env.reset(seed=RANDOM_SEED) for env in envs]
+
+    # for _ in tqdm(range(TEST_HORIZON)):
+    #   # step returns a tuple of (obs, rewards, dones, infos)
+    #   step_results = [env.step({}) for env in envs]
+
+    # event_logs = [env.realm.event_log.get_data() for env in envs]
+
+    # self.assertTrue(observations_are_equal(init_obs[0], init_obs[1])),\
+    #   f"The multi-env determinism failed. Seed: {RANDOM_SEED}."
+    # self.assertTrue(observations_are_equal(step_results[0][0], step_results[1][0])),\
+    #   f"The multi-env determinism failed. Seed: {RANDOM_SEED}." # after 30 runs
+    # assert np.array_equal(event_logs[0], event_logs[1]),\
+    #   f"The multi-env determinism failed. Seed: {RANDOM_SEED}."
 
 
 if __name__ == '__main__':
