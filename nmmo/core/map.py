@@ -57,11 +57,16 @@ class Map:
       raise
 
     materials = {mat.index: mat for mat in material.All}
+    r, c = 0, 0
     for r, row in enumerate(map_file):
       for c, idx in enumerate(row):
         mat  = materials[idx]
         tile = self.tiles[r, c]
         tile.reset(mat, config)
+
+    assert c == config.MAP_SIZE - 1
+    assert r == config.MAP_SIZE - 1
+
     self._repr = None
 
   def step(self):
