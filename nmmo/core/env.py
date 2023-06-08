@@ -15,8 +15,8 @@ from nmmo.core.observation import Observation
 from nmmo.core.tile import Tile
 from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
-from nmmo.task.game_state import GameStateGenerator
 from nmmo.task import task_api
+from nmmo.task.game_state import GameStateGenerator
 from scripted.baselines import Scripted
 
 class Env(ParallelEnv):
@@ -35,11 +35,13 @@ class Env(ParallelEnv):
     self.obs = None
 
     self.possible_agents = list(range(1, config.PLAYER_N + 1))
-    self._dead_agents = OrderedSet()
+    self._dead_agents = set()
+    self._episode_stats = defaultdict(lambda: defaultdict(float))
     self.scripted_agents = OrderedSet()
 
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
     self.game_state = None
+    # Default task: rewards 1 each turn agent is alive
     self.tasks = task_api.nmmo_default_task(self.possible_agents)
 
   # pylint: disable=method-cache-max-size-none
@@ -144,7 +146,8 @@ class Env(ParallelEnv):
 
     self._init_random(seed)
     self.realm.reset(map_id)
-    self._dead_agents = OrderedSet()
+    self._dead_agents = set()
+    self._episode_stats.clear()
 
     # check if there are scripted agents
     for eid, ent in self.realm.players.items():
@@ -269,6 +272,7 @@ class Env(ParallelEnv):
       if eid not in self.realm.players or self.realm.tick >= self.config.HORIZON:
         if eid not in self._dead_agents:
           self._dead_agents.add(eid)
+          self._episode_stats[eid]["death_tick"] = self.realm.tick
           dones[eid] = True
 
     # Store the observations, since actions reference them
@@ -276,6 +280,16 @@ class Env(ParallelEnv):
     gym_obs = {a: o.to_gym() for a,o in self.obs.items()}
 
     rewards, infos = self._compute_rewards(self.obs.keys(), dones)
+    for k,r in rewards.items():
+      self._episode_stats[k]['reward'] += r
+
+    # When the episode ends, add the episode stats to the info of one of
+    # the last dagents
+    if len(self._dead_agents) == len(self.possible_agents):
+      for agent_id, stats in self._episode_stats.items():
+        if agent_id not in infos:
+          infos[agent_id] = {}
+        infos[agent_id]["episode_stats"] = stats
 
     return gym_obs, rewards, dones, infos
 
