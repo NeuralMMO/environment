@@ -7,7 +7,7 @@ from nmmo.core.env import Env
 from nmmo.task.predicate_api import make_predicate, Predicate
 from nmmo.task.task_api import Task, make_team_tasks
 from nmmo.task.group import Group
-from nmmo.task.constraint import InvalidConstraint, ScalarConstraint
+from nmmo.task.constraint import ScalarConstraint, GroupConstraint, AGENT_LIST_CONSTRAINT
 from nmmo.task.base_predicates import TickGE, CanSeeGroup, AllMembersWithinRange
 
 from nmmo.systems import item as Item
@@ -31,6 +31,7 @@ class MockGameState():
   def __init__(self):
     # pylint: disable=super-init-not-called
     self.config = nmmo.config.Default()
+    self.current_tick = -1
     self.cache_result = {}
     self.get_subject_view = lambda _: None
 
@@ -130,27 +131,11 @@ class TestTaskAPI(unittest.TestCase):
       "(SUB_(ADD_(MUL_(Failure_(0,))_(Fake_(2,)_1_Hat_Melee))_0.3)_0.4))")
 
   def test_constraint(self):
-    # pylint: disable=not-callable,no-value-for-parameter
-    # define predicate classes from functions
-
-    # make predicate class from function
-    success_pred_cls = make_predicate(Success)
-    tickge_pred_cls = make_predicate(TickGE)
-    self.assertTrue(isinstance(TickGE, FunctionType))
-
     mock_gs = MockGameState()
-    good = success_pred_cls(Group(0))
-    bad = success_pred_cls(Group(99999))
-    good(mock_gs)
-    self.assertRaises(InvalidConstraint,lambda: bad(mock_gs))
-
     scalar = ScalarConstraint(low=-10,high=10)
     for _ in range(10):
       self.assertTrue(scalar.sample(mock_gs.config)<10)
       self.assertTrue(scalar.sample(mock_gs.config)>=-10)
-
-    bad = tickge_pred_cls(Group(0), -1)
-    self.assertRaises(InvalidConstraint, lambda: bad(mock_gs))
 
   def test_sample_predicate(self):
     # pylint: disable=no-value-for-parameter,expression-not-assigned
@@ -160,7 +145,8 @@ class TestTaskAPI(unittest.TestCase):
 
     # if the predicate class is instantiated without the subject,
     mock_gs = MockGameState()
-    predicate = canseegrp_pred_cls() & tickge_pred_cls()
+    predicate = canseegrp_pred_cls(subject=GroupConstraint, target=AGENT_LIST_CONSTRAINT) &\
+                tickge_pred_cls(subject=GroupConstraint, num_tick=ScalarConstraint)
     self.assertEqual(predicate.name,
                      "(AND_(CanSeeGroup_subject:GroupConstraint_target:AgentListConstraint)_"+\
                      "(TickGE_subject:GroupConstraint_num_tick:ScalarConstraint))")
