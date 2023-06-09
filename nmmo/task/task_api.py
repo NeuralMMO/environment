@@ -135,7 +135,7 @@ class OngoingTask(Task):
 #   with the agent as the predicate subject and task assignee
 def make_same_task(predicate: Union[type[Predicate], Callable],
                    agent_list: Iterable[int],
-                   task_cls = type[Task], **kwargs) -> List[Task]:
+                   task_cls = Task, **kwargs) -> List[Task]:
   # if a function is provided, make it a predicate class
   if isinstance(predicate, FunctionType):
     predicate = make_predicate(predicate)
