@@ -2,6 +2,7 @@
 from typing import Callable, Iterable, Dict, List, Union, Tuple
 from types import FunctionType
 from abc import ABC
+import inspect
 
 from nmmo.task.group import Group
 from nmmo.task.predicate_api import Predicate, make_predicate, arg_to_string
@@ -25,7 +26,6 @@ class Task(ABC):
     self._progress = 0.0
     self._completed = False
     self._reward_multiplier = reward_multiplier
-
     self.name = self._make_name(self.__class__.__name__,
                                 eval_fn=eval_fn, assignee=self._assignee)
 
@@ -86,6 +86,37 @@ class Task(ABC):
 
   def __str__(self):
     return self.name
+
+  @property
+  def subject(self):
+    if isinstance(self._eval_fn, Predicate):
+      return self._eval_fn.subject.agents
+    return self.assignee
+
+  def get_source_code(self):
+    if isinstance(self._eval_fn, Predicate):
+      return self._eval_fn.get_source_code()
+    return inspect.getsource(self._eval_fn).strip()
+
+  def get_signature(self):
+    if isinstance(self._eval_fn, Predicate):
+      return self._eval_fn.get_signature()
+    signature = inspect.signature(self._eval_fn)
+    return list(signature.parameters)
+
+  @property
+  def args(self):
+    if isinstance(self._eval_fn, Predicate):
+      return self._eval_fn.args
+    # the function _eval_fn must only take gs
+    return []
+
+  @property
+  def kwargs(self):
+    if isinstance(self._eval_fn, Predicate):
+      return self._eval_fn.kwargs
+    # the function _eval_fn must only take gs
+    return {}
 
 class OngoingTask(Task):
   def _map_progress_to_reward(self, gs) -> float:
