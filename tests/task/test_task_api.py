@@ -57,21 +57,45 @@ class TestTaskAPI(unittest.TestCase):
     # NOTE: only the instantiated predicate can be used with operators like below
     mock_gs = MockGameState()
 
+    # get the individual predicate's source code
+    self.assertEqual(SUCCESS.get_source_code(),
+                     'def Success(gs, subject: Group):\n  return True')
+    self.assertEqual(FAILURE.get_source_code(),
+                     'def Failure(gs, subject: Group):\n  return False')
+
     # AND (&), OR (|), NOT (~)
     pred1 = SUCCESS & FAILURE
     self.assertFalse(pred1(mock_gs))
+    # NOTE: get_source_code() of the combined predicates returns the joined str
+    #   of each predicate's source code, which may NOT represent what the actual
+    #   predicate is doing
+    self.assertEqual(pred1.get_source_code(),
+                     'def Success(gs, subject: Group):\n  return True\n\n'+
+                     'def Failure(gs, subject: Group):\n  return False')
 
     pred2 = SUCCESS | FAILURE | SUCCESS
     self.assertTrue(pred2(mock_gs))
+    self.assertEqual(pred2.get_source_code(),
+                     'def Success(gs, subject: Group):\n  return True\n\n'+
+                     'def Failure(gs, subject: Group):\n  return False\n\n'+
+                     'def Success(gs, subject: Group):\n  return True')
 
     pred3 = SUCCESS & ~ FAILURE & SUCCESS
     self.assertTrue(pred3(mock_gs))
+    # NOTE: demonstrating the above point -- it just returns the functions
+    #   NOT what this predicate actually evaluates.
+    self.assertEqual(pred2.get_source_code(),
+                     pred3.get_source_code())
 
     # predicate math
     pred4 = 0.1 * SUCCESS + 0.3
     self.assertEqual(pred4(mock_gs), 0.4)
     self.assertEqual(pred4.name,
                      "(ADD_(MUL_(Success_(0,))_0.1)_0.3)")
+    # NOTE: demonstrating the above point again, -- it just returns the functions
+    #   NOT what this predicate actually evaluates.
+    self.assertEqual(pred4.get_source_code(),
+                     'def Success(gs, subject: Group):\n  return True')
 
     pred5 = 0.3 * SUCCESS - 1
     self.assertEqual(pred5(mock_gs), 0.0) # cannot go below 0
@@ -157,13 +181,27 @@ class TestTaskAPI(unittest.TestCase):
     fake_pred_cls = make_predicate(Fake)
 
     mock_gs = MockGameState()
-    predicate = fake_pred_cls(Group(2), 1, Item.Hat, Action.Melee)
+    group = Group(2)
+    item = Item.Hat
+    action = Action.Melee
+    predicate = fake_pred_cls(group, a=1, b=item, c=action)
+    self.assertEqual(predicate.get_source_code(),
+                     'def Fake(gs, subject, a,b,c):\n  return False')
+    self.assertEqual(predicate.get_signature(), ['gs', 'subject', 'a', 'b', 'c'])
+    self.assertEqual(predicate.args, [group])
+    self.assertDictEqual(predicate.kwargs, {'a': 1, 'b': item, 'c': action})
+
     assignee = [1,2,3] # list of agent ids
     task = predicate.create_task(assignee=assignee)
     rewards, infos = task.compute_rewards(mock_gs)
 
     self.assertEqual(task.name, # contains predicate name and assignee list
-                     "(Task_eval_fn:(Fake_(2,)_1_Hat_Melee)_assignee:(1,2,3))")
+                     "(Task_eval_fn:(Fake_(2,)_a:1_b:Hat_c:Melee)_assignee:(1,2,3))")
+    self.assertEqual(task.get_source_code(),
+                     'def Fake(gs, subject, a,b,c):\n  return False')
+    self.assertEqual(task.get_signature(), ['gs', 'subject', 'a', 'b', 'c'])
+    self.assertEqual(task.args, [group])
+    self.assertDictEqual(task.kwargs, {'a': 1, 'b': item, 'c': action})
     for agent_id in assignee:
       self.assertEqual(rewards[agent_id], 0)
       self.assertEqual(infos[agent_id]['progress'], 0) # progress (False -> 0)
@@ -182,6 +220,14 @@ class TestTaskAPI(unittest.TestCase):
 
     self.assertEqual(task.name, # contains predicate name and assignee list
                      "(Task_eval_fn:is_agent_1_assignee:(1,2,3))")
+    self.assertEqual(task.get_source_code(),
+                     'def is_agent_1(gs):\n        ' +
+                     'return any(agent_id == 1 for agent_id in subject.agents)')
+    self.assertEqual(task.get_signature(), ['gs'])
+    self.assertEqual(task.args, [])
+    self.assertDictEqual(task.kwargs, {})
+    self.assertEqual(task.subject, tuple(assignee))
+    self.assertEqual(task.assignee, tuple(assignee))
     for agent_id in assignee:
       self.assertEqual(rewards[agent_id], 1)
       self.assertEqual(infos[agent_id]['progress'], 1) # progress (True -> 1)
@@ -206,6 +252,18 @@ class TestTaskAPI(unittest.TestCase):
     env = Env(config)
     env.reset(make_task_fn=lambda: make_team_tasks(teams, [task_spec]))
 
+    task = env.tasks[0]
+    self.assertEqual(task.name,
+                     '(Task_eval_fn:(PracticeFormation_(1,2,3)_dist:1_num_tick:10)'+
+                     '_assignee:(1,2,3))')
+    self.assertEqual(task.get_source_code(),
+                     'def PracticeFormation(gs, subject, dist, num_tick):\n      '+
+                     'return AllMembersWithinRange(gs, subject, dist) * '+
+                     'TickGE(gs, subject, num_tick)')
+    self.assertEqual(task.get_signature(), ['gs', 'subject', 'dist', 'num_tick'])
+    self.assertEqual(task.subject, tuple(teams[0]))
+    self.assertEqual(task.kwargs, task_spec[2])
+    self.assertEqual(task.assignee, tuple(teams[0]))
     # move agent 2, 3 to agent 1's pos
     for agent_id in [2,3]:
       change_spawn_pos(env.realm, agent_id,

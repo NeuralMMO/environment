@@ -124,6 +124,26 @@ class Predicate(ABC):
   def __str__(self):
     return self.name
 
+  @abstractmethod
+  def get_source_code(self) -> str:
+    """ Returns the actual source code how the game state/progress evaluation is done.
+    """
+    raise NotImplementedError
+
+  @abstractmethod
+  def get_signature(self) -> List:
+    """ Returns the signature of the game state/progress evaluation function.
+    """
+    raise NotImplementedError
+
+  @property
+  def args(self):
+    return self._args
+
+  @property
+  def kwargs(self):
+    return self._kwargs
+
   @property
   def subject(self):
     return self._subject
@@ -205,12 +225,11 @@ def make_predicate(fn: Callable) -> type[Predicate]:
       self._kwargs = kwargs
       self.name = self._make_name(fn.__name__, args, kwargs)
     def _evaluate(self, gs: GameState) -> float:
-      # pylint: disable=redefined-builtin, unused-variable
-      __doc = fn.__doc__
-      result = fn(gs, *self._args, **self._kwargs)
-      if isinstance(result, Predicate):
-        return result(gs)
-      return result
+      return fn(gs, *self._args, **self._kwargs)
+    def get_source_code(self):
+      return inspect.getsource(fn).strip()
+    def get_signature(self) -> List:
+      return list(self._signature.parameters)
 
   return FunctionPredicate
 
@@ -244,6 +263,38 @@ class PredicateOperator(Predicate):
     predicates = [p.sample(config, **kwargs) if isinstance(p, Predicate)
                   else p(None) for p in self._predicates]
     return cls(*predicates, subject=subject)
+
+  def get_source_code(self) -> str:
+    # NOTE: get_source_code() of the combined predicates returns the joined str
+    #   of each predicate's source code, which may NOT represent what the actual
+    #   predicate is doing
+    # TODO: try to generate "the source code" that matches
+    #   what the actual instantiated predicate returns,
+    #   which perhaps should reflect the actual agent ids, etc...
+    src_list = []
+    for pred in self._predicates:
+      if isinstance(pred, Predicate):
+        src_list.append(pred.get_source_code())
+    return '\n\n'.join(src_list).strip()
+
+  def get_signature(self):
+    # TODO: try to generate the correct signature
+    return []
+
+  @property
+  def args(self):
+    # TODO: try to generate the correct args
+    return []
+
+  @property
+  def kwargs(self):
+    # NOTE: This is incorrect implementation. kwargs of the combined predicates returns
+    #   all summed kwargs dict, which can OVERWRITE the values of duplicated keys
+    # TODO: try to match the eval function and kwargs, which can be correctly used downstream
+    # for pred in self._predicates:
+    #   if isinstance(pred, Predicate):
+    #     kwargs.update(pred.kwargs)
+    return {}
 
 class OR(PredicateOperator, Predicate):
   def __init__(self, *predicates: Predicate, subject: Group=None):
