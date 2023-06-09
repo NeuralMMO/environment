@@ -148,7 +148,7 @@ class Predicate(ABC):
   def subject(self):
     return self._subject
 
-  def create_task(self, task_cls: Task=None,
+  def create_task(self, task_cls: type[Task]=None,
                   assignee: Union[Iterable[int], int]=None,
                   reward_multiplier=1.0) -> Task:
     """ Creates a task from this predicate"""
