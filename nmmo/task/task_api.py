@@ -1,5 +1,5 @@
 # pylint: disable=unused-import
-from typing import Callable, Iterable, Dict, List, Union, Tuple
+from typing import Callable, Iterable, Dict, List, Union, Tuple, Type
 from types import FunctionType
 from abc import ABC
 import inspect
@@ -133,9 +133,9 @@ class OngoingTask(Task):
 
 # The same task is assigned each agent in agent_list individually
 #   with the agent as the predicate subject and task assignee
-def make_same_task(predicate: Union[type[Predicate], Callable],
+def make_same_task(predicate: Union[Type[Predicate], Callable],
                    agent_list: Iterable[int],
-                   task_cls = Task, **kwargs) -> List[Task]:
+                   task_cls: Type[Task]=Task, **kwargs) -> List[Task]:
   # if a function is provided, make it a predicate class
   if isinstance(predicate, FunctionType):
     predicate = make_predicate(predicate)
