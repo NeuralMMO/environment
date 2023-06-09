@@ -16,7 +16,8 @@ class Task(ABC):
   def __init__(self,
                eval_fn: Callable,
                assignee: Union[Iterable[int], int],
-               reward_multiplier = 1.0):
+               reward_multiplier = 1.0,
+               embedding = None):
     if isinstance(assignee, int):
       self._assignee = (assignee,)
     else:
@@ -26,6 +27,7 @@ class Task(ABC):
     self._progress = 0.0
     self._completed = False
     self._reward_multiplier = reward_multiplier
+    self._embedding = embedding
     self.name = self._make_name(self.__class__.__name__,
                                 eval_fn=eval_fn, assignee=self._assignee)
 
@@ -44,6 +46,10 @@ class Task(ABC):
   @property
   def reward_multiplier(self) -> float:
     return self._reward_multiplier
+
+  @property
+  def embedding(self):
+    return self._embedding
 
   def _map_progress_to_reward(self, gs) -> float:
     """ The default reward is the diff between the old and new progress.
@@ -135,12 +141,15 @@ class OngoingTask(Task):
 #   with the agent as the predicate subject and task assignee
 def make_same_task(predicate: Union[Type[Predicate], Callable],
                    agent_list: Iterable[int],
-                   task_cls: Type[Task]=Task, **kwargs) -> List[Task]:
+                   task_cls: Type[Task]=Task,
+                   task_embedding=None,
+                   **kwargs) -> List[Task]:
   # if a function is provided, make it a predicate class
   if isinstance(predicate, FunctionType):
     predicate = make_predicate(predicate)
 
-  return [predicate(Group(agent_id),**kwargs).create_task(task_cls=task_cls)
+  return [predicate(Group(agent_id),**kwargs).create_task(task_cls=task_cls,
+                                                          task_embedding=task_embedding)
           for agent_id in agent_list]
 
 def nmmo_default_task(agent_list: Iterable[int], test_mode=None) -> List[Task]:
@@ -175,7 +184,15 @@ def make_team_tasks(teams, task_spec) -> List[Task]:
   team_helper = TeamHelper(teams)
   for idx in range(min(len(team_list), len(task_spec))):
     team_id = team_list[idx]
-    reward_to, pred_fn, kwargs = task_spec[team_id]
+
+    # see if task_spec has the task embedding
+    if len(task_spec[idx]) == 3:
+      reward_to, pred_fn, kwargs = task_spec[team_id]
+      task_embedding = None
+    elif len(task_spec[idx]) == 4:
+      reward_to, pred_fn, kwargs, task_embedding = task_spec[team_id]
+    else:
+      raise ValueError('Wrong task spec format')
 
     assert reward_to in REWARD_TO, 'Wrong reward target'
 
@@ -210,18 +227,24 @@ def make_team_tasks(teams, task_spec) -> List[Task]:
     if reward_to == 'team':
       assignee = team_helper.teams[team_id]
       if predicate is None:
-        tasks.append(pred_cls(Group(assignee), **kwargs).create_task(task_cls=task_cls))
+        predicate = pred_cls(Group(assignee), **kwargs)
+        tasks.append(predicate.create_task(task_cls=task_cls, task_embedding=task_embedding))
       else:
         # this branch is for the cases like AllDead, StayAlive
-        tasks.append(predicate.create_task(assignee=assignee, task_cls=task_cls))
+        tasks.append(predicate.create_task(assignee=assignee, task_cls=task_cls,
+                                           task_embedding=task_embedding))
 
     elif reward_to == 'agent':
       agent_list = team_helper.teams[team_id]
       if predicate is None:
-        tasks += make_same_task(pred_cls, agent_list, task_cls=task_cls, **kwargs)
+        tasks += make_same_task(pred_cls, agent_list,
+                                task_cls=task_cls,
+                                task_embedding=task_embedding,
+                                **kwargs)
       else:
         # this branch is for the cases like AllDead, StayAlive
-        tasks += [predicate.create_task(assignee=agent_id, task_cls=task_cls)
+        tasks += [predicate.create_task(assignee=agent_id, task_cls=task_cls,
+                                        task_embedding=task_embedding)
                   for agent_id in agent_list]
 
   return tasks

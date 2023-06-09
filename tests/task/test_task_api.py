@@ -1,6 +1,7 @@
 # pylint: disable=unused-argument,invalid-name
 import unittest
 from types import FunctionType
+import numpy as np
 
 import nmmo
 from nmmo.core.env import Env
@@ -238,6 +239,7 @@ class TestTaskAPI(unittest.TestCase):
     env = Env(config)
     env.reset(make_task_fn=lambda: make_team_tasks(teams, [task_spec]))
 
+    # check the task information
     task = env.tasks[0]
     self.assertEqual(task.name,
                      '(Task_eval_fn:(PracticeFormation_(1,2,3)_dist:1_num_tick:10)'+
@@ -250,6 +252,12 @@ class TestTaskAPI(unittest.TestCase):
     self.assertEqual(task.subject, tuple(teams[0]))
     self.assertEqual(task.kwargs, task_spec[2])
     self.assertEqual(task.assignee, tuple(teams[0]))
+
+    # check the agent-task map
+    for agent_id, agent_tasks in env.agent_task_map.items():
+      for task in agent_tasks:
+        self.assertTrue(agent_id in task.assignee)
+
     # move agent 2, 3 to agent 1's pos
     for agent_id in [2,3]:
       change_spawn_pos(env.realm, agent_id,
@@ -267,6 +275,26 @@ class TestTaskAPI(unittest.TestCase):
         self.assertEqual(rewards[1], 0)
         self.assertEqual(infos[1]['task'][env.tasks[0].name]['progress'], 1)
         self.assertEqual(infos[1]['task'][env.tasks[0].name]['completed'], True)
+
+    # test the task_spec_with_embedding
+    task_embedding = np.array([1,2,3])
+    task_spec_with_embedding = ('team', PracticeFormation, {'dist': 1, 'num_tick': goal_tick},
+                                task_embedding)
+    env.reset(make_task_fn=lambda: make_team_tasks(teams, [task_spec_with_embedding]))
+
+    task = env.tasks[0]
+    self.assertEqual(task.name,
+                     '(Task_eval_fn:(PracticeFormation_(1,2,3)_dist:1_num_tick:10)'+
+                     '_assignee:(1,2,3))')
+    self.assertEqual(task.get_source_code(),
+                     'def PracticeFormation(gs, subject, dist, num_tick):\n      '+
+                     'return AllMembersWithinRange(gs, subject, dist) * '+
+                     'TickGE(gs, subject, num_tick)')
+    self.assertEqual(task.get_signature(), ['gs', 'subject', 'dist', 'num_tick'])
+    self.assertEqual(task.subject, tuple(teams[0]))
+    self.assertEqual(task.kwargs, task_spec[2])
+    self.assertEqual(task.assignee, tuple(teams[0]))
+    self.assertTrue(np.array_equal(task.embedding, task_embedding))
 
   def test_completed_tasks_in_info(self):
     # pylint: disable=no-value-for-parameter,no-member
