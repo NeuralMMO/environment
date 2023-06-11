@@ -6,10 +6,10 @@ import numpy as np
 import nmmo
 from nmmo.core.env import Env
 from nmmo.task.predicate_api import make_predicate, Predicate
-from nmmo.task.task_api import Task, make_team_tasks
+from nmmo.task.task_api import Task, make_team_tasks, OngoingTask
 from nmmo.task.group import Group
 from nmmo.task.constraint import ScalarConstraint, GroupConstraint, AGENT_LIST_CONSTRAINT
-from nmmo.task.base_predicates import TickGE, CanSeeGroup, AllMembersWithinRange
+from nmmo.task.base_predicates import TickGE, CanSeeGroup, AllMembersWithinRange, StayAlive
 
 from nmmo.systems import item as Item
 from nmmo.core import action as Action
@@ -279,7 +279,7 @@ class TestTaskAPI(unittest.TestCase):
     # test the task_spec_with_embedding
     task_embedding = np.array([1,2,3])
     task_spec_with_embedding = ('team', PracticeFormation, {'dist': 1, 'num_tick': goal_tick},
-                                task_embedding)
+                                {'embedding': task_embedding})
     env.reset(make_task_fn=lambda: make_team_tasks(teams, [task_spec_with_embedding]))
 
     task = env.tasks[0]
@@ -342,6 +342,49 @@ class TestTaskAPI(unittest.TestCase):
         self.assertTrue(env.tasks[3].name not in infos[ent_id]['task'])
 
     # DONE
+
+  def test_make_tasks_with_task_spec(self):
+    """
+    task_spec is a list of tuple (reward_to, evaluation function, eval_fn_kwargs, task_kwargs)
+    each tuple in the task_spec will create tasks for a team in teams
+
+    reward_to: must be in ['team', 'agent']
+      * 'team' create a single team task, in which all team members get rewarded
+      * 'agent' create a task for each agent, in which only the agent gets rewarded
+
+    evaluation functions from the base_predicates.py or could be custom functions like above
+
+    eval_fn_kwargs are the additional args that go into predicate. There are also special keys
+      * 'target' must be ['left_team', 'right_team', 'left_team_leader', 'right_team_leader']
+          these str will be translated into the actual agent ids
+
+    task_kwargs are the optional, additional args that go into the task.
+      * 'task_cls' specifies the task class to be used. 
+         If not provided, the standard Task is used.
+    """
+    teams = {0:[1,2,3], 1:[4,5,6]}
+    task_spec = [
+      ('agent', StayAlive, {}),
+      ('team', StayAlive, {}),
+      ('team', StayAlive, {'target': 'my_team_leader'}, {'task_cls': OngoingTask}),
+      ('team', StayAlive, {'target': 'left_team'},
+       {'task_cls': OngoingTask, 'reward_multiplier': 2, 'embedding': np.array([1,2,3])}),
+    ]
+
+    task_list = []
+    # testing each task spec, individually
+    for single_spec in task_spec:
+      task_list.append(make_team_tasks(teams, [single_spec]))
+
+    # check the task names
+    self.assertEqual(task_list[0][0].name, '(Task_eval_fn:(StayAlive_(1,))_assignee:(1,))')
+    self.assertEqual(task_list[1][0].name, '(Task_eval_fn:(StayAlive_(1,2,3))_assignee:(1,2,3))')
+    self.assertEqual(task_list[2][0].name,
+                     '(OngoingTask_eval_fn:(StayAlive_(1,))_assignee:(1,2,3))')
+    self.assertEqual(task_list[3][0].name,
+                     '(OngoingTask_eval_fn:(StayAlive_(4,5,6))_assignee:(1,2,3))')
+    self.assertEqual(task_list[3][0].reward_multiplier, 2)
+    self.assertTrue(np.array_equal(task_list[3][0].embedding, np.array([1,2,3])))
 
 if __name__ == '__main__':
   unittest.main()

@@ -23,7 +23,7 @@ ALL_ITEM = c.armour + c.weapons + c.tools + c.ammunition + c.consumables
 EQUIP_ITEM = c.armour + c.weapons + c.tools + c.ammunition
 HARVEST_ITEM = c.weapons + c.ammunition + c.consumables
 
-""" task_spec is a list of tuple (reward_to, predicate class, kwargs)
+""" task_spec is a list of tuple (reward_to, evaluation function, eval_fn_kwargs, task_kwargs)
 
     each tuple in the task_spec will create tasks for a team in teams
 
@@ -31,12 +31,15 @@ HARVEST_ITEM = c.weapons + c.ammunition + c.consumables
       * 'team' create a single team task, in which all team members get rewarded
       * 'agent' create a task for each agent, in which only the agent gets rewarded
 
-    predicate class from the base predicates or custom predicates like above
+    evaluation functions from the base_predicates.py or could be custom functions like above
 
-    kwargs are the additional args that go into predicate. There are also special keys
+    eval_fn_kwargs are the additional args that go into predicate. There are also special keys
       * 'target' must be ['left_team', 'right_team', 'left_team_leader', 'right_team_leader']
           these str will be translated into the actual agent ids
-      * 'task_cls' is optional. If not provided, the standard Task is used. """
+
+    task_kwargs are the optional, additional args that go into the task.
+      * 'task_cls' specifies the task class to be used. If not provided, the standard Task is used.
+      """
 task_spec = []
 
 # explore, eat, drink, attack any agent, harvest any item, level up any skill
@@ -66,7 +69,8 @@ for reward_to in ['agent', 'team']:
     task_spec.append((reward_to, TickGE, {'num_tick': num_tick}))
 
 # protect the leader: get reward for each tick the leader is alive
-task_spec.append(('team', StayAlive, {'target': 'my_team_leader', 'task_cls': OngoingTask}))
+# NOTE: a tuple of length four, to pass in the task_kwargs
+task_spec.append(('team', StayAlive, {'target': 'my_team_leader'}, {'task_cls': OngoingTask}))
 
 # want the other team or team leader to die
 for target in ['left_team', 'left_team_leader', 'right_team', 'right_team_leader']:

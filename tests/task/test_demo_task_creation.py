@@ -210,29 +210,34 @@ class TestDemoTask(unittest.TestCase):
 
     # DONE
 
-  def test_make_team_tasks_using_task_spec(self):
-    # NOTE: len(teams) and len(task_spec) don't need to match
-    teams = {0:[1,2,3], 1:[4,5], 2:[6,7], 3:[8,9], 4:[10,11]}
+  def test_task_spec_based_curriculum(self):
+    """
+    task_spec is a list of tuple (reward_to, evaluation function, eval_fn_kwargs, task_kwargs)
+    each tuple in the task_spec will create tasks for a team in teams
 
-    """ task_spec is a list of tuple (reward_to, predicate class, kwargs)
+    reward_to: must be in ['team', 'agent']
+      * 'team' create a single team task, in which all team members get rewarded
+      * 'agent' create a task for each agent, in which only the agent gets rewarded
 
-        each tuple in the task_spec will create tasks for a team in teams
+    evaluation functions from the base_predicates.py or could be custom functions like above
 
-        reward_to: must be in ['team', 'agent']
-          * 'team' create a single team task, in which all team members get rewarded
-          * 'agent' create a task for each agent, in which only the agent gets rewarded
+    eval_fn_kwargs are the additional args that go into predicate. There are also special keys
+      * 'target' must be ['left_team', 'right_team', 'left_team_leader', 'right_team_leader']
+          these str will be translated into the actual agent ids
 
-        predicate class from the base predicates or custom predicates like above
-
-        kwargs are the additional args that go into predicate. There are also special keys
-          * 'target' must be ['left_team', 'right_team', 'left_team_leader', 'right_team_leader']
-             these str will be translated into the actual agent ids
-          * 'task_cls' is optional. If not provided, the standard Task is used. """
+    task_kwargs are the optional, additional args that go into the task.
+      * 'task_cls' specifies the task class to be used. 
+         If not provided, the standard Task is used.
+    """
     task_spec = [ # (reward_to, predicate function, kwargs)
       ('team', bp.CountEvent, {'event': 'PLAYER_KILL', 'N': 1}), # one task
       ('agent', bp.CountEvent, {'event': 'PLAYER_KILL', 'N': 2}),
       ('agent', bp.AllDead, {'target': 'left_team'}),
-      ('team', bp.CanSeeAgent, {'target': 'right_team_leader', 'task_cls': t.OngoingTask})]
+      ('team', bp.CanSeeAgent, {'target': 'right_team_leader'}, {'task_cls': t.OngoingTask}),
+    ]
+
+    # NOTE: len(teams) and len(task_spec) don't need to match
+    teams = {0:[1,2,3], 1:[4,5], 2:[6,7], 3:[8,9], 4:[10,11]}
 
     config = ScriptedAgentTestConfig()
     env = Env(config)

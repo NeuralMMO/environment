@@ -148,10 +148,10 @@ class Predicate(ABC):
   def subject(self):
     return self._subject
 
-  def create_task(self, task_cls: Type[Task]=None,
+  def create_task(self,
+                  task_cls: Optional[Type[Task]]=None,
                   assignee: Union[Iterable[int], int]=None,
-                  reward_multiplier=1.0,
-                  task_embedding=None) -> Task:
+                  **kwargs) -> Task:
     """ Creates a task from this predicate"""
     if task_cls is None:
       from nmmo.task.task_api import Task
@@ -161,8 +161,7 @@ class Predicate(ABC):
       # the new task is assigned to this predicate's subject
       assignee = self._subject.agents
 
-    return task_cls(eval_fn=self, assignee=assignee, reward_multiplier=reward_multiplier,
-                    embedding=task_embedding)
+    return task_cls(eval_fn=self, assignee=assignee, **kwargs)
 
   def __and__(self, other):
     return AND(self, other)
