@@ -364,8 +364,8 @@ class TestTaskAPI(unittest.TestCase):
     """
     teams = {0:[1,2,3], 1:[4,5,6]}
     task_spec = [
-      ('agent', StayAlive, {}),
-      ('team', StayAlive, {}),
+      ('agent', TickGE, {'num_tick': 20}),
+      ('agent', StayAlive, {}, {'task_cls': OngoingTask}),
       ('team', StayAlive, {'target': 'my_team_leader'}, {'task_cls': OngoingTask}),
       ('team', StayAlive, {'target': 'left_team'},
        {'task_cls': OngoingTask, 'reward_multiplier': 2, 'embedding': np.array([1,2,3])}),
@@ -377,8 +377,10 @@ class TestTaskAPI(unittest.TestCase):
       task_list.append(make_team_tasks(teams, [single_spec]))
 
     # check the task names
-    self.assertEqual(task_list[0][0].name, '(Task_eval_fn:(StayAlive_(1,))_assignee:(1,))')
-    self.assertEqual(task_list[1][0].name, '(Task_eval_fn:(StayAlive_(1,2,3))_assignee:(1,2,3))')
+    self.assertEqual(task_list[0][0].name,
+                     '(Task_eval_fn:(TickGE_(1,)_num_tick:20)_assignee:(1,))')
+    self.assertEqual(task_list[1][0].name,
+                     '(OngoingTask_eval_fn:(StayAlive_(1,))_assignee:(1,))')
     self.assertEqual(task_list[2][0].name,
                      '(OngoingTask_eval_fn:(StayAlive_(1,))_assignee:(1,2,3))')
     self.assertEqual(task_list[3][0].name,
