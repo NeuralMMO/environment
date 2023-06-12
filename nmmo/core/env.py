@@ -43,6 +43,7 @@ class Env(ParallelEnv):
     self.game_state = None
     # Default task: rewards 1 each turn agent is alive
     self.tasks = task_api.nmmo_default_task(self.possible_agents)
+    self.agent_task_map = None
 
   # pylint: disable=method-cache-max-size-none
   @functools.lru_cache(maxsize=None)
@@ -162,8 +163,19 @@ class Env(ParallelEnv):
     else:
       for task in self.tasks:
         task.reset()
+    self.agent_task_map = self._map_task_to_agent()
 
     return {a: o.to_gym() for a,o in self.obs.items()}
+
+  def _map_task_to_agent(self):
+    agent_task_map: Dict[int, List[task_api.Task]] = {}
+    for task in self.tasks:
+      for agent_id in task.assignee:
+        if agent_id in agent_task_map:
+          agent_task_map[agent_id].append(task)
+        else:
+          agent_task_map[agent_id] = [task]
+    return agent_task_map
 
   def step(self, actions: Dict[int, Dict[str, Dict[str, Any]]]):
     '''Simulates one game tick or timestep
@@ -388,6 +400,10 @@ class Env(ParallelEnv):
 
       inventory = Item.Query.owned_by(self.realm.datastore, agent_id)
 
+      # NOTE: the tasks for each agent is in self.agent_task_map, and task embeddings are
+      #   available in each task instance, via task.embedding
+      # CHECK ME: do we pass in self.agent_task_map[agent_id],
+      #   so that we can include task embedding in the obs?
       obs[agent_id] = Observation(self.config,
                                   self.realm.tick,
                                   agent_id,

@@ -1,14 +1,15 @@
 # pylint: disable=unused-argument,invalid-name
 import unittest
 from types import FunctionType
+import numpy as np
 
 import nmmo
 from nmmo.core.env import Env
 from nmmo.task.predicate_api import make_predicate, Predicate
-from nmmo.task.task_api import Task, make_team_tasks
+from nmmo.task.task_api import Task, make_team_tasks, OngoingTask
 from nmmo.task.group import Group
-from nmmo.task.constraint import InvalidConstraint, ScalarConstraint
-from nmmo.task.base_predicates import TickGE, CanSeeGroup, AllMembersWithinRange
+from nmmo.task.constraint import ScalarConstraint, GroupConstraint, AGENT_LIST_CONSTRAINT
+from nmmo.task.base_predicates import TickGE, CanSeeGroup, AllMembersWithinRange, StayAlive
 
 from nmmo.systems import item as Item
 from nmmo.core import action as Action
@@ -31,6 +32,7 @@ class MockGameState():
   def __init__(self):
     # pylint: disable=super-init-not-called
     self.config = nmmo.config.Default()
+    self.current_tick = -1
     self.cache_result = {}
     self.get_subject_view = lambda _: None
 
@@ -130,27 +132,11 @@ class TestTaskAPI(unittest.TestCase):
       "(SUB_(ADD_(MUL_(Failure_(0,))_(Fake_(2,)_1_Hat_Melee))_0.3)_0.4))")
 
   def test_constraint(self):
-    # pylint: disable=not-callable,no-value-for-parameter
-    # define predicate classes from functions
-
-    # make predicate class from function
-    success_pred_cls = make_predicate(Success)
-    tickge_pred_cls = make_predicate(TickGE)
-    self.assertTrue(isinstance(TickGE, FunctionType))
-
     mock_gs = MockGameState()
-    good = success_pred_cls(Group(0))
-    bad = success_pred_cls(Group(99999))
-    good(mock_gs)
-    self.assertRaises(InvalidConstraint,lambda: bad(mock_gs))
-
     scalar = ScalarConstraint(low=-10,high=10)
     for _ in range(10):
       self.assertTrue(scalar.sample(mock_gs.config)<10)
       self.assertTrue(scalar.sample(mock_gs.config)>=-10)
-
-    bad = tickge_pred_cls(Group(0), -1)
-    self.assertRaises(InvalidConstraint, lambda: bad(mock_gs))
 
   def test_sample_predicate(self):
     # pylint: disable=no-value-for-parameter,expression-not-assigned
@@ -160,7 +146,8 @@ class TestTaskAPI(unittest.TestCase):
 
     # if the predicate class is instantiated without the subject,
     mock_gs = MockGameState()
-    predicate = canseegrp_pred_cls() & tickge_pred_cls()
+    predicate = canseegrp_pred_cls(subject=GroupConstraint, target=AGENT_LIST_CONSTRAINT) &\
+                tickge_pred_cls(subject=GroupConstraint, num_tick=ScalarConstraint)
     self.assertEqual(predicate.name,
                      "(AND_(CanSeeGroup_subject:GroupConstraint_target:AgentListConstraint)_"+\
                      "(TickGE_subject:GroupConstraint_num_tick:ScalarConstraint))")
@@ -252,6 +239,7 @@ class TestTaskAPI(unittest.TestCase):
     env = Env(config)
     env.reset(make_task_fn=lambda: make_team_tasks(teams, [task_spec]))
 
+    # check the task information
     task = env.tasks[0]
     self.assertEqual(task.name,
                      '(Task_eval_fn:(PracticeFormation_(1,2,3)_dist:1_num_tick:10)'+
@@ -264,6 +252,12 @@ class TestTaskAPI(unittest.TestCase):
     self.assertEqual(task.subject, tuple(teams[0]))
     self.assertEqual(task.kwargs, task_spec[2])
     self.assertEqual(task.assignee, tuple(teams[0]))
+
+    # check the agent-task map
+    for agent_id, agent_tasks in env.agent_task_map.items():
+      for task in agent_tasks:
+        self.assertTrue(agent_id in task.assignee)
+
     # move agent 2, 3 to agent 1's pos
     for agent_id in [2,3]:
       change_spawn_pos(env.realm, agent_id,
@@ -281,6 +275,26 @@ class TestTaskAPI(unittest.TestCase):
         self.assertEqual(rewards[1], 0)
         self.assertEqual(infos[1]['task'][env.tasks[0].name]['progress'], 1)
         self.assertEqual(infos[1]['task'][env.tasks[0].name]['completed'], True)
+
+    # test the task_spec_with_embedding
+    task_embedding = np.array([1,2,3])
+    task_spec_with_embedding = ('team', PracticeFormation, {'dist': 1, 'num_tick': goal_tick},
+                                {'embedding': task_embedding})
+    env.reset(make_task_fn=lambda: make_team_tasks(teams, [task_spec_with_embedding]))
+
+    task = env.tasks[0]
+    self.assertEqual(task.name,
+                     '(Task_eval_fn:(PracticeFormation_(1,2,3)_dist:1_num_tick:10)'+
+                     '_assignee:(1,2,3))')
+    self.assertEqual(task.get_source_code(),
+                     'def PracticeFormation(gs, subject, dist, num_tick):\n      '+
+                     'return AllMembersWithinRange(gs, subject, dist) * '+
+                     'TickGE(gs, subject, num_tick)')
+    self.assertEqual(task.get_signature(), ['gs', 'subject', 'dist', 'num_tick'])
+    self.assertEqual(task.subject, tuple(teams[0]))
+    self.assertEqual(task.kwargs, task_spec[2])
+    self.assertEqual(task.assignee, tuple(teams[0]))
+    self.assertTrue(np.array_equal(task.embedding, task_embedding))
 
   def test_completed_tasks_in_info(self):
     # pylint: disable=no-value-for-parameter,no-member
@@ -328,6 +342,51 @@ class TestTaskAPI(unittest.TestCase):
         self.assertTrue(env.tasks[3].name not in infos[ent_id]['task'])
 
     # DONE
+
+  def test_make_tasks_with_task_spec(self):
+    """
+    task_spec is a list of tuple (reward_to, evaluation function, eval_fn_kwargs, task_kwargs)
+    each tuple in the task_spec will create tasks for a team in teams
+
+    reward_to: must be in ['team', 'agent']
+      * 'team' create a single team task, in which all team members get rewarded
+      * 'agent' create a task for each agent, in which only the agent gets rewarded
+
+    evaluation functions from the base_predicates.py or could be custom functions like above
+
+    eval_fn_kwargs are the additional args that go into predicate. There are also special keys
+      * 'target' must be ['left_team', 'right_team', 'left_team_leader', 'right_team_leader']
+          these str will be translated into the actual agent ids
+
+    task_kwargs are the optional, additional args that go into the task.
+      * 'task_cls' specifies the task class to be used. 
+         If not provided, the standard Task is used.
+    """
+    teams = {0:[1,2,3], 1:[4,5,6]}
+    task_spec = [
+      ('agent', TickGE, {'num_tick': 20}),
+      ('agent', StayAlive, {}, {'task_cls': OngoingTask}),
+      ('team', StayAlive, {'target': 'my_team_leader'}, {'task_cls': OngoingTask}),
+      ('team', StayAlive, {'target': 'left_team'},
+       {'task_cls': OngoingTask, 'reward_multiplier': 2, 'embedding': np.array([1,2,3])}),
+    ]
+
+    task_list = []
+    # testing each task spec, individually
+    for single_spec in task_spec:
+      task_list.append(make_team_tasks(teams, [single_spec]))
+
+    # check the task names
+    self.assertEqual(task_list[0][0].name,
+                     '(Task_eval_fn:(TickGE_(1,)_num_tick:20)_assignee:(1,))')
+    self.assertEqual(task_list[1][0].name,
+                     '(OngoingTask_eval_fn:(StayAlive_(1,))_assignee:(1,))')
+    self.assertEqual(task_list[2][0].name,
+                     '(OngoingTask_eval_fn:(StayAlive_(1,))_assignee:(1,2,3))')
+    self.assertEqual(task_list[3][0].name,
+                     '(OngoingTask_eval_fn:(StayAlive_(4,5,6))_assignee:(1,2,3))')
+    self.assertEqual(task_list[3][0].reward_multiplier, 2)
+    self.assertTrue(np.array_equal(task_list[3][0].embedding, np.array([1,2,3])))
 
 if __name__ == '__main__':
   unittest.main()

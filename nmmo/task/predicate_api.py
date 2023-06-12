@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, List, Optional, Tuple, Union, Iterable, TYPE_CHECKING
+from typing import Callable, List, Optional, Tuple, Union, Iterable, Type, TYPE_CHECKING
 from types import FunctionType
 from abc import ABC, abstractmethod
 import inspect
@@ -148,9 +148,10 @@ class Predicate(ABC):
   def subject(self):
     return self._subject
 
-  def create_task(self, task_cls: Task=None,
+  def create_task(self,
+                  task_cls: Optional[Type[Task]]=None,
                   assignee: Union[Iterable[int], int]=None,
-                  reward_multiplier=1.0) -> Task:
+                  **kwargs) -> Task:
     """ Creates a task from this predicate"""
     if task_cls is None:
       from nmmo.task.task_api import Task
@@ -160,7 +161,7 @@ class Predicate(ABC):
       # the new task is assigned to this predicate's subject
       assignee = self._subject.agents
 
-    return task_cls(eval_fn=self, assignee=assignee, reward_multiplier=reward_multiplier)
+    return task_cls(eval_fn=self, assignee=assignee, **kwargs)
 
   def __and__(self, other):
     return AND(self, other)
@@ -191,7 +192,7 @@ def arg_to_string(arg):
 
 ################################################
 
-def make_predicate(fn: Callable) -> type[Predicate]:
+def make_predicate(fn: Callable) -> Type[Predicate]:
   """ Syntactic sugar API for defining predicates from function
   """
   signature = inspect.signature(fn)
@@ -258,7 +259,7 @@ class PredicateOperator(Predicate):
     return all((p.check(config) if isinstance(p, Predicate)
                 else True for p in self._predicates))
 
-  def sample(self, config: Config, cls: type[PredicateOperator], **kwargs):
+  def sample(self, config: Config, cls: Type[PredicateOperator], **kwargs):
     subject = self._subject_argument if 'subject' not in kwargs else kwargs['subject']
     predicates = [p.sample(config, **kwargs) if isinstance(p, Predicate)
                   else p(None) for p in self._predicates]

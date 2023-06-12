@@ -1,5 +1,5 @@
 # pylint: disable=unused-import
-from typing import Callable, Iterable, Dict, List, Union, Tuple
+from typing import Callable, Iterable, Dict, List, Union, Tuple, Type
 from types import FunctionType
 from abc import ABC
 import inspect
@@ -16,7 +16,8 @@ class Task(ABC):
   def __init__(self,
                eval_fn: Callable,
                assignee: Union[Iterable[int], int],
-               reward_multiplier = 1.0):
+               reward_multiplier = 1.0,
+               embedding = None):
     if isinstance(assignee, int):
       self._assignee = (assignee,)
     else:
@@ -26,6 +27,7 @@ class Task(ABC):
     self._progress = 0.0
     self._completed = False
     self._reward_multiplier = reward_multiplier
+    self._embedding = embedding
     self.name = self._make_name(self.__class__.__name__,
                                 eval_fn=eval_fn, assignee=self._assignee)
 
@@ -44,6 +46,10 @@ class Task(ABC):
   @property
   def reward_multiplier(self) -> float:
     return self._reward_multiplier
+
+  @property
+  def embedding(self):
+    return self._embedding
 
   def _map_progress_to_reward(self, gs) -> float:
     """ The default reward is the diff between the old and new progress.
@@ -133,15 +139,24 @@ class OngoingTask(Task):
 
 # The same task is assigned each agent in agent_list individually
 #   with the agent as the predicate subject and task assignee
-def make_same_task(predicate: Union[Predicate, Callable],
+def make_same_task(pred_cls: Union[Type[Predicate], Callable],
                    agent_list: Iterable[int],
-                   task_cls = Task, **kwargs) -> List[Task]:
+                   pred_kwargs=None,
+                   task_cls: Type[Task]=Task,
+                   task_kwargs=None) -> List[Task]:
   # if a function is provided, make it a predicate class
-  if isinstance(predicate, FunctionType):
-    predicate = make_predicate(predicate)
+  if isinstance(pred_cls, FunctionType):
+    pred_cls = make_predicate(pred_cls)
+  if pred_kwargs is None:
+    pred_kwargs = {}
+  if task_kwargs is None:
+    task_kwargs = {}
 
-  return [predicate(Group(agent_id),**kwargs).create_task(task_cls=task_cls)
-          for agent_id in agent_list]
+  task_list = []
+  for agent_id in agent_list:
+    predicate = pred_cls(Group(agent_id), **pred_kwargs)
+    task_list.append(predicate.create_task(task_cls=task_cls, **task_kwargs))
+  return task_list
 
 def nmmo_default_task(agent_list: Iterable[int], test_mode=None) -> List[Task]:
   # (almost) no overhead in env._compute_rewards()
@@ -175,22 +190,30 @@ def make_team_tasks(teams, task_spec) -> List[Task]:
   team_helper = TeamHelper(teams)
   for idx in range(min(len(team_list), len(task_spec))):
     team_id = team_list[idx]
-    reward_to, pred_fn, kwargs = task_spec[team_id]
+
+    # see if task_spec has the task embedding
+    if len(task_spec[idx]) == 3:
+      reward_to, pred_fn, pred_fn_kwargs = task_spec[team_id]
+      task_kwargs = {}
+    elif len(task_spec[idx]) == 4:
+      reward_to, pred_fn, pred_fn_kwargs, task_kwargs = task_spec[team_id]
+    else:
+      raise ValueError('Wrong task spec format')
 
     assert reward_to in REWARD_TO, 'Wrong reward target'
 
-    if 'task_cls' in kwargs:
-      task_cls = kwargs.pop('task_cls')
+    if 'task_cls' in task_kwargs:
+      task_cls = task_kwargs.pop('task_cls')
     else:
       task_cls = Task
 
     # reserve 'target' for relative agent mapping
-    if 'target' in kwargs:
-      target = kwargs.pop('target')
+    if 'target' in pred_fn_kwargs:
+      target = pred_fn_kwargs.pop('target')
       assert target in VALID_TARGET, 'Invalid target'
       # translate target to specific agent ids using team_helper
       target = team_helper.get_target_agent(team_id, target)
-      kwargs['target'] = target
+      pred_fn_kwargs['target'] = target
 
     # handle some special cases and instantiate the predicate first
     predicate = None
@@ -199,29 +222,31 @@ def make_team_tasks(teams, task_spec) -> List[Task]:
       pred_cls = make_predicate(pred_fn)
 
     # TODO: should create a test for these
-    if pred_fn in [bp.AllDead]:
-      kwargs.pop('target') # remove target
-      predicate = pred_cls(Group(target), **kwargs)
-    if pred_fn in [bp.StayAlive] and 'target' in kwargs:
-      kwargs.pop('target') # remove target
-      predicate = pred_cls(Group(target), **kwargs)
+    if (pred_fn in [bp.AllDead]) or \
+       (pred_fn in [bp.StayAlive] and 'target' in pred_fn_kwargs):
+      # use the target as the predicate subject
+      pred_fn_kwargs.pop('target') # remove target
+      predicate = pred_cls(Group(target), **pred_fn_kwargs)
 
     # create the task
     if reward_to == 'team':
       assignee = team_helper.teams[team_id]
       if predicate is None:
-        tasks.append(pred_cls(Group(assignee), **kwargs).create_task(task_cls=task_cls))
+        predicate = pred_cls(Group(assignee), **pred_fn_kwargs)
+        tasks.append(predicate.create_task(task_cls=task_cls, **task_kwargs))
       else:
         # this branch is for the cases like AllDead, StayAlive
-        tasks.append(predicate.create_task(assignee=assignee, task_cls=task_cls))
+        tasks.append(predicate.create_task(assignee=assignee, task_cls=task_cls,
+                                           **task_kwargs))
 
     elif reward_to == 'agent':
       agent_list = team_helper.teams[team_id]
       if predicate is None:
-        tasks += make_same_task(pred_cls, agent_list, task_cls=task_cls, **kwargs)
+        tasks += make_same_task(pred_cls, agent_list, pred_kwargs=pred_fn_kwargs,
+                                task_cls=task_cls, task_kwargs=task_kwargs)
       else:
         # this branch is for the cases like AllDead, StayAlive
-        tasks += [predicate.create_task(assignee=agent_id, task_cls=task_cls)
+        tasks += [predicate.create_task(assignee=agent_id, task_cls=task_cls, **task_kwargs)
                   for agent_id in agent_list]
 
   return tasks
