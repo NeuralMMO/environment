@@ -610,12 +610,8 @@ class Exchange:
   EXCHANGE_LISTING_DURATION           = 5
   '''The number of ticks, during which the item is listed for sale'''
 
-  @property
-  def MARKET_N_OBS(self):
-    # TODO(kywch): This is a hack. Check if the limit is reached
-    # pylint: disable=no-member
-    '''Number of distinct item observations'''
-    return self.PLAYER_N * self.EXCHANGE_LISTING_DURATION
+  MARKET_N_OBS = 1024
+  '''Number of distinct item observations'''
 
   PRICE_N_OBS = 99 # make it different from PLAYER_N_OBS
   '''Number of distinct price observations
