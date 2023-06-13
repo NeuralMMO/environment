@@ -44,6 +44,7 @@ setup(
     'pettingzoo==1.19.0',
     'gym==0.23.0',
     'pylint==2.16.0',
+    'psutil==5.9.3',
     'py==1.11.0',
     'tqdm<5',
   ],
