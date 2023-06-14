@@ -366,10 +366,10 @@ class Env(ParallelEnv):
     market = Item.Query.for_sale(self.realm.datastore) # the same for all agents
 
     # dummy obs
-    dummy_tiles = np.zeros((1, len(Tile.State.attr_name_to_col)))
-    dummy_entities = np.zeros((1, len(Entity.State.attr_name_to_col)))
-    dummy_inventory = np.zeros((1, len(Item.State.attr_name_to_col)))
-    dummy_market = np.zeros((1, len(Item.State.attr_name_to_col)))
+    dummy_tiles = np.zeros((0, len(Tile.State.attr_name_to_col)))
+    dummy_entities = np.zeros((0, len(Entity.State.attr_name_to_col)))
+    dummy_inventory = np.zeros((0, len(Item.State.attr_name_to_col)))
+    dummy_market = np.zeros((0, len(Item.State.attr_name_to_col)))
 
     for agent_id in self.agents:
       if agent_id not in self.realm.players:
