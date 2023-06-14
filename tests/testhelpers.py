@@ -384,7 +384,7 @@ def profile_env_step(action_target=True, tasks=None, condition=None):
     ('env.realm.step():', lambda: env.realm.step({})),
     ('env._compute_observations():', lambda: env._compute_observations()),
     ('obs.to_gym(), ActionTarget:', lambda: {a: o.to_gym() for a,o in obs.items()}),
-    ('env._compute_rewards():', lambda: env._compute_rewards())
+    ('env._compute_rewards():', lambda: env._compute_rewards(obs.keys(), {}))
   ]
 
   if condition:
