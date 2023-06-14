@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, List, Tuple, MutableMapping
+from typing import Dict, List, Tuple, MutableMapping, Set
 from dataclasses import dataclass
 from copy import deepcopy
 from abc import ABC, abstractmethod
@@ -31,7 +31,7 @@ class GameState:
   config: Config
   spawn_pos: Dict[int, Tuple[int, int]] # ent_id: (row, col) of all spawned agents
 
-  alive_agents: List[int] # of alive agents' ent_id (for convenience)
+  alive_agents: Set[int] # of alive agents' ent_id (for convenience)
   env_obs: Dict[int, Observation] # env passes the obs of only alive agents
 
   entity_data: np.ndarray # a copied, whole Entity ds table
@@ -192,12 +192,14 @@ class GameStateGenerator:
   def generate(self, realm: Realm, env_obs: Dict[int, Observation]) -> GameState:
     # copy the datastore, by running astype
     entity_all = EntityState.Query.table(realm.datastore).astype(np.int16)
+    alive_agents = entity_all[:, EntityAttr["id"]]
+    alive_agents = set(alive_agents[alive_agents > 0])
 
     return GameState(
       current_tick = realm.tick,
       config = self.config,
       spawn_pos = self.spawn_pos,
-      alive_agents = list(entity_all[:, EntityAttr["id"]]),
+      alive_agents = alive_agents,
       env_obs = env_obs,
       entity_data = entity_all,
       item_data = ItemState.Query.table(realm.datastore).astype(np.int16),
