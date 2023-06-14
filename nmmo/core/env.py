@@ -282,11 +282,13 @@ class Env(ParallelEnv):
     # Execute actions
     self._dead_this_tick = self.realm.step(actions)
     dones = {}
-    for eid in self.possible_agents:
-      if eid in self._dead_this_tick or self.realm.tick >= self.config.HORIZON:
-        self._dead_agents.add(eid)
-        self._episode_stats[eid]["death_tick"] = self.realm.tick
-        dones[eid] = True
+    for agent_id in self.agents:
+      if agent_id in self._dead_this_tick or self.realm.tick >= self.config.HORIZON:
+        self._dead_agents.add(agent_id)
+        self._episode_stats[agent_id]["death_tick"] = self.realm.tick
+        dones[agent_id] = True
+      else:
+        dones[agent_id] = False
 
     # Generate obs for each agent in self.agents
     self.obs = self._compute_observations()
@@ -297,14 +299,14 @@ class Env(ParallelEnv):
     for k,r in rewards.items():
       self._episode_stats[k]['reward'] += r
 
-    # When the episode ends, add the episode stats to the info of one of
-    # the last dagents
+    # When the episode ends, add the episode stats to the info of the last agents
     if len(self._dead_agents) == len(self.possible_agents):
       for agent_id, stats in self._episode_stats.items():
         if agent_id not in infos:
           infos[agent_id] = {}
         infos[agent_id]["episode_stats"] = stats
 
+    # NOTE: all obs, rewards, dones, infos have data for each agent in self.agents
     return gym_obs, rewards, dones, infos
 
   def _validate_actions(self, actions: Dict[int, Dict[str, Dict[str, Any]]]):
@@ -417,13 +419,14 @@ class Env(ParallelEnv):
     # Initialization
     infos = {agent_id: {'task': {}} for agent_id in self.agents}
     rewards = defaultdict(int)
+    agents = set(self.agents)
 
     # Compute Rewards and infos
     self.game_state = self._gamestate_generator.generate(self.realm, self.obs)
     for task in self.tasks:
       task_rewards, task_infos = task.compute_rewards(self.game_state)
       for agent_id, reward in task_rewards.items():
-        if agent_id in self.agents:
+        if agent_id in agents:
           rewards[agent_id] = rewards.get(agent_id,0) + reward
           infos[agent_id]['task'][task.name] = task_infos[agent_id] # progress
 

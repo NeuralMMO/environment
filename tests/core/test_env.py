@@ -65,13 +65,18 @@ class TestEnv(unittest.TestCase):
           self.assertEqual(np.sum(player_obs['Inventory']), 0)
           self.assertEqual(np.sum(player_obs['Market']), 0)
 
-      obs, rewards, dones, _ = self.env.step({})
+      obs, rewards, dones, infos = self.env.step({})
 
       # make sure dead agents return proper dones=True, dummy obs, and -1 reward
       self.assertEqual(len(self.env.agents),
                        len(self.env.realm.players) + len(self.env._dead_this_tick))
       self.assertEqual(len(self.env.possible_agents),
                        len(self.env.realm.players) + len(self.env._dead_agents))
+      for agent_id in self.env.agents:
+        self.assertTrue(agent_id in obs)
+        self.assertTrue(agent_id in rewards)
+        self.assertTrue(agent_id in dones)
+        self.assertTrue(agent_id in infos)
       if len(self.env._dead_agents) > len(dead_agents):
         for dead_id in self.env._dead_agents - dead_agents:
           self.assertEqual(rewards[dead_id], -1)
