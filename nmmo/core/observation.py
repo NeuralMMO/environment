@@ -55,7 +55,8 @@ class Observation:
     self.entities = BasicObs(entities[0:config.PLAYER_N_OBS],
                               EntityState.State.attr_name_to_col["id"])
 
-    if config.COMBAT_SYSTEM_ENABLED:
+    agent = self.agent()
+    if config.COMBAT_SYSTEM_ENABLED and agent is not None:
       latest_combat_tick = self.agent().latest_combat_tick
       self.agent_in_combat = False if latest_combat_tick == 0 else \
         (current_tick - latest_combat_tick) < config.COMBAT_STATUS_DURATION
@@ -112,31 +113,42 @@ class Observation:
   def agent(self):
     return self.entity(self.agent_id)
 
-  def to_gym(self):
-    '''Convert the observation to a format that can be used by OpenAI Gym'''
-
-    tiles = np.zeros((self.config.MAP_N_OBS, self.tiles.shape[1]))
-    tiles[:self.tiles.shape[0],:] = self.tiles
-
-    entities = np.zeros((self.config.PLAYER_N_OBS, self.entities.values.shape[1]))
-    entities[:self.entities.values.shape[0],:] = self.entities.values
-
+  def get_empty_obs(self):
     gym_obs = {
       "CurrentTick": np.array([self.current_tick]),
       "AgentId": np.array([self.agent_id]),
-      "Tile": tiles,
-      "Entity": entities,
+      "Tile": np.zeros((self.config.MAP_N_OBS, self.tiles.shape[1])),
+      "Entity": np.zeros((self.config.PLAYER_N_OBS, self.entities.values.shape[1])),
     }
 
     if self.config.ITEM_SYSTEM_ENABLED:
-      inventory = np.zeros((self.config.INVENTORY_N_OBS, self.inventory.values.shape[1]))
-      inventory[:self.inventory.values.shape[0],:] = self.inventory.values
-      gym_obs["Inventory"] = inventory
+      gym_obs["Inventory"] = np.zeros((self.config.INVENTORY_N_OBS,
+                                       self.inventory.values.shape[1]))
 
     if self.config.EXCHANGE_SYSTEM_ENABLED:
-      market = np.zeros((self.config.MARKET_N_OBS, self.market.values.shape[1]))
-      market[:self.market.values.shape[0],:] = self.market.values
-      gym_obs["Market"] = market
+      gym_obs["Market"] = np.zeros((self.config.MARKET_N_OBS,
+                                    self.market.values.shape[1]))
+
+    if self.config.PROVIDE_ACTION_TARGETS:
+      gym_obs["ActionTargets"] = None
+
+    return gym_obs
+
+  def to_gym(self):
+    '''Convert the observation to a format that can be used by OpenAI Gym'''
+    gym_obs = self.get_empty_obs()
+    if self.agent() is None:
+      # return empty obs for the dead agents
+      return gym_obs
+
+    gym_obs['Tile'][:self.tiles.shape[0],:] = self.tiles
+    gym_obs['Entity'][:self.entities.values.shape[0],:] = self.entities.values
+
+    if self.config.ITEM_SYSTEM_ENABLED:
+      gym_obs["Inventory"][:self.inventory.values.shape[0],:] = self.inventory.values
+
+    if self.config.EXCHANGE_SYSTEM_ENABLED:
+      gym_obs["Market"][:self.market.values.shape[0],:] = self.market.values
 
     if self.config.PROVIDE_ACTION_TARGETS:
       gym_obs["ActionTargets"] = self._make_action_targets()
