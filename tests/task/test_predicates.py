@@ -126,6 +126,8 @@ class TestBasePredicate(unittest.TestCase):
         # make sure that dead players not in the realm nor the datastore
         self.assertTrue(ent_id not in env.realm.players)
         self.assertTrue(ent_id not in entities)
+        # CHECK ME: dead agents are also not in infos
+        self.assertTrue(ent_id not in infos)
 
     # TickGE_5 is true. Agents 1-3 are dead, so
     # StayAlive(1,3) and StayAlive(3,4) are false, StayAlive(4) is true
