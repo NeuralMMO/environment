@@ -417,9 +417,9 @@ class Env(ParallelEnv):
           entity identified by ent_id.
     '''
     # Initialization
-    infos = {agent_id: {'task': {}} for agent_id in self.agents}
-    rewards = defaultdict(int)
     agents = set(self.agents)
+    infos = {agent_id: {'task': {}} for agent_id in agents}
+    rewards = defaultdict(int)
 
     # Compute Rewards and infos
     self.game_state = self._gamestate_generator.generate(self.realm, self.obs)

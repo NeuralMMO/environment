@@ -83,6 +83,14 @@ class TestEnv(unittest.TestCase):
           self.assertTrue(dones[dead_id])
           dead_agents.add(dead_id)
 
+      # check dead and alive
+      entity_all = EntityState.Query.table(self.env.realm.datastore).astype(np.int16)
+      alive_agents = entity_all[:, Entity.State.attr_name_to_col["id"]]
+      alive_agents = set(alive_agents[alive_agents > 0])
+      for agent_id in alive_agents:
+        self.assertTrue(agent_id in self.env.realm.players)
+        self.assertTrue(agent_id not in self.env._dead_agents)
+
   def _validate_tiles(self, obs, realm: Realm):
     for tile_obs in obs["Tile"]:
       tile_obs = TileState.parse_array(tile_obs)
