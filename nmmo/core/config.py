@@ -151,21 +151,6 @@ class Config(Template):
   PLAYERS                      = [Agent]
   '''Player classes from which to spawn'''
 
-  ############################################################################
-  ### Emulation Parameters
-
-  EMULATE_FLAT_OBS       = False
-  '''Emulate a flat observation space'''
-
-  EMULATE_FLAT_ATN       = False
-  '''Emulate a flat action space'''
-
-  EMULATE_CONST_PLAYER_N = False
-  '''Emulate a constant number of agents'''
-
-  EMULATE_CONST_HORIZON  = False
-  '''Emulate a constant HORIZON simulations steps'''
-
 
   ############################################################################
   ### Population Parameters
@@ -213,11 +198,19 @@ class Config(Template):
   PLAYER_DEATH_FOG             = None
   '''How long before spawning death fog. None for no death fog'''
 
+  ############################################################################
+  ### Map Parameters
+  HORIZON = 1024
+  '''Number of steps before the environment resets'''
+
 
   ############################################################################
   ### Agent Parameters
   IMMORTAL = False
   '''Debug parameter: prevents agents from dying except by void'''
+
+  RESET_ON_DEATH = False
+  '''Whether to reset the environment whenever an agent dies'''
 
   BASE_HEALTH                = 10
   '''Initial Constitution level and agent health'''
