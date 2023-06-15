@@ -4,7 +4,7 @@ import numpy as np
 from nmmo.datastore.serialized import SerializedState
 from nmmo.lib import material
 
-# pylint: disable=no-member
+# pylint: disable=no-member,protected-access
 TileState = SerializedState.subclass(
   "Tile", [
     "row",
@@ -23,6 +23,9 @@ TileState.Query = SimpleNamespace(
     TileState.State.attr_name_to_col["row"],
     TileState.State.attr_name_to_col["col"],
     r, c, radius),
+  get_map=lambda ds, map_size:
+    ds.table("Tile")._data[1:(map_size*map_size+1)]
+                    .reshape((map_size,map_size,len(TileState.State.attr_name_to_col)))
 )
 
 class Tile(TileState):

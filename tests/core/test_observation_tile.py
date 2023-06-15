@@ -22,7 +22,7 @@ class TestObservationTile(unittest.TestCase):
   def test_tile_attr(self):
     self.assertDictEqual(TileAttr, {'row': 0, 'col': 1, 'material_id': 2})
 
-  def test_tile_correctness(self):
+  def test_obs_tile_correctness(self):
     obs = self.env._compute_observations()
     center = self.config.PLAYER_VISION_RADIUS
     tile_dim = self.config.PLAYER_VISION_DIAMETER
@@ -56,6 +56,38 @@ class TestObservationTile(unittest.TestCase):
                               number=1000, globals=globals()))
     print('implemented:', timeit(lambda: agent_obs.tile(*d.delta),
                                 number=1000, globals=globals()))
+
+  def test_env_visible_tiles_correctness(self):
+    def correct_visible_tile(realm, agent_id):
+      # Based on numpy datatable window query
+      assert agent_id in realm.players, "agent_id not in the realm"
+      agent = realm.players[agent_id]
+      radius = realm.config.PLAYER_VISION_RADIUS
+      return TileState.Query.window(
+        realm.datastore, agent.row.val, agent.col.val, radius)
+
+    # implemented in the env._compute_observations()
+    def visible_tiles_by_index(realm, agent_id, tile_map):
+      assert agent_id in realm.players, "agent_id not in the realm"
+      agent = realm.players[agent_id]
+      radius = realm.config.PLAYER_VISION_RADIUS
+      return tile_map[agent.row.val-radius:agent.row.val+radius+1,
+                      agent.col.val-radius:agent.col.val+radius+1,:].reshape(225,3)
+
+    # get tile map, to bypass the expensive tile window query
+    tile_map = TileState.Query.get_map(self.env.realm.datastore, self.config.MAP_SIZE)
+
+    obs = self.env._compute_observations()
+    for agent_id in self.env.realm.players:
+      self.assertTrue(np.array_equal(correct_visible_tile(self.env.realm, agent_id),
+                                     obs[agent_id].tiles))
+
+    print('---test_visible_tile_window---')
+    print('reference:', timeit(lambda: correct_visible_tile(self.env.realm, agent_id),
+                              number=1000, globals=globals()))
+    print('implemented:',
+          timeit(lambda: visible_tiles_by_index(self.env.realm, agent_id, tile_map),
+                 number=1000, globals=globals()))
 
 if __name__ == '__main__':
   unittest.main()

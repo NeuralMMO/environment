@@ -251,8 +251,9 @@ class TestBasePredicate(unittest.TestCase):
     env = self._get_taskenv(test_preds, grass_map=True)
 
     # All agents to one corner
+    BORDER = env.config.MAP_BORDER
     for ent_id in env.realm.players:
-      change_agent_pos(env.realm,ent_id,(0,0))
+      change_agent_pos(env.realm,ent_id,(BORDER,BORDER))
     env.obs = env._compute_observations()
 
     _, _, _, infos = env.step({})

@@ -376,6 +376,11 @@ class Env(ParallelEnv):
     obs = {}
     market = Item.Query.for_sale(self.realm.datastore)
 
+    # get tile map, to bypass the expensive tile window query
+    tile_map = Tile.Query.get_map(self.realm.datastore, self.config.MAP_SIZE)
+    radius = self.config.PLAYER_VISION_RADIUS
+    tile_obs_size = ((2*radius+1)**2, len(Tile.State.attr_name_to_col))
+
     for agent_id in self.agents:
       if agent_id not in self.realm.players:
         # return dummy obs for the agents in dead_this_tick
@@ -391,12 +396,10 @@ class Env(ParallelEnv):
         visible_entities = Entity.Query.window(
             self.realm.datastore,
             agent_r, agent_c,
-            self.config.PLAYER_VISION_RADIUS
+            radius
         )
-        visible_tiles = Tile.Query.window(
-            self.realm.datastore,
-            agent_r, agent_c,
-            self.config.PLAYER_VISION_RADIUS)
+        visible_tiles = tile_map[agent_r-radius:agent_r+radius+1,
+                                 agent_c-radius:agent_c+radius+1,:].reshape(tile_obs_size)
 
         inventory = Item.Query.owned_by(self.realm.datastore, agent_id)
 
