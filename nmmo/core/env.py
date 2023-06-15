@@ -286,7 +286,9 @@ class Env(ParallelEnv):
     self._dead_this_tick = self.realm.step(actions)
     dones = {}
     for agent_id in self.agents:
-      if agent_id in self._dead_this_tick or self.realm.tick >= self.config.HORIZON:
+      if agent_id in self._dead_this_tick or \
+        self.realm.tick >= self.config.HORIZON or \
+        (self.config.RESET_ON_DEATH and len(self._dead_agents) > 0):
         self._dead_agents.add(agent_id)
         self._episode_stats[agent_id]["death_tick"] = self.realm.tick
         dones[agent_id] = True
