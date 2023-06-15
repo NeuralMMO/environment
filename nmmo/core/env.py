@@ -2,6 +2,7 @@ import functools
 import random
 from typing import Any, Dict, List, Callable
 from collections import defaultdict
+from copy import copy
 from ordered_set import OrderedSet
 
 import gym
@@ -33,10 +34,12 @@ class Env(ParallelEnv):
     self.config = config
     self.realm = realm.Realm(config)
     self.obs = None
+    self._dummy_obs = None
 
     self.possible_agents = list(range(1, config.PLAYER_N + 1))
     self._dead_agents = set()
     self._episode_stats = defaultdict(lambda: defaultdict(float))
+    self._dead_this_tick = None
     self.scripted_agents = OrderedSet()
 
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
@@ -149,12 +152,14 @@ class Env(ParallelEnv):
     self.realm.reset(map_id)
     self._dead_agents = set()
     self._episode_stats.clear()
+    self._dead_this_tick = {}
 
     # check if there are scripted agents
     for eid, ent in self.realm.players.items():
       if isinstance(ent.agent, Scripted):
         self.scripted_agents.add(eid)
 
+    self._dummy_obs = self._make_dummy_obs()
     self.obs = self._compute_observations()
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
 
@@ -278,31 +283,32 @@ class Env(ParallelEnv):
     #   we don't need _deserialize_scripted_actions() anymore
     actions = self._validate_actions(actions)
     # Execute actions
-    self.realm.step(actions)
+    self._dead_this_tick = self.realm.step(actions)
     dones = {}
-    for eid in self.possible_agents:
-      if eid not in self.realm.players or self.realm.tick >= self.config.HORIZON:
-        if eid not in self._dead_agents:
-          self._dead_agents.add(eid)
-          self._episode_stats[eid]["death_tick"] = self.realm.tick
-          dones[eid] = True
+    for agent_id in self.agents:
+      if agent_id in self._dead_this_tick or self.realm.tick >= self.config.HORIZON:
+        self._dead_agents.add(agent_id)
+        self._episode_stats[agent_id]["death_tick"] = self.realm.tick
+        dones[agent_id] = True
+      else:
+        dones[agent_id] = False
 
     # Store the observations, since actions reference them
     self.obs = self._compute_observations()
     gym_obs = {a: o.to_gym() for a,o in self.obs.items()}
 
-    rewards, infos = self._compute_rewards(self.obs.keys(), dones)
+    rewards, infos = self._compute_rewards()
     for k,r in rewards.items():
       self._episode_stats[k]['reward'] += r
 
-    # When the episode ends, add the episode stats to the info of one of
-    # the last dagents
+    # When the episode ends, add the episode stats to the info of the last agents
     if len(self._dead_agents) == len(self.possible_agents):
       for agent_id, stats in self._episode_stats.items():
         if agent_id not in infos:
           infos[agent_id] = {}
         infos[agent_id]["episode_stats"] = stats
 
+    # NOTE: all obs, rewards, dones, infos have data for each agent in self.agents
     return gym_obs, rewards, dones, infos
 
   def _validate_actions(self, actions: Dict[int, Dict[str, Dict[str, Any]]]):
@@ -356,63 +362,51 @@ class Env(ParallelEnv):
 
     return actions
 
+  def _make_dummy_obs(self):
+    dummy_tiles = np.zeros((0, len(Tile.State.attr_name_to_col)))
+    dummy_entities = np.zeros((0, len(Entity.State.attr_name_to_col)))
+    dummy_inventory = np.zeros((0, len(Item.State.attr_name_to_col)))
+    dummy_market = np.zeros((0, len(Item.State.attr_name_to_col)))
+    return Observation(self.config, self.realm.tick, 0,
+                       dummy_tiles, dummy_entities, dummy_inventory, dummy_market)
+
   def _compute_observations(self):
-    '''Neural MMO Observation API
-
-    Args:
-        agents: List of agents to return observations for. If None, returns
-        observations for all agents
-
-    Returns:
-        obs: Dictionary of observations for each agent
-        obs[agent_id] = {
-          "Entity": [e1, e2, ...],
-          "Task": [encoded_task],
-          "Tile": [t1, t2, ...],
-          "Inventory": [i1, i2, ...],
-          "Market": [m1, m2, ...],
-          "ActionTargets": {
-              "Attack": [a1, a2, ...],
-              "Sell": [s1, s2, ...],
-              "Buy": [b1, b2, ...],
-              "Move": [m1, m2, ...],
-          }
-        '''
-
     obs = {}
-
     market = Item.Query.for_sale(self.realm.datastore)
 
     for agent_id in self.agents:
-      agent = self.realm.players.get(agent_id)
-      agent_r = agent.row.val
-      agent_c = agent.col.val
+      if agent_id not in self.realm.players:
+        # return dummy obs for the agents in dead_this_tick
+        dummy_obs = copy(self._dummy_obs)
+        dummy_obs.current_tick = self.realm.tick
+        dummy_obs.agent_id = agent_id
+        obs[agent_id] = dummy_obs
+      else:
+        agent = self.realm.players.get(agent_id)
+        agent_r = agent.row.val
+        agent_c = agent.col.val
 
-      visible_entities = Entity.Query.window(
-          self.realm.datastore,
-          agent_r, agent_c,
-          self.config.PLAYER_VISION_RADIUS
-      )
-      visible_tiles = Tile.Query.window(
-          self.realm.datastore,
-          agent_r, agent_c,
-          self.config.PLAYER_VISION_RADIUS)
+        visible_entities = Entity.Query.window(
+            self.realm.datastore,
+            agent_r, agent_c,
+            self.config.PLAYER_VISION_RADIUS
+        )
+        visible_tiles = Tile.Query.window(
+            self.realm.datastore,
+            agent_r, agent_c,
+            self.config.PLAYER_VISION_RADIUS)
 
-      inventory = Item.Query.owned_by(self.realm.datastore, agent_id)
+        inventory = Item.Query.owned_by(self.realm.datastore, agent_id)
 
-      # NOTE: the tasks for each agent is in self.agent_task_map, and task embeddings are
-      #   available in each task instance, via task.embedding
-      # CHECK ME: do we pass in self.agent_task_map[agent_id],
-      #   so that we can include task embedding in the obs?
-      obs[agent_id] = Observation(self.config,
-                                  self.realm.tick,
-                                  agent_id,
-                                  visible_tiles,
-                                  visible_entities,
-                                  inventory, market)
+        # NOTE: the tasks for each agent is in self.agent_task_map, and task embeddings are
+        #   available in each task instance, via task.embedding
+        # CHECK ME: do we pass in self.agent_task_map[agent_id],
+        #   so that we can include task embedding in the obs?
+        obs[agent_id] = Observation(self.config, self.realm.tick, agent_id,
+                                    visible_tiles, visible_entities, inventory, market)
     return obs
 
-  def _compute_rewards(self, agents: List[AgentID], dones: Dict[AgentID, bool]):
+  def _compute_rewards(self):
     '''Computes the reward for the specified agent
 
     Override this method to create custom reward functions. You have full
@@ -428,23 +422,22 @@ class Env(ParallelEnv):
           entity identified by ent_id.
     '''
     # Initialization
+    agents = set(self.agents)
     infos = {agent_id: {'task': {}} for agent_id in agents}
     rewards = defaultdict(int)
-    agents = set(agents)
-    reward_cache = {}
 
     # Compute Rewards and infos
     self.game_state = self._gamestate_generator.generate(self.realm, self.obs)
     for task in self.tasks:
-      if task in reward_cache:
-        task_rewards, task_infos = reward_cache[task]
-      else:
-        task_rewards, task_infos = task.compute_rewards(self.game_state)
-        reward_cache[task] = (task_rewards, task_infos)
+      task_rewards, task_infos = task.compute_rewards(self.game_state)
       for agent_id, reward in task_rewards.items():
-        if agent_id in agents and agent_id not in dones:
+        if agent_id in agents:
           rewards[agent_id] = rewards.get(agent_id,0) + reward
           infos[agent_id]['task'][task.name] = task_infos[agent_id] # progress
+
+    # Make sure the dead agents return the rewards of -1
+    for agent_id in self._dead_this_tick:
+      rewards[agent_id] = -1
 
     return rewards, infos
 
@@ -458,7 +451,9 @@ class Env(ParallelEnv):
   @property
   def agents(self) -> List[AgentID]:
     '''For conformity with the PettingZoo API only; rendering is external'''
-    return list(set(self.realm.players.keys()) - self._dead_agents)
+    # "current" agents, which return obs: both alive and dead_this_tick
+    agents = set(list(self.realm.players.keys()) + list(self._dead_this_tick.keys()))
+    return list(agents)
 
   def close(self):
     '''For conformity with the PettingZoo API only; rendering is external'''

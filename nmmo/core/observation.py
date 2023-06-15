@@ -55,7 +55,8 @@ class Observation:
     self.entities = BasicObs(entities[0:config.PLAYER_N_OBS],
                               EntityState.State.attr_name_to_col["id"])
 
-    if config.COMBAT_SYSTEM_ENABLED:
+    self.dummy_obs = self.agent() is None
+    if config.COMBAT_SYSTEM_ENABLED and not self.dummy_obs:
       latest_combat_tick = self.agent().latest_combat_tick
       self.agent_in_combat = False if latest_combat_tick == 0 else \
         (current_tick - latest_combat_tick) < config.COMBAT_STATUS_DURATION
@@ -112,31 +113,37 @@ class Observation:
   def agent(self):
     return self.entity(self.agent_id)
 
-  def to_gym(self):
-    '''Convert the observation to a format that can be used by OpenAI Gym'''
-
-    tiles = np.zeros((self.config.MAP_N_OBS, self.tiles.shape[1]))
-    tiles[:self.tiles.shape[0],:] = self.tiles
-
-    entities = np.zeros((self.config.PLAYER_N_OBS, self.entities.values.shape[1]))
-    entities[:self.entities.values.shape[0],:] = self.entities.values
-
+  def get_empty_obs(self):
     gym_obs = {
       "CurrentTick": np.array([self.current_tick]),
       "AgentId": np.array([self.agent_id]),
-      "Tile": tiles,
-      "Entity": entities,
-    }
+      "Tile": np.zeros((self.config.MAP_N_OBS, self.tiles.shape[1])),
+      "Entity": np.zeros((self.config.PLAYER_N_OBS, self.entities.values.shape[1]))}
+    if self.config.ITEM_SYSTEM_ENABLED:
+      gym_obs["Inventory"] = np.zeros((self.config.INVENTORY_N_OBS,
+                                       self.inventory.values.shape[1]))
+    if self.config.EXCHANGE_SYSTEM_ENABLED:
+      gym_obs["Market"] = np.zeros((self.config.MARKET_N_OBS,
+                                    self.market.values.shape[1]))
+    return gym_obs
+
+  def to_gym(self):
+    '''Convert the observation to a format that can be used by OpenAI Gym'''
+    gym_obs = self.get_empty_obs()
+    if self.dummy_obs:
+      # return empty obs for the dead agents
+      if self.config.PROVIDE_ACTION_TARGETS:
+        gym_obs["ActionTargets"] = self._make_action_targets()
+      return gym_obs
+
+    gym_obs['Tile'][:self.tiles.shape[0],:] = self.tiles
+    gym_obs['Entity'][:self.entities.values.shape[0],:] = self.entities.values
 
     if self.config.ITEM_SYSTEM_ENABLED:
-      inventory = np.zeros((self.config.INVENTORY_N_OBS, self.inventory.values.shape[1]))
-      inventory[:self.inventory.values.shape[0],:] = self.inventory.values
-      gym_obs["Inventory"] = inventory
+      gym_obs["Inventory"][:self.inventory.values.shape[0],:] = self.inventory.values
 
     if self.config.EXCHANGE_SYSTEM_ENABLED:
-      market = np.zeros((self.config.MARKET_N_OBS, self.market.values.shape[1]))
-      market[:self.market.values.shape[0],:] = self.market.values
-      gym_obs["Market"] = market
+      gym_obs["Market"][:self.market.values.shape[0],:] = self.market.values
 
     if self.config.PROVIDE_ACTION_TARGETS:
       gym_obs["ActionTargets"] = self._make_action_targets()
@@ -149,9 +156,10 @@ class Observation:
       action.Direction: self._make_move_mask()
     }
 
+    multiplier = 0 if self.dummy_obs else 1
     if self.config.COMBAT_SYSTEM_ENABLED:
       masks[action.Attack] = {
-        action.Style: np.ones(len(action.Style.edges), dtype=np.int8),
+        action.Style: np.ones(len(action.Style.edges), dtype=np.int8) * multiplier,
         action.Target: self._make_attack_mask()
       }
 
@@ -170,7 +178,7 @@ class Observation:
     if self.config.EXCHANGE_SYSTEM_ENABLED:
       masks[action.Sell] = {
         action.InventoryItem: self._make_sell_mask(),
-        action.Price: np.ones(len(action.Price.edges), dtype=np.int8)
+        action.Price: np.ones(len(action.Price.edges), dtype=np.int8) * multiplier
       }
       masks[action.Buy] = {
         action.MarketItem: self._make_buy_mask()
@@ -182,12 +190,14 @@ class Observation:
 
     if self.config.COMMUNICATION_SYSTEM_ENABLED:
       masks[action.Comm] = {
-        action.Token: np.ones(len(action.Token.edges), dtype=np.int8)
+        action.Token: np.ones(len(action.Token.edges), dtype=np.int8) * multiplier
       }
 
     return masks
 
   def _make_move_mask(self):
+    if self.dummy_obs:
+      return np.zeros(len(action.Direction.edges), dtype=np.int8)
     # pylint: disable=not-an-iterable
     return np.array([self.tile(*d.delta).material_id in material.Habitable.indices
                      for d in action.Direction.edges], dtype=np.int8)
@@ -199,12 +209,14 @@ class Observation:
     assert self.config.COMBAT_MELEE_REACH == self.config.COMBAT_RANGE_REACH
     assert self.config.COMBAT_MELEE_REACH == self.config.COMBAT_MAGE_REACH
     assert self.config.COMBAT_RANGE_REACH == self.config.COMBAT_MAGE_REACH
-
-    attack_range = self.config.COMBAT_MELEE_REACH
+    attack_mask = np.zeros(self.config.PLAYER_N_OBS, dtype=np.int8)
+    if self.dummy_obs:
+      return attack_mask
 
     agent = self.agent()
     entities_pos = self.entities.values[:,[EntityState.State.attr_name_to_col["row"],
                                            EntityState.State.attr_name_to_col["col"]]]
+    attack_range = self.config.COMBAT_MELEE_REACH
     within_range = utils.linf(entities_pos,(agent.row, agent.col)) <= attack_range
 
     immunity = self.config.COMBAT_SPAWN_IMMUNITY
@@ -218,14 +230,14 @@ class Observation:
     # allow friendly fire but no self shooting
     not_me = self.entities.ids != agent.id
 
-    attack_mask = np.zeros(self.config.PLAYER_N_OBS, dtype=np.int8)
     attack_mask[:self.entities.len] = within_range & not_me & spawn_immunity
     return attack_mask
 
   def _make_use_mask(self):
     # empty inventory -- nothing to use
     use_mask = np.zeros(self.config.INVENTORY_N_OBS, dtype=np.int8)
-    if not (self.config.ITEM_SYSTEM_ENABLED and self.inventory.len > 0) or self.agent_in_combat:
+    if not (self.config.ITEM_SYSTEM_ENABLED and self.inventory.len > 0)\
+        or self.dummy_obs or self.agent_in_combat:
       return use_mask
 
     item_skill = self._item_skill()
@@ -273,7 +285,8 @@ class Observation:
   def _make_destroy_item_mask(self):
     destroy_mask = np.zeros(self.config.INVENTORY_N_OBS, dtype=np.int8)
     # empty inventory -- nothing to destroy
-    if not (self.config.ITEM_SYSTEM_ENABLED and self.inventory.len > 0) or self.agent_in_combat:
+    if not (self.config.ITEM_SYSTEM_ENABLED and self.inventory.len > 0)\
+        or self.dummy_obs or self.agent_in_combat:
       return destroy_mask
 
     # not equipped items in the inventory can be destroyed
@@ -285,7 +298,8 @@ class Observation:
   def _make_give_target_mask(self):
     give_mask = np.zeros(self.config.PLAYER_N_OBS, dtype=np.int8)
     # empty inventory -- nothing to give
-    if not (self.config.ITEM_SYSTEM_ENABLED and self.inventory.len > 0) or self.agent_in_combat:
+    if not (self.config.ITEM_SYSTEM_ENABLED and self.inventory.len > 0)\
+        or self.dummy_obs or self.agent_in_combat:
       return give_mask
 
     agent = self.agent()
@@ -299,9 +313,11 @@ class Observation:
     return give_mask
 
   def _make_give_gold_mask(self):
-    gold = int(self.agent().gold)
     mask = np.zeros(self.config.PRICE_N_OBS, dtype=np.int8)
+    if self.dummy_obs:
+      return mask
 
+    gold = int(self.agent().gold)
     if gold and not self.agent_in_combat:
       mask[:gold] = 1 # NOTE that action.Price starts from Discrete_1
 
@@ -311,7 +327,7 @@ class Observation:
     sell_mask = np.zeros(self.config.INVENTORY_N_OBS, dtype=np.int8)
     # empty inventory -- nothing to sell
     if not (self.config.EXCHANGE_SYSTEM_ENABLED and self.inventory.len > 0) \
-      or self.agent_in_combat:
+      or self.dummy_obs or self.agent_in_combat:
       return sell_mask
 
     not_equipped = self.inventory.values[:,ItemState.State.attr_name_to_col["equipped"]] == 0
@@ -322,7 +338,7 @@ class Observation:
 
   def _make_buy_mask(self):
     buy_mask = np.zeros(self.config.MARKET_N_OBS, dtype=np.int8)
-    if not self.config.EXCHANGE_SYSTEM_ENABLED or self.agent_in_combat:
+    if not self.config.EXCHANGE_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat:
       return buy_mask
 
     agent = self.agent()
