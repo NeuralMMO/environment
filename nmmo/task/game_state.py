@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from copy import deepcopy
 from abc import ABC, abstractmethod
 from collections import defaultdict
+import functools
 
 import numpy as np
 
@@ -36,31 +37,39 @@ class GameState:
   env_obs: Dict[int, Observation] # env passes the obs of only alive agents
 
   entity_data: np.ndarray # a copied, whole Entity ds table
-  entity_index: Dict[int, Iterable] # index for where_in_1d
+  entity_index: Dict[int, Iterable] # precomputed index for where_in_1d
   item_data: np.ndarray # a copied, whole Item ds table
   item_index: Dict[int, Iterable]
   event_data: np.ndarray # a copied, whole Event log table
   event_index: Dict[int, Iterable]
 
   cache_result: MutableMapping # cache for general memoization
+
   # add helper functions below
+  @functools.lru_cache
   def entity_or_none(self, ent_id):
     flt_ent = self.entity_data[:, EntityAttr['id']] == ent_id
     if np.any(flt_ent):
       return EntityState.parse_array(self.entity_data[flt_ent][0])
-
     return None
 
   def where_in_id(self, data_type, subject: Iterable[int]):
+    k = (data_type, subject)
+    if k in self.cache_result:
+      return self.cache_result[k]
+
     if data_type == 'entity':
       flt_idx = [row for sbj in subject for row in self.entity_index.get(sbj,[])]
-      return self.entity_data[flt_idx]
+      self.cache_result[k] = self.entity_data[flt_idx]
     if data_type == 'item':
       flt_idx = [row for sbj in subject for row in self.item_index.get(sbj,[])]
-      return self.item_data[flt_idx]
+      self.cache_result[k] = self.item_data[flt_idx]
     if data_type == 'event':
       flt_idx = [row for sbj in subject for row in self.event_index.get(sbj,[])]
-      return self.event_data[flt_idx]
+      self.cache_result[k] = self.event_data[flt_idx]
+    if data_type in ['entity', 'item', 'event']:
+      return self.cache_result[k]
+
     raise ValueError("data_type must be in entity, item, event")
 
   def get_subject_view(self, subject: Group):
@@ -157,27 +166,31 @@ class GroupView:
     self._subject = subject
     self.obs = GroupObsView(gs, subject)
 
-    self._sbj_ent = None
-    self.entity = None
-    self._sbj_item = None
-    self.item = None
-    self._sbj_event = None
-    self.event = None
+  @functools.cached_property
+  def _sbj_ent(self):
+    return self._gs.where_in_id('entity', self._subject.agents)
+
+  @functools.cached_property
+  def entity(self):
+    return EntityView(self._gs, self._subject, self._sbj_ent)
+
+  @functools.cached_property
+  def _sbj_item(self):
+    return self._gs.where_in_id('item', self._subject.agents)
+
+  @functools.cached_property
+  def item(self):
+    return ItemView(self._gs, self._subject, self._sbj_item)
+
+  @functools.cached_property
+  def _sbj_event(self):
+    return self._gs.where_in_id('event', self._subject.agents)
+
+  @functools.cached_property
+  def event(self):
+    return EventView(self._gs, self._subject, self._sbj_event)
 
   def __getattribute__(self, attr):
-    # lazy loading
-    if attr in ['_sjb_ent', 'entity']:
-      self._sbj_ent = self._gs.where_in_id('entity', self._subject.agents)
-    if attr == 'entity':
-      self.entity = EntityView(self._gs, self._subject, self._sbj_ent)
-    if attr in ['_sbj_item', 'item']:
-      self._sbj_item = self._gs.where_in_id('item', self._subject.agents)
-    if attr == 'item':
-      self.item = ItemView(self._gs, self._subject, self._sbj_item)
-    if attr in ['_sbj_event', 'event']:
-      self._sbj_event = self._gs.where_in_id('event', self._subject.agents)
-    if attr == 'event':
-      self.event = EventView(self._gs, self._subject, self._sbj_event)
     if attr in ['_gs','_subject','_sbj_ent','_sbj_item','entity','item','event','obs']:
       return object.__getattribute__(self, attr)
 
@@ -189,10 +202,6 @@ class GroupView:
     try:
       # Get property
       if attr in EntityAttr.keys():
-        if self._sbj_ent is None:
-          self._sbj_ent = self._gs.where_in_id('entity', self._subject.agents)
-        if self.entity is None:
-          self.entity = EntityView(self._gs, self._subject, self._sbj_ent)
         v = getattr(self.entity, attr)
       else:
         v = object.__getattribute__(self, attr)
