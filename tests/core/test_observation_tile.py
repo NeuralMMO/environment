@@ -5,8 +5,10 @@ import numpy as np
 
 import nmmo
 from nmmo.core.tile import TileState
+from nmmo.entity.entity import EntityState
 from nmmo.core.observation import Observation
 from nmmo.core import action as Action
+from nmmo.lib import utils
 
 TileAttr = TileState.State.attr_name_to_col
 
@@ -21,6 +23,11 @@ class TestObservationTile(unittest.TestCase):
 
   def test_tile_attr(self):
     self.assertDictEqual(TileAttr, {'row': 0, 'col': 1, 'material_id': 2})
+
+  def test_action_target_consts(self):
+    self.assertEqual(len(Action.Style.edges), 3)
+    self.assertEqual(len(Action.Price.edges), self.config.PRICE_N_OBS)
+    self.assertEqual(len(Action.Token.edges), self.config.COMMUNICATION_NUM_TOKENS)
 
   def test_obs_tile_correctness(self):
     obs = self.env._compute_observations()
@@ -37,6 +44,9 @@ class TestObservationTile(unittest.TestCase):
         return TileState.parse_array(agent_obs.tiles[r_cond & c_cond][0])
 
     for agent_obs in obs.values():
+      # check if the tile obs size
+      self.assertEqual(len(agent_obs.tiles), self.config.MAP_N_OBS)
+
       # check if the coord conversion is correct
       row_map = agent_obs.tiles[:,TileAttr['row']].reshape(tile_dim,tile_dim)
       col_map = agent_obs.tiles[:,TileAttr['col']].reshape(tile_dim,tile_dim)
@@ -88,6 +98,39 @@ class TestObservationTile(unittest.TestCase):
     print('implemented:',
           timeit(lambda: visible_tiles_by_index(self.env.realm, agent_id, tile_map),
                  number=1000, globals=globals()))
+
+  def test_make_attack_mask_within_range(self):
+    # pylint: disable=invalid-name
+    EntityAttr = EntityState.State.attr_name_to_col
+    def correct_within_range(entities, attack_range, agent_row, agent_col):
+      entities_pos = entities[:,[EntityAttr["row"],EntityAttr["col"]]]
+      within_range = utils.linf(entities_pos,(agent_row, agent_col)) <= attack_range
+      return within_range
+
+    # implemented in the Observation._make_attack_mask()
+    def simple_within_range(entities, attack_range, agent_row, agent_col):
+      return np.maximum(
+          np.abs(entities[:,EntityAttr["row"]] - agent_row),
+          np.abs(entities[:,EntityAttr["col"]] - agent_col)
+        ) <= attack_range
+
+    obs = self.env._compute_observations()
+    attack_range = self.config.COMBAT_MELEE_REACH
+
+    for agent_obs in obs.values():
+      entities = agent_obs.entities.values
+      agent = agent_obs.agent()
+      self.assertTrue(np.array_equal(
+        correct_within_range(entities, attack_range, agent.row, agent.col),
+        simple_within_range(entities, attack_range, agent.row, agent.col)))
+
+    print('---test_attack_within_range---')
+    print('reference:', timeit(
+      lambda: correct_within_range(entities, attack_range, agent.row, agent.col),
+      number=1000, globals=globals()))
+    print('implemented:', timeit(
+      lambda: simple_within_range(entities, attack_range, agent.row, agent.col),
+      number=1000, globals=globals()))
 
 if __name__ == '__main__':
   unittest.main()
