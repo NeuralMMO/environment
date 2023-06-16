@@ -72,7 +72,7 @@ def seed():
 def linf(pos1, pos2):
   # pos could be a single (r,c) or a vector of (r,c)s
   diff = np.abs(np.array(pos1) - np.array(pos2))
-  return np.max(diff, axis=len(diff.shape)-1)
+  return np.max(diff, axis=-1)
 
 #Bounds checker
 def in_bounds(r, c, shape, border=0):
