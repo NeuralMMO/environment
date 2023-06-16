@@ -117,14 +117,15 @@ class Observation:
     gym_obs = {
       "CurrentTick": np.array([self.current_tick]),
       "AgentId": np.array([self.agent_id]),
-      "Tile": np.zeros((self.config.MAP_N_OBS, self.tiles.shape[1])),
-      "Entity": np.zeros((self.config.PLAYER_N_OBS, self.entities.values.shape[1]))}
+      "Tile": None, # np.zeros((self.config.MAP_N_OBS, self.tiles.shape[1])),
+      "Entity": np.zeros((self.config.PLAYER_N_OBS,
+                          self.entities.values.shape[1]), dtype=np.int16)}
     if self.config.ITEM_SYSTEM_ENABLED:
       gym_obs["Inventory"] = np.zeros((self.config.INVENTORY_N_OBS,
                                        self.inventory.values.shape[1]))
     if self.config.EXCHANGE_SYSTEM_ENABLED:
       gym_obs["Market"] = np.zeros((self.config.MARKET_N_OBS,
-                                    self.market.values.shape[1]))
+                                    self.market.values.shape[1]), dtype=np.int16)
     return gym_obs
 
   def to_gym(self):
@@ -132,11 +133,13 @@ class Observation:
     gym_obs = self.get_empty_obs()
     if self.dummy_obs:
       # return empty obs for the dead agents
+      gym_obs['Tile'] = np.zeros((self.config.MAP_N_OBS, self.tiles.shape[1]), dtype=np.int16)
       if self.config.PROVIDE_ACTION_TARGETS:
         gym_obs["ActionTargets"] = self._make_action_targets()
       return gym_obs
 
-    gym_obs['Tile'][:self.tiles.shape[0],:] = self.tiles
+    # NOTE: assume that all len(self.tiles) == self.config.MAP_N_OBS
+    gym_obs['Tile'] = self.tiles
     gym_obs['Entity'][:self.entities.values.shape[0],:] = self.entities.values
 
     if self.config.ITEM_SYSTEM_ENABLED:
@@ -156,10 +159,12 @@ class Observation:
       action.Direction: self._make_move_mask()
     }
 
-    multiplier = 0 if self.dummy_obs else 1
     if self.config.COMBAT_SYSTEM_ENABLED:
+      # Test below. see tests/core/test_observation_tile.py, test_action_target_consts()
+      # assert len(action.Style.edges) == 3
       masks[action.Attack] = {
-        action.Style: np.ones(len(action.Style.edges), dtype=np.int8) * multiplier,
+        action.Style: np.zeros(3, dtype=np.int8) if self.dummy_obs\
+                        else np.ones(3, dtype=np.int8),
         action.Target: self._make_attack_mask()
       }
 
@@ -178,7 +183,8 @@ class Observation:
     if self.config.EXCHANGE_SYSTEM_ENABLED:
       masks[action.Sell] = {
         action.InventoryItem: self._make_sell_mask(),
-        action.Price: np.ones(len(action.Price.edges), dtype=np.int8) * multiplier
+        action.Price: np.zeros(self.config.PRICE_N_OBS, dtype=np.int8) if self.dummy_obs\
+                        else np.ones(self.config.PRICE_N_OBS, dtype=np.int8)
       }
       masks[action.Buy] = {
         action.MarketItem: self._make_buy_mask()
@@ -190,7 +196,9 @@ class Observation:
 
     if self.config.COMMUNICATION_SYSTEM_ENABLED:
       masks[action.Comm] = {
-        action.Token: np.ones(len(action.Token.edges), dtype=np.int8) * multiplier
+        action.Token:\
+          np.zeros(self.config.COMMUNICATION_NUM_TOKENS, dtype=np.int8) if self.dummy_obs\
+            else np.ones(self.config.COMMUNICATION_NUM_TOKENS, dtype=np.int8)
       }
 
     return masks
@@ -214,10 +222,10 @@ class Observation:
       return attack_mask
 
     agent = self.agent()
-    entities_pos = self.entities.values[:,[EntityState.State.attr_name_to_col["row"],
-                                           EntityState.State.attr_name_to_col["col"]]]
-    attack_range = self.config.COMBAT_MELEE_REACH
-    within_range = utils.linf(entities_pos,(agent.row, agent.col)) <= attack_range
+    within_range = np.maximum( # calculating the l-inf dist
+        np.abs(self.entities.values[:,EntityState.State.attr_name_to_col["row"]] - agent.row),
+        np.abs(self.entities.values[:,EntityState.State.attr_name_to_col["col"]] - agent.col)
+      ) <= self.config.COMBAT_MELEE_REACH
 
     immunity = self.config.COMBAT_SPAWN_IMMUNITY
     if 0 < immunity < agent.time_alive:
