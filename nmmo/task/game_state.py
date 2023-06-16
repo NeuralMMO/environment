@@ -1,8 +1,9 @@
 from __future__ import annotations
-from typing import Dict, List, Tuple, MutableMapping, Set
+from typing import Dict, Iterable, Tuple, MutableMapping, Set
 from dataclasses import dataclass
 from copy import deepcopy
 from abc import ABC, abstractmethod
+from collections import defaultdict
 
 import numpy as np
 
@@ -35,8 +36,11 @@ class GameState:
   env_obs: Dict[int, Observation] # env passes the obs of only alive agents
 
   entity_data: np.ndarray # a copied, whole Entity ds table
+  entity_index: Dict[int, Iterable] # index for where_in_1d
   item_data: np.ndarray # a copied, whole Item ds table
+  item_index: Dict[int, Iterable]
   event_data: np.ndarray # a copied, whole Event log table
+  event_index: Dict[int, Iterable]
 
   cache_result: MutableMapping # cache for general memoization
   # add helper functions below
@@ -47,15 +51,15 @@ class GameState:
 
     return None
 
-  def where_in_id(self, data_type, subject: List[int]):
+  def where_in_id(self, data_type, subject: Iterable[int]):
     if data_type == 'entity':
-      flt_idx = np.in1d(self.entity_data[:, EntityAttr['id']], subject)
+      flt_idx = [row for sbj in subject for row in self.entity_index.get(sbj,[])]
       return self.entity_data[flt_idx]
     if data_type == 'item':
-      flt_idx = np.in1d(self.item_data[:, ItemAttr['owner_id']], subject)
+      flt_idx = [row for sbj in subject for row in self.item_index.get(sbj,[])]
       return self.item_data[flt_idx]
     if data_type == 'event':
-      flt_idx = np.in1d(self.event_data[:, EventAttr['ent_id']], subject)
+      flt_idx = [row for sbj in subject for row in self.event_index.get(sbj,[])]
       return self.event_data[flt_idx]
     raise ValueError("data_type must be in entity, item, event")
 
@@ -151,18 +155,31 @@ class GroupView:
   def __init__(self, gs: GameState, subject: Group):
     self._gs = gs
     self._subject = subject
-    self._sbj_ent = gs.where_in_id('entity', subject.agents)
-    self._sbj_item = gs.where_in_id('item', subject.agents)
-    self._sbj_event = gs.where_in_id('event', subject.agents)
-
-    self.entity = EntityView(gs, subject, self._sbj_ent)
-    self.item = ItemView(gs, subject, self._sbj_item)
-    self.event = EventView(gs, subject, self._sbj_event)
     self.obs = GroupObsView(gs, subject)
 
+    self._sbj_ent = None
+    self.entity = None
+    self._sbj_item = None
+    self.item = None
+    self._sbj_event = None
+    self.event = None
+
   def __getattribute__(self, attr):
+    # lazy loading
+    if attr in ['_sjb_ent', 'entity']:
+      self._sbj_ent = self._gs.where_in_id('entity', self._subject.agents)
+    if attr == 'entity':
+      self.entity = EntityView(self._gs, self._subject, self._sbj_ent)
+    if attr in ['_sbj_item', 'item']:
+      self._sbj_item = self._gs.where_in_id('item', self._subject.agents)
+    if attr == 'item':
+      self.item = ItemView(self._gs, self._subject, self._sbj_item)
+    if attr in ['_sbj_event', 'event']:
+      self._sbj_event = self._gs.where_in_id('event', self._subject.agents)
+    if attr == 'event':
+      self.event = EventView(self._gs, self._subject, self._sbj_event)
     if attr in ['_gs','_subject','_sbj_ent','_sbj_item','entity','item','event','obs']:
-      return object.__getattribute__(self,attr)
+      return object.__getattribute__(self, attr)
 
     # Cached optimization
     k = (self._subject, attr)
@@ -172,6 +189,10 @@ class GroupView:
     try:
       # Get property
       if attr in EntityAttr.keys():
+        if self._sbj_ent is None:
+          self._sbj_ent = self._gs.where_in_id('entity', self._subject.agents)
+        if self.entity is None:
+          self.entity = EntityView(self._gs, self._subject, self._sbj_ent)
         v = getattr(self.entity, attr)
       else:
         v = object.__getattribute__(self, attr)
@@ -179,7 +200,7 @@ class GroupView:
       return v
     except AttributeError:
       # View behavior
-      return object.__getattribute__(self._gs,attr)
+      return object.__getattribute__(self._gs, attr)
 
 class GameStateGenerator:
   def __init__(self, realm: Realm, config: Config):
@@ -194,6 +215,8 @@ class GameStateGenerator:
     entity_all = EntityState.Query.table(realm.datastore).astype(np.int16)
     alive_agents = entity_all[:, EntityAttr["id"]]
     alive_agents = set(alive_agents[alive_agents > 0])
+    item_data = ItemState.Query.table(realm.datastore).astype(np.int16)
+    event_data = EventState.Query.table(realm.datastore).astype(np.int16)
 
     return GameState(
       current_tick = realm.tick,
@@ -202,7 +225,20 @@ class GameStateGenerator:
       alive_agents = alive_agents,
       env_obs = env_obs,
       entity_data = entity_all,
-      item_data = ItemState.Query.table(realm.datastore).astype(np.int16),
-      event_data = EventState.Query.table(realm.datastore).astype(np.int16),
+      entity_index = self._precompute_index(entity_all, EntityAttr["id"]),
+      item_data = item_data,
+      item_index = self._precompute_index(item_data, ItemAttr['owner_id']),
+      event_data = event_data,
+      event_index = self._precompute_index(event_data, EventAttr['ent_id']),
       cache_result = {}
     )
+
+  @staticmethod
+  def _precompute_index(table, id_col):
+    index = defaultdict()
+    for row, id_ in enumerate(table[:,id_col]):
+      if id_ in index:
+        index[id_].append(row)
+      else:
+        index[id_] = [row]
+    return index

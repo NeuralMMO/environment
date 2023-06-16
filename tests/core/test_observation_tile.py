@@ -1,16 +1,24 @@
 # pylint: disable=protected-access,bad-builtin
 import unittest
 from timeit import timeit
+from collections import defaultdict
 import numpy as np
 
 import nmmo
 from nmmo.core.tile import TileState
 from nmmo.entity.entity import EntityState
+from nmmo.systems.item import ItemState
+from nmmo.lib.event_log import EventState
 from nmmo.core.observation import Observation
 from nmmo.core import action as Action
 from nmmo.lib import utils
+from tests.testhelpers import ScriptedAgentTestConfig
 
 TileAttr = TileState.State.attr_name_to_col
+EntityAttr = EntityState.State.attr_name_to_col
+ItemAttr = ItemState.State.attr_name_to_col
+EventAttr = EventState.State.attr_name_to_col
+
 
 class TestObservationTile(unittest.TestCase):
   @classmethod
@@ -100,8 +108,6 @@ class TestObservationTile(unittest.TestCase):
                  number=1000, globals=globals()))
 
   def test_make_attack_mask_within_range(self):
-    # pylint: disable=invalid-name
-    EntityAttr = EntityState.State.attr_name_to_col
     def correct_within_range(entities, attack_range, agent_row, agent_col):
       entities_pos = entities[:,[EntityAttr["row"],EntityAttr["col"]]]
       within_range = utils.linf(entities_pos,(agent_row, agent_col)) <= attack_range
@@ -130,6 +136,44 @@ class TestObservationTile(unittest.TestCase):
       number=1000, globals=globals()))
     print('implemented:', timeit(
       lambda: simple_within_range(entities, attack_range, agent.row, agent.col),
+      number=1000, globals=globals()))
+
+  def test_gs_where_in_1d(self):
+    config = ScriptedAgentTestConfig()
+    env = nmmo.Env(config)
+    env.reset(seed=0)
+    for _ in range(5):
+      env.step({})
+
+    def correct_where_in_1d(event_data, subject):
+      flt_idx = np.in1d(event_data[:, EventAttr['ent_id']], subject)
+      return event_data[flt_idx]
+
+    def where_in_1d_with_index(event_data, subject, index):
+      flt_idx = [row for sbj in subject for row in index.get(sbj,[])]
+      return event_data[flt_idx]
+
+    event_data = EventState.Query.table(env.realm.datastore).astype(np.int16)
+    event_index = defaultdict()
+    for row, id_ in enumerate(event_data[:,EventAttr['ent_id']]):
+      if id_ in event_index:
+        event_index[id_].append(row)
+      else:
+        event_index[id_] = [row]
+
+    # NOTE: the index-based approach returns the data in different order,
+    #   and all the operations in the task system don't use the order info
+    arr = where_in_1d_with_index(event_data, [1,2,3], event_index)
+    sorted_idx = np.argsort(arr[:,0]) # event_id
+    self.assertTrue(np.array_equal(correct_where_in_1d(event_data, [1,2,3]),
+                                   arr[sorted_idx]))
+
+    print('---test_gs_where_in_1d---')
+    print('reference:', timeit(
+      lambda: correct_where_in_1d(event_data, [1, 2, 3]),
+      number=1000, globals=globals()))
+    print('implemented:', timeit(
+      lambda: where_in_1d_with_index(event_data, [1, 2, 3], event_index),
       number=1000, globals=globals()))
 
 if __name__ == '__main__':
