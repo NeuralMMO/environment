@@ -22,11 +22,11 @@ def inSight(dr, dc, vision):
           dr <= vision and
           dc <= vision)
 
-def rand(config, ob, actions):
-   direction                 = random.choice(action.Direction.edges)
+def rand(config, ob, actions, np_random):
+   direction = np_random.choice(action.Direction.edges)
    actions[action.Move] = {action.Direction: direction}
 
-def towards(direction):
+def towards(direction, np_random):
    if direction == (-1, 0):
       return action.North
    elif direction == (1, 0):
@@ -36,14 +36,14 @@ def towards(direction):
    elif direction == (0, 1):
       return action.East
    else:
-      return random.choice(action.Direction.edges)
+      return np_random.choice(action.Direction.edges)
 
-def pathfind(config, ob, actions, rr, cc):
+def pathfind(config, ob, actions, rr, cc, np_random):
    direction = aStar(config, ob, actions, rr, cc)
-   direction = towards(direction)
+   direction = towards(direction, np_random)
    actions[action.Move] = {action.Direction: direction}
 
-def meander(config, ob, actions):
+def meander(config, ob, actions, np_random):
    cands = []
    if ob.tile(-1, 0).material_id in material.Habitable.indices:
       cands.append((-1, 0))
@@ -56,11 +56,11 @@ def meander(config, ob, actions):
    if not cands:
       return (-1, 0)
 
-   direction = random.choices(cands)[0]
-   direction = towards(direction)
+   direction = np_random.choices(cands)[0]
+   direction = towards(direction, np_random)
    actions[action.Move] = {action.Direction: direction}
 
-def explore(config, ob, actions, r, c):
+def explore(config, ob, actions, r, c, np_random):
    vision = config.PLAYER_VISION_RADIUS
    sz     = config.MAP_SIZE
 
@@ -71,16 +71,17 @@ def explore(config, ob, actions, r, c):
    mmag = max(1, abs(vR), abs(vC))
    rr   = int(np.round(vision*vR/mmag))
    cc   = int(np.round(vision*vC/mmag))
-   pathfind(config, ob, actions, rr, cc)
+   pathfind(config, ob, actions, rr, cc, np_random)
 
-def evade(config, ob: Observation, actions, attacker):
+def evade(config, ob: Observation, actions, attacker, np_random):
    agent = ob.agent()
 
    rr, cc = (2*agent.row - attacker.row, 2*agent.col - attacker.col)
 
-   pathfind(config, ob, actions, rr, cc)
+   pathfind(config, ob, actions, rr, cc, np_random)
 
-def forageDijkstra(config, ob: Observation, actions, food_max, water_max, cutoff=100):
+def forageDijkstra(config, ob: Observation, actions,
+                   food_max, water_max, np_random, cutoff=100):
    vision = config.PLAYER_VISION_RADIUS
 
    agent  = ob.agent()
@@ -145,7 +146,7 @@ def forageDijkstra(config, ob: Observation, actions, food_max, water_max, cutoff
 
    while goal in backtrace and backtrace[goal] != start:
       goal = backtrace[goal]
-   direction = towards(goal)
+   direction = towards(goal, np_random)
    actions[action.Move] = {action.Direction: direction}
 
 def findResource(config, ob: Observation, resource):
@@ -163,7 +164,7 @@ def findResource(config, ob: Observation, resource):
 
     return False
 
-def gatherAStar(config, ob, actions, resource, cutoff=100):
+def gatherAStar(config, ob, actions, resource, np_random, cutoff=100):
     resource_pos = findResource(config, ob, resource)
     if not resource_pos:
         return
@@ -173,11 +174,11 @@ def gatherAStar(config, ob, actions, resource, cutoff=100):
     if not next_pos or next_pos == (0, 0):
         return
 
-    direction = towards(next_pos)
+    direction = towards(next_pos, np_random)
     actions[action.Move] = {action.Direction: direction}
     return True
 
-def gatherBFS(config, ob: Observation, actions, resource, cutoff=100):
+def gatherBFS(config, ob: Observation, actions, resource, np_random, cutoff=100):
     vision = config.PLAYER_VISION_RADIUS
 
     start  = (0, 0)
@@ -241,7 +242,7 @@ def gatherBFS(config, ob: Observation, actions, resource, cutoff=100):
     while found in backtrace and backtrace[found] != start:
         found = backtrace[found]
 
-    direction = towards(found)
+    direction = towards(found, np_random)
     actions[action.Move] = {action.Direction: direction}
 
     return True

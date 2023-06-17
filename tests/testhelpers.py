@@ -9,6 +9,7 @@ import nmmo
 from nmmo.core import action
 from nmmo.systems import item as Item
 from nmmo.core.realm import Realm
+from nmmo.lib import material as Material
 
 from scripted import baselines
 
@@ -50,6 +51,7 @@ def observations_are_equal(source_obs, target_obs, debug=True):
   keys_obs = list(target_obs.keys())
   if keys_src != keys_obs:
     if debug:
+      #print("entities don't match")
       logging.error("entities don't match")
     return False
 
@@ -58,6 +60,7 @@ def observations_are_equal(source_obs, target_obs, debug=True):
     ent_tgt = target_obs[k]
     if list(ent_src.keys()) != list(ent_tgt.keys()):
       if debug:
+        #print(f"entries don't match. key: {k}")
         logging.error("entries don't match. key: %s", str(k))
       return False
 
@@ -72,6 +75,7 @@ def observations_are_equal(source_obs, target_obs, debug=True):
       obj_tgt = ent_tgt[o]
       if np.sum(obj_src != obj_tgt) > 0:
         if debug:
+          #print(f"objects don't match. key: {k}, obj: {o}")
           logging.error("objects don't match. key: %s, obj: %s", str(k), str(o))
         return False
 
@@ -243,6 +247,15 @@ class ScriptedTestTemplate(unittest.TestCase):
     # teleport the players, if provided with specific locations
     for ent_id, pos in self.spawn_locs.items():
       change_spawn_pos(env.realm, ent_id, pos)
+
+    # Change entire map to grass to become habitable and non-harvestable
+    MS = env.config.MAP_SIZE
+    for i in range(MS):
+      for j in range(MS):
+        tile = env.realm.map.tiles[i,j]
+        tile.material = Material.Grass
+        tile.material_id.update(Material.Grass.index)
+        tile.state = Material.Grass(env.config)
 
     env.obs = env._compute_observations()
 

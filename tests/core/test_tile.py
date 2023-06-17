@@ -1,4 +1,6 @@
 import unittest
+import numpy as np
+
 import nmmo
 from nmmo.core.tile import Tile, TileState
 from nmmo.datastore.numpy_datastore import NumpyDatastore
@@ -9,6 +11,7 @@ class MockRealm:
     self.datastore = NumpyDatastore()
     self.datastore.register_object_type("Tile", TileState.State.num_attributes)
     self.config = nmmo.config.Small()
+    self.np_random = np.random
 
 class MockEntity():
   def __init__(self, ent_id):

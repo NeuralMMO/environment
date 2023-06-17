@@ -1,5 +1,3 @@
-import numpy as np
-
 class Fixed():
   def __init__(self, item):
     self.item = item
@@ -13,7 +11,7 @@ class Drop:
     self.prob = prob
 
   def roll(self, realm, level):
-    if np.random.rand() < self.prob:
+    if realm.np_random.random() < self.prob:
       return self.item(realm, level)
 
     return None

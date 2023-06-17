@@ -1,7 +1,5 @@
 from collections.abc import Mapping
 from typing import Dict
-
-import numpy as np
 from ordered_set import OrderedSet
 
 from nmmo.entity.entity import Entity
@@ -16,6 +14,7 @@ class EntityGroup(Mapping):
     self.datastore = realm.datastore
     self.realm = realm
     self.config = realm.config
+    self.np_random = realm.np_random
 
     self.entities: Dict[int, Entity] = {}
     self.dead_this_tick: Dict[int, Entity] = {}
@@ -44,6 +43,7 @@ class EntityGroup(Mapping):
     return {k: v.packet() for k, v in self.corporeal.items()}
 
   def reset(self):
+    self.np_random = self.realm.np_random # reset the RNG
     for ent in self.entities.values():
       # destroy the items
       if self.config.ITEM_SYSTEM_ENABLED:
@@ -109,12 +109,12 @@ class NPCManager(EntityGroup):
 
       if self.spawn_dangers:
         danger = self.spawn_dangers[-1]
-        r, c   = combat.spawn(config, danger)
+        r, c   = combat.spawn(config, danger, self.np_random)
       else:
         center = config.MAP_CENTER
         border = self.config.MAP_BORDER
         # pylint: disable=unbalanced-tuple-unpacking
-        r, c   = np.random.randint(border, center+border, 2).tolist()
+        r, c   = self.np_random.integers(border, center+border, 2).tolist()
 
       npc = NPC.spawn(self.realm, (r, c), self.next_id)
       if npc:
@@ -146,7 +146,7 @@ class PlayerManager(EntityGroup):
 
   def reset(self):
     super().reset()
-    self._agent_loader = self.loader_class(self.config)
+    self._agent_loader = self.loader_class(self.config, self.np_random)
     self.spawned = OrderedSet()
 
   def spawn_individual(self, r, c, idx):

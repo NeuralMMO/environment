@@ -1,5 +1,3 @@
-import numpy as np
-
 from nmmo.systems.skill import Skills
 from nmmo.entity import entity
 
@@ -73,7 +71,7 @@ class Player(entity.Entity):
     # TODO: make source receive the highest-level items first
     #   because source cannot take it if the inventory is full
     item_list = list(self.inventory.items)
-    np.random.shuffle(item_list)
+    self.np_random.shuffle(item_list)
     for item in item_list:
       self.inventory.remove(item)
 

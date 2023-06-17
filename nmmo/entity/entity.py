@@ -218,6 +218,7 @@ class Entity(EntityState):
 
     self.realm = realm
     self.config: Config = realm.config
+    self.np_random = realm.np_random
 
     self.policy = name
     self.entity_id = entity_id

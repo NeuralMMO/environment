@@ -1,5 +1,4 @@
 import functools
-import random
 from typing import Any, Dict, List, Callable
 from collections import defaultdict
 from copy import copy
@@ -18,6 +17,7 @@ from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
 from nmmo.task import task_api
 from nmmo.task.game_state import GameStateGenerator
+from nmmo.lib import seeding
 from scripted.baselines import Scripted
 
 class Env(ParallelEnv):
@@ -27,12 +27,12 @@ class Env(ParallelEnv):
   def __init__(self,
                config: Default = nmmo.config.Default(),
                seed = None):
-    self._init_random(seed)
-
+    self.np_random, self._np_seed = seeding.np_random(seed)
     super().__init__()
 
     self.config = config
-    self.realm = realm.Realm(config)
+    self.realm = realm.Realm(config, self.np_random)
+    self._reset_required = True
     self.obs = None
     self._dummy_obs = None
 
@@ -86,11 +86,6 @@ class Env(ParallelEnv):
       obs_space['ActionTargets'] = self.action_space(None)
 
     return gym.spaces.Dict(obs_space)
-
-  def _init_random(self, seed):
-    if seed is not None:
-      np.random.seed(seed)
-      random.seed(seed)
 
   @functools.lru_cache(maxsize=None)
   def action_space(self, agent):
@@ -147,9 +142,9 @@ class Env(ParallelEnv):
         but finite horizon: ~1000 timesteps for small maps and
         5000+ timesteps for large maps
     '''
-
-    self._init_random(seed)
-    self.realm.reset(map_id)
+    if seed is not None:
+      self.np_random, self._np_seed = seeding.np_random(seed)
+    self.realm.reset(self.np_random, map_id)
     self._dead_agents = set()
     self._episode_stats.clear()
     self._dead_this_tick = {}
@@ -158,6 +153,7 @@ class Env(ParallelEnv):
     for eid, ent in self.realm.players.items():
       if isinstance(ent.agent, Scripted):
         self.scripted_agents.add(eid)
+        ent.agent.np_random = self.np_random
 
     self._dummy_obs = self._make_dummy_obs()
     self.obs = self._compute_observations()
@@ -169,6 +165,8 @@ class Env(ParallelEnv):
       for task in self.tasks:
         task.reset()
     self.agent_task_map = self._map_task_to_agent()
+
+    self._reset_required = False
 
     return {a: o.to_gym() for a,o in self.obs.items()}
 
@@ -274,7 +272,7 @@ class Env(ParallelEnv):
 
           Provided for conformity with PettingZoo
     '''
-    assert self.obs is not None, 'step() called before reset'
+    assert not self._reset_required, 'step() called before reset'
     # Add in scripted agents' actions, if any
     if self.scripted_agents:
       actions = self._compute_scripted_agent_actions(actions)
@@ -464,7 +462,9 @@ class Env(ParallelEnv):
     '''For conformity with the PettingZoo API only; rendering is external'''
 
   def seed(self, seed=None):
-    return self._init_random(seed)
+    '''Reseeds the environment. reset() must be called after seed(), and before step().'''
+    self.np_random, self._np_seed = seeding.np_random(seed)
+    self._reset_required = True
 
   def state(self) -> np.ndarray:
     raise NotImplementedError

@@ -27,6 +27,7 @@ class Scripted(nmmo.Agent):
         config : A forge.blade.core.Config object or subclass object
     '''
     super().__init__(config, idx)
+    self.np_random = None
     self.health_max = config.PLAYER_BASE_HEALTH
 
     if config.RESOURCE_SYSTEM_ENABLED:
@@ -48,15 +49,16 @@ class Scripted(nmmo.Agent):
 
   def forage(self):
     '''Min/max food and water using Dijkstra's algorithm'''
-    move.forageDijkstra(self.config, self.ob, self.actions, self.food_max, self.water_max)
+    move.forageDijkstra(self.config, self.ob, self.actions,
+                        self.food_max, self.water_max, self.np_random)
 
   def gather(self, resource):
     '''BFS search for a particular resource'''
-    return move.gatherBFS(self.config, self.ob, self.actions, resource)
+    return move.gatherBFS(self.config, self.ob, self.actions, resource, self.np_random)
 
   def explore(self):
     '''Route away from spawn'''
-    move.explore(self.config, self.ob, self.actions, self.me.row, self.me.col)
+    move.explore(self.config, self.ob, self.actions, self.me.row, self.me.col, self.np_random)
 
   @property
   def downtime(self):
@@ -65,7 +67,7 @@ class Scripted(nmmo.Agent):
 
   def evade(self):
     '''Target and path away from an attacker'''
-    move.evade(self.config, self.ob, self.actions, self.attacker)
+    move.evade(self.config, self.ob, self.actions, self.attacker, self.np_random)
     self.target     = self.attacker
     self.targetID   = self.attackerID
     self.targetDist = self.attackerDist
@@ -74,7 +76,7 @@ class Scripted(nmmo.Agent):
     '''Attack the current target'''
     if self.target is not None:
       assert self.targetID is not None
-      style = random.choice(self.style)
+      style = self.np_random.choice(self.style)
       attack.target(self.config, self.actions, style, self.targetID)
 
   def target_weak(self):
@@ -277,7 +279,7 @@ class Scripted(nmmo.Agent):
 
     purchase = None
     best = list(self.best_heuristic.items())
-    random.shuffle(best)
+    self.np_random.shuffle(best)
     for type_id, itm in best:
       # Buy top k
       if type_id in buy_k:
@@ -311,6 +313,7 @@ class Scripted(nmmo.Agent):
 
   def __call__(self, observation: Observation):
     '''Process observations and return actions'''
+    assert self.np_random is not None, "Agent's RNG must be set."
     self.actions = {}
 
     self.ob = observation
@@ -358,7 +361,7 @@ class Random(Scripted):
   def __call__(self, obs):
     super().__call__(obs)
 
-    move.rand(self.config, self.ob, self.actions)
+    move.rand(self.config, self.ob, self.actions, self.np_random)
     return self.actions
 
 class Meander(Scripted):
@@ -366,7 +369,7 @@ class Meander(Scripted):
   def __call__(self, obs):
     super().__call__(obs)
 
-    move.meander(self.config, self.ob, self.actions)
+    move.meander(self.config, self.ob, self.actions, self.np_random)
     return self.actions
 
 class Explore(Scripted):

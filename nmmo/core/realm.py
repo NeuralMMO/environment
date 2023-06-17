@@ -4,8 +4,6 @@ import logging
 from collections import defaultdict
 from typing import Dict
 
-import numpy as np
-
 import nmmo
 from nmmo.core.log_helper import LogHelper
 from nmmo.core.map import Map
@@ -30,8 +28,9 @@ def prioritized(entities: Dict, merged: Dict):
 class Realm:
   """Top-level world object"""
 
-  def __init__(self, config):
+  def __init__(self, config, np_random):
     self.config = config
+    self.np_random = np_random # rng
     assert isinstance(
         config, nmmo.config.Config
     ), f"Config {config} is not a config instance (did you pass the class?)"
@@ -39,6 +38,8 @@ class Realm:
     Action.hook(config)
 
     # Generate maps if they do not exist
+    # CHECK ME: Does the map generator need use the env-level RNG?
+    #   Do the maps need to be deterministic?
     config.MAP_GENERATOR(config).generate_all_maps()
 
     self.datastore = NumpyDatastore()
@@ -67,16 +68,17 @@ class Realm:
     # Initialize actions
     nmmo.Action.init(config)
 
-  def reset(self, map_id: int = None):
+  def reset(self, np_random, map_id: int = None):
     """Reset the environment and load the specified map
 
     Args:
         idx: Map index to load
     """
+    self.np_random = np_random
     self.log_helper.reset()
     self.event_log.reset()
 
-    map_id = map_id or np.random.randint(self.config.MAP_N) + 1
+    map_id = map_id or self.np_random.integers(self.config.MAP_N) + 1
     self.map.reset(map_id)
     self.tick = 0
 
@@ -170,7 +172,7 @@ class Realm:
       # TODO: we should be randomizing these, otherwise the lower ID agents
       # will always go first. --> ONLY SHUFFLE BUY
       if priority == Buy.priority:
-        np.random.shuffle(merged[priority])
+        self.np_random.shuffle(merged[priority])
 
       # CHECK ME: do we need this line?
       # ent_id, (atn, args) = merged[priority][0]
