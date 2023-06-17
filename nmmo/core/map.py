@@ -1,10 +1,9 @@
 import os
 import logging
-
 import numpy as np
 from ordered_set import OrderedSet
-from nmmo.core.tile import Tile
 
+from nmmo.core.tile import Tile
 from nmmo.lib import material
 
 
@@ -45,7 +44,7 @@ class Map:
   def reset(self, map_id):
     '''Reuse the current tile objects to load a new map'''
     config = self.config
-    self.update_list = OrderedSet()
+    self.update_list = OrderedSet() # critical for determinism
 
     path_map_suffix = config.PATH_MAP_SUFFIX.format(map_id)
     f_path = os.path.join(config.PATH_CWD, config.PATH_MAPS, path_map_suffix)

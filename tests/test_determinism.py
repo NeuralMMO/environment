@@ -34,20 +34,17 @@ class TestDeterminism(unittest.TestCase):
 
     init_obs = [env.reset(seed=RANDOM_SEED) for env in envs]
 
+    self.assertTrue(observations_are_equal(init_obs[0], init_obs[0])) # sanity check
+    self.assertTrue(observations_are_equal(init_obs[0], init_obs[1]),
+                    f"The multi-env determinism failed. Seed: {RANDOM_SEED}.")
+
     for _ in tqdm(range(TEST_HORIZON)):
       # step returns a tuple of (obs, rewards, dones, infos)
       step_results = [env.step({}) for env in envs]
+      self.assertTrue(observations_are_equal(step_results[0][0], step_results[1][0]),
+                      f"The multi-env determinism failed. Seed: {RANDOM_SEED}.")
 
     event_logs = [env.realm.event_log.get_data() for env in envs]
-
-    # sanity checks
-    self.assertTrue(observations_are_equal(init_obs[0], init_obs[0]))
-    self.assertTrue(observations_are_equal(step_results[0][0], step_results[0][0]))
-
-    self.assertTrue(observations_are_equal(init_obs[0], init_obs[1]),
-                    f"The multi-env determinism failed. Seed: {RANDOM_SEED}.")
-    self.assertTrue(observations_are_equal(step_results[0][0], step_results[1][0]),
-                    f"The multi-env determinism failed. Seed: {RANDOM_SEED}.") # after 30 runs
     self.assertTrue(np.array_equal(event_logs[0], event_logs[1]),
                     f"The multi-env determinism failed. Seed: {RANDOM_SEED}.")
 

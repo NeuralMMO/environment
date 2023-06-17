@@ -2,7 +2,6 @@ import functools
 from typing import Any, Dict, List, Callable
 from collections import defaultdict
 from copy import copy
-from ordered_set import OrderedSet
 
 import gym
 import numpy as np
@@ -37,10 +36,11 @@ class Env(ParallelEnv):
     self._dummy_obs = None
 
     self.possible_agents = list(range(1, config.PLAYER_N + 1))
+    self._agents = None
     self._dead_agents = set()
     self._episode_stats = defaultdict(lambda: defaultdict(float))
     self._dead_this_tick = None
-    self.scripted_agents = OrderedSet()
+    self.scripted_agents = set()
 
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
     self.game_state = None
@@ -145,6 +145,7 @@ class Env(ParallelEnv):
     if seed is not None:
       self.np_random, self._np_seed = seeding.np_random(seed)
     self.realm.reset(self.np_random, map_id)
+    self._agents = list(self.realm.players.keys())
     self._dead_agents = set()
     self._episode_stats.clear()
     self._dead_this_tick = {}
@@ -282,6 +283,9 @@ class Env(ParallelEnv):
     actions = self._validate_actions(actions)
     # Execute actions
     self._dead_this_tick = self.realm.step(actions)
+    # the list of "current" agents, both alive and dead_this_tick
+    self._agents = list(set(list(self.realm.players.keys()) + list(self._dead_this_tick.keys())))
+
     dones = {}
     for agent_id in self.agents:
       if agent_id in self._dead_this_tick or \
@@ -351,14 +355,16 @@ class Env(ParallelEnv):
 
   def _compute_scripted_agent_actions(self, actions: Dict[int, Dict[str, Dict[str, Any]]]):
     '''Compute actions for scripted agents and add them into the action dict'''
-    for eid in self.scripted_agents:
-      # remove the dead scripted agent from the list
-      if eid in self._dead_agents or eid not in self.realm.players:
-        self.scripted_agents.discard(eid)
-        continue
+    dead_agents = set()
+    for agent_id in self.scripted_agents:
+      if agent_id in self.realm.players:
+        # override the provided scripted agents' actions
+        actions[agent_id] = self.realm.players[agent_id].agent(self.obs[agent_id])
+      else:
+        dead_agents.add(agent_id)
 
-      # override the provided scripted agents' actions
-      actions[eid] = self.realm.players[eid].agent(self.obs[eid])
+    # remove the dead scripted agent from the list
+    self.scripted_agents -= dead_agents
 
     return actions
 
@@ -453,10 +459,9 @@ class Env(ParallelEnv):
 
   @property
   def agents(self) -> List[AgentID]:
-    '''For conformity with the PettingZoo API only; rendering is external'''
-    # "current" agents, which return obs: both alive and dead_this_tick
-    agents = set(list(self.realm.players.keys()) + list(self._dead_this_tick.keys()))
-    return list(agents)
+    '''For conformity with the PettingZoo API'''
+    # returns the list of "current" agents, both alive and dead_this_tick
+    return self._agents
 
   def close(self):
     '''For conformity with the PettingZoo API only; rendering is external'''

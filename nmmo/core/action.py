@@ -2,7 +2,6 @@
 # pylint: disable=no-method-argument,unused-argument,no-self-argument,no-member
 
 from enum import Enum, auto
-from ordered_set import OrderedSet
 import numpy as np
 
 from nmmo.lib import utils
@@ -226,7 +225,7 @@ class Attack(Node):
     R, C = stim.shape
     R, C = R//2, C//2
 
-    rets = OrderedSet([entity])
+    rets = set([entity])
     for r in range(R-N, R+N+1):
       for c in range(C-N, C+N+1):
         for e in stim[r, c].entities.values():

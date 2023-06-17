@@ -1,6 +1,5 @@
 from collections.abc import Mapping
 from typing import Dict
-from ordered_set import OrderedSet
 
 from nmmo.entity.entity import Entity
 from nmmo.entity.npc import NPC
@@ -147,7 +146,7 @@ class PlayerManager(EntityGroup):
   def reset(self):
     super().reset()
     self._agent_loader = self.loader_class(self.config, self.np_random)
-    self.spawned = OrderedSet()
+    self.spawned = set()
 
   def spawn_individual(self, r, c, idx):
     agent = next(self._agent_loader)
