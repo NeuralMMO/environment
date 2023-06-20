@@ -1,7 +1,9 @@
+# pylint: disable=invalid-name
 import unittest
 import numpy as np
 from tqdm import tqdm
 
+import nmmo
 from nmmo.lib import seeding
 from tests.testhelpers import ScriptedAgentTestConfig, ScriptedAgentTestEnv
 from tests.testhelpers import observations_are_equal
@@ -11,14 +13,6 @@ TEST_HORIZON = 30
 RANDOM_SEED = np.random.randint(0, 100000)
 
 
-def rollout_with_seed(env, seed):
-  init_obs = env.reset(seed=seed)
-  for _ in tqdm(range(TEST_HORIZON)):
-    obs, _, _, _ = env.step({})
-  event_log = env.realm.event_log.get_data()
-
-  return init_obs, obs, event_log
-
 class TestDeterminism(unittest.TestCase):
   def test_gym_np_random(self):
     _, _np_seed_1 = seeding.np_random(RANDOM_SEED)
@@ -26,12 +20,10 @@ class TestDeterminism(unittest.TestCase):
     self.assertEqual(_np_seed_1, _np_seed_2)
 
   def test_map_determinism(self):
-    config = ScriptedAgentTestConfig()
+    config = nmmo.config.Default()
     config.MAP_FORCE_GENERATION = True
-    config.PATH_MAPS = 'maps/det0'
 
     map_generator = config.MAP_GENERATOR(config)
-
     np_random1, _ = seeding.np_random(RANDOM_SEED)
     np_random2, _ = seeding.np_random(RANDOM_SEED)
 
@@ -40,6 +32,25 @@ class TestDeterminism(unittest.TestCase):
 
     self.assertTrue(np.array_equal(terrain1, terrain2))
     self.assertTrue(np.array_equal(tiles1, tiles2))
+
+  def test_flip_seed_map(self):
+    config1 = nmmo.config.Default()
+    config1.MAP_FORCE_GENERATION = True
+    config1.TERRAIN_FLIP_SEED = False
+    config2 = nmmo.config.Default()
+    config2.MAP_FORCE_GENERATION = True
+    config2.TERRAIN_FLIP_SEED = True
+
+    map_generator1 = config1.MAP_GENERATOR(config1)
+    np_random1, _ = seeding.np_random(RANDOM_SEED)
+    map_generator2 = config1.MAP_GENERATOR(config2)
+    np_random2, _ = seeding.np_random(RANDOM_SEED)
+
+    terrain1, tiles1 = map_generator1.generate_map(0, np_random1)
+    terrain2, tiles2 = map_generator2.generate_map(0, np_random2)
+
+    self.assertFalse(np.array_equal(terrain1, terrain2))
+    self.assertFalse(np.array_equal(tiles1, tiles2))
 
   def test_env_level_rng(self):
     # two envs running independently should return the same results
