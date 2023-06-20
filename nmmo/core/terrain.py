@@ -1,6 +1,4 @@
-
 import os
-import random
 import logging
 
 import numpy as np
@@ -145,13 +143,13 @@ class Terrain:
 
     return val, matl, interpolaters
 
-def place_fish(tiles):
+def place_fish(tiles, np_random):
   placed = False
   allow = {Terrain.GRASS}
 
   water_loc = np.where(tiles == Terrain.WATER)
   water_loc = list(zip(water_loc[0], water_loc[1]))
-  random.shuffle(water_loc)
+  np_random.shuffle(water_loc)
 
   for r, c in water_loc:
     if tiles[r-1, c] in allow or tiles[r+1, c] in allow or \
@@ -163,25 +161,25 @@ def place_fish(tiles):
   if not placed:
     raise RuntimeError('Could not find the water tile to place fish.')
 
-def uniform(config, tiles, mat, mmin, mmax):
-  r = random.randint(mmin, mmax)
-  c = random.randint(mmin, mmax)
+def uniform(config, tiles, mat, mmin, mmax, np_random):
+  r = np_random.integers(mmin, mmax)
+  c = np_random.integers(mmin, mmax)
 
   if tiles[r, c] not in {Terrain.GRASS}:
-    uniform(config, tiles, mat, mmin, mmax)
+    uniform(config, tiles, mat, mmin, mmax, np_random)
   else:
     tiles[r, c] = mat
 
-def cluster(config, tiles, mat, mmin, mmax):
+def cluster(config, tiles, mat, mmin, mmax, np_random):
   mmin = mmin + 1
   mmax = mmax - 1
 
-  r = random.randint(mmin, mmax)
-  c = random.randint(mmin, mmax)
+  r = np_random.integers(mmin, mmax)
+  c = np_random.integers(mmin, mmax)
 
   matls = {Terrain.GRASS}
   if tiles[r, c] not in matls:
-    cluster(config, tiles, mat, mmin-1, mmax+1)
+    cluster(config, tiles, mat, mmin-1, mmax+1, np_random)
     return
 
   tiles[r, c] = mat
@@ -194,18 +192,21 @@ def cluster(config, tiles, mat, mmin, mmax):
   if tiles[r, c+1] in matls:
     tiles[r, c+1] = mat
 
-def spawn_profession_resources(config, tiles):
+def spawn_profession_resources(config, tiles, np_random=None):
+  if np_random is None:
+    np_random = np.random
+
   mmin = config.MAP_BORDER + 1
   mmax = config.MAP_SIZE - config.MAP_BORDER - 1
 
   for _ in range(config.PROGRESSION_SPAWN_CLUSTERS):
-    cluster(config, tiles, Terrain.ORE, mmin, mmax)
-    cluster(config, tiles, Terrain.TREE, mmin, mmax)
-    cluster(config, tiles, Terrain.CRYSTAL, mmin, mmax)
+    cluster(config, tiles, Terrain.ORE, mmin, mmax, np_random)
+    cluster(config, tiles, Terrain.TREE, mmin, mmax, np_random)
+    cluster(config, tiles, Terrain.CRYSTAL, mmin, mmax, np_random)
 
   for _ in range(config.PROGRESSION_SPAWN_UNIFORMS):
-    uniform(config, tiles, Terrain.HERB, mmin, mmax)
-    place_fish(tiles)
+    uniform(config, tiles, Terrain.HERB, mmin, mmax, np_random)
+    place_fish(tiles, np_random)
 
 class MapGenerator:
   '''Procedural map generation'''
@@ -226,7 +227,7 @@ class MapGenerator:
       setattr(Terrain, key.upper(), mat.index)
     self.textures = lookup
 
-  def generate_all_maps(self):
+  def generate_all_maps(self, np_random=None):
     '''Generates NMAPS maps according to generate_map
 
     Provides additional utilities for saving to .npy and rendering png previews'''
@@ -253,7 +254,7 @@ class MapGenerator:
       path = path_maps + '/map' + str(idx+1)
       os.makedirs(path, exist_ok=True)
 
-      terrain, tiles = self.generate_map(idx)
+      terrain, tiles = self.generate_map(idx, np_random)
 
       #Save/render
       Save.as_numpy(tiles, path)
@@ -263,7 +264,7 @@ class MapGenerator:
         Save.fractal(terrain, path+'/fractal.png')
         Save.render(tiles, self.textures, path+'/map.png')
 
-  def generate_map(self, idx):
+  def generate_map(self, idx, np_random=None):
     '''Generate a single map
 
     The default method is a relatively complex multiscale perlin noise method.
@@ -295,6 +296,6 @@ class MapGenerator:
             tiles[r, c] = Terrain.VOID
 
     if config.PROFESSION_SYSTEM_ENABLED:
-      spawn_profession_resources(config, tiles)
+      spawn_profession_resources(config, tiles, np_random)
 
     return terrain, tiles

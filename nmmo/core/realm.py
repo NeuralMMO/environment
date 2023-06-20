@@ -38,9 +38,9 @@ class Realm:
     Action.hook(config)
 
     # Generate maps if they do not exist
-    # CHECK ME: Does the map generator need use the env-level RNG?
-    #   Do the maps need to be deterministic?
-    config.MAP_GENERATOR(config).generate_all_maps()
+    # NOTE: Map generation interferes with determinism.
+    #   To ensure determinism, provide seed to env.reset()
+    config.MAP_GENERATOR(config).generate_all_maps(np_random)
 
     self.datastore = NumpyDatastore()
     for s in [TileState, EntityState, ItemState, EventState]:

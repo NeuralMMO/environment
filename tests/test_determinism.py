@@ -25,14 +25,39 @@ class TestDeterminism(unittest.TestCase):
     _, _np_seed_2 = seeding.np_random(RANDOM_SEED)
     self.assertEqual(_np_seed_1, _np_seed_2)
 
+  def test_map_determinism(self):
+    config = ScriptedAgentTestConfig()
+    config.MAP_FORCE_GENERATION = True
+    config.PATH_MAPS = 'maps/det0'
+
+    map_generator = config.MAP_GENERATOR(config)
+
+    np_random1, _ = seeding.np_random(RANDOM_SEED)
+    np_random2, _ = seeding.np_random(RANDOM_SEED)
+
+    terrain1, tiles1 = map_generator.generate_map(0, np_random1)
+    terrain2, tiles2 = map_generator.generate_map(0, np_random2)
+
+    self.assertTrue(np.array_equal(terrain1, terrain2))
+    self.assertTrue(np.array_equal(tiles1, tiles2))
+
   def test_env_level_rng(self):
     # two envs running independently should return the same results
-    config = ScriptedAgentTestConfig()
-    env1 = ScriptedAgentTestEnv(config)
-    env2 = ScriptedAgentTestEnv(config)
+
+    # config to always generate new maps, to test map determinism
+    config1 = ScriptedAgentTestConfig()
+    config1.MAP_FORCE_GENERATION = True
+    config1.PATH_MAPS = 'maps/det1'
+    config2 = ScriptedAgentTestConfig()
+    config2.MAP_FORCE_GENERATION = True
+    config2.PATH_MAPS = 'maps/det2'
+
+    # to create the same maps, seed must be provided
+    env1 = ScriptedAgentTestEnv(config1, seed=RANDOM_SEED)
+    env2 = ScriptedAgentTestEnv(config2, seed=RANDOM_SEED)
     envs = [env1, env2]
 
-    init_obs = [env.reset(seed=RANDOM_SEED) for env in envs]
+    init_obs = [env.reset(seed=RANDOM_SEED+1) for env in envs]
 
     self.assertTrue(observations_are_equal(init_obs[0], init_obs[0])) # sanity check
     self.assertTrue(observations_are_equal(init_obs[0], init_obs[1]),
