@@ -21,31 +21,25 @@ class TestDeterminism(unittest.TestCase):
   def test_map_determinism(self):
     config = nmmo.config.Default()
     config.MAP_FORCE_GENERATION = True
+    config.TERRAIN_FLIP_SEED = False
 
     map_generator = config.MAP_GENERATOR(config)
     np_random1, _ = seeding.np_random(RANDOM_SEED)
-    np_random2, _ = seeding.np_random(RANDOM_SEED)
+    np_random1_1, _ = seeding.np_random(RANDOM_SEED)
 
     terrain1, tiles1 = map_generator.generate_map(0, np_random1)
-    terrain2, tiles2 = map_generator.generate_map(0, np_random2)
+    terrain1_1, tiles1_1 = map_generator.generate_map(0, np_random1_1)
 
-    self.assertTrue(np.array_equal(terrain1, terrain2))
-    self.assertTrue(np.array_equal(tiles1, tiles2))
+    self.assertTrue(np.array_equal(terrain1, terrain1_1))
+    self.assertTrue(np.array_equal(tiles1, tiles1_1))
 
-  def test_flip_seed_map(self):
-    config1 = nmmo.config.Default()
-    config1.MAP_FORCE_GENERATION = True
-    config1.TERRAIN_FLIP_SEED = False
+    # test flip seed
     config2 = nmmo.config.Default()
     config2.MAP_FORCE_GENERATION = True
     config2.TERRAIN_FLIP_SEED = True
 
-    map_generator1 = config1.MAP_GENERATOR(config1)
-    np_random1, _ = seeding.np_random(RANDOM_SEED)
-    map_generator2 = config1.MAP_GENERATOR(config2)
+    map_generator2 = config2.MAP_GENERATOR(config2)
     np_random2, _ = seeding.np_random(RANDOM_SEED)
-
-    terrain1, tiles1 = map_generator1.generate_map(0, np_random1)
     terrain2, tiles2 = map_generator2.generate_map(0, np_random2)
 
     self.assertFalse(np.array_equal(terrain1, terrain2))
