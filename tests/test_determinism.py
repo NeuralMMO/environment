@@ -1,4 +1,3 @@
-# pylint: disable=invalid-name
 import unittest
 import numpy as np
 from tqdm import tqdm
@@ -57,11 +56,11 @@ class TestDeterminism(unittest.TestCase):
 
     # config to always generate new maps, to test map determinism
     config1 = ScriptedAgentTestConfig()
-    config1.MAP_FORCE_GENERATION = True
-    config1.PATH_MAPS = 'maps/det1'
+    setattr(config1, 'MAP_FORCE_GENERATION', True)
+    setattr(config1, 'PATH_MAPS', 'maps/det1')
     config2 = ScriptedAgentTestConfig()
-    config2.MAP_FORCE_GENERATION = True
-    config2.PATH_MAPS = 'maps/det2'
+    setattr(config2, 'MAP_FORCE_GENERATION', True)
+    setattr(config2, 'PATH_MAPS', 'maps/det2')
 
     # to create the same maps, seed must be provided
     env1 = ScriptedAgentTestEnv(config1, seed=RANDOM_SEED)
