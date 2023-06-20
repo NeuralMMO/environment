@@ -115,14 +115,14 @@ class Observation:
 
   def get_empty_obs(self):
     gym_obs = {
-      "CurrentTick": np.array([self.current_tick]),
-      "AgentId": np.array([self.agent_id]),
+      "CurrentTick": self.current_tick,
+      "AgentId": self.agent_id,
       "Tile": None, # np.zeros((self.config.MAP_N_OBS, self.tiles.shape[1])),
       "Entity": np.zeros((self.config.PLAYER_N_OBS,
                           self.entities.values.shape[1]), dtype=np.int16)}
     if self.config.ITEM_SYSTEM_ENABLED:
       gym_obs["Inventory"] = np.zeros((self.config.INVENTORY_N_OBS,
-                                       self.inventory.values.shape[1]))
+                                       self.inventory.values.shape[1]), dtype=np.int16)
     if self.config.EXCHANGE_SYSTEM_ENABLED:
       gym_obs["Market"] = np.zeros((self.config.MARKET_N_OBS,
                                     self.market.values.shape[1]), dtype=np.int16)

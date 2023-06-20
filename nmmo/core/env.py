@@ -12,6 +12,7 @@ from nmmo.core import realm
 from nmmo.core.config import Default
 from nmmo.core.observation import Observation
 from nmmo.core.tile import Tile
+from nmmo.core import action as Action
 from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
 from nmmo.task import task_api
@@ -48,33 +49,21 @@ class Env(ParallelEnv):
     self.tasks = task_api.nmmo_default_task(self.possible_agents)
     self.agent_task_map = None
 
-  # pylint: disable=method-cache-max-size-none
-  @functools.lru_cache(maxsize=None)
-  def observation_space(self, agent: int):
-    '''Neural MMO Observation Space
-
-    Args:
-        agent: Agent ID
-
-    Returns:
-        observation: gym.spaces object contained the structured observation
-        for the specified agent. Each visible object is represented by
-        continuous and discrete vectors of attributes. A 2-layer attentional
-        encoder can be used to convert this structured observation into
-        a flat vector embedding.'''
-
+  @functools.cached_property
+  def _obs_space(self):
     def box(rows, cols):
       return gym.spaces.Box(
-          low=-2**20, high=2**20,
+          low=-2**15, high=2**15-1,
           shape=(rows, cols),
-          dtype=np.float32)
+          dtype=np.int16)
+    def mask_box(length):
+      return gym.spaces.Box(low=0, high=1, shape=(length,), dtype=np.int8)
 
     obs_space = {
-      "CurrentTick": gym.spaces.Discrete(1),
-      "AgentId": gym.spaces.Discrete(1),
+      "CurrentTick": gym.spaces.Discrete(self.config.HORIZON+1),
+      "AgentId": gym.spaces.Discrete(self.config.PLAYER_N+1),
       "Tile": box(self.config.MAP_N_OBS, Tile.State.num_attributes),
-      "Entity": box(self.config.PLAYER_N_OBS, Entity.State.num_attributes),
-    }
+      "Entity": box(self.config.PLAYER_N_OBS, Entity.State.num_attributes)}
 
     if self.config.ITEM_SYSTEM_ENABLED:
       obs_space["Inventory"] = box(self.config.INVENTORY_N_OBS, Item.State.num_attributes)
@@ -83,12 +72,65 @@ class Env(ParallelEnv):
       obs_space["Market"] = box(self.config.MARKET_N_OBS, Item.State.num_attributes)
 
     if self.config.PROVIDE_ACTION_TARGETS:
-      obs_space['ActionTargets'] = self.action_space(None)
+      mask_spec = {}
+      mask_spec[Action.Move] = gym.spaces.Dict(
+        {Action.Direction: mask_box(len(Action.Direction.edges))})
+      if self.config.COMBAT_SYSTEM_ENABLED:
+        mask_spec[Action.Attack] = gym.spaces.Dict({
+          Action.Style: mask_box(3),
+          Action.Target: mask_box(self.config.PLAYER_N_OBS)})
+      if self.config.ITEM_SYSTEM_ENABLED:
+        mask_spec[Action.Use] = gym.spaces.Dict(
+          {Action.InventoryItem: mask_box(self.config.INVENTORY_N_OBS)})
+        mask_spec[Action.Destroy] = gym.spaces.Dict(
+          {Action.InventoryItem: mask_box(self.config.INVENTORY_N_OBS)})
+        mask_spec[Action.Give] = gym.spaces.Dict({
+          Action.InventoryItem: mask_box(self.config.INVENTORY_N_OBS),
+          Action.Target: mask_box(self.config.PLAYER_N_OBS)})
+      if self.config.EXCHANGE_SYSTEM_ENABLED:
+        mask_spec[Action.Buy] = gym.spaces.Dict(
+          {Action.MarketItem: mask_box(self.config.MARKET_N_OBS)})
+        mask_spec[Action.Sell] = gym.spaces.Dict({
+          Action.InventoryItem: mask_box(self.config.INVENTORY_N_OBS),
+          Action.Price: mask_box(self.config.PRICE_N_OBS)})
+        mask_spec[Action.GiveGold] = gym.spaces.Dict({
+          Action.Price: mask_box(self.config.PRICE_N_OBS),
+          Action.Target: mask_box(self.config.PLAYER_N_OBS)})
+      if self.config.COMMUNICATION_SYSTEM_ENABLED:
+        mask_spec[Action.Comm] = gym.spaces.Dict(
+          {Action.Token: mask_box(self.config.COMMUNICATION_NUM_TOKENS)})
+      obs_space['ActionTargets'] = gym.spaces.Dict(mask_spec)
 
     return gym.spaces.Dict(obs_space)
 
+  # pylint: disable=method-cache-max-size-none
   @functools.lru_cache(maxsize=None)
-  def action_space(self, agent):
+  def observation_space(self, agent: AgentID):
+    '''Neural MMO Observation Space
+
+    Args:
+        agent: Agent ID
+
+    Returns:
+        observation: gym.spaces object contained the structured observation
+        for the specified agent.'''
+    return self._obs_space
+
+  @functools.cached_property
+  def _atn_space(self):
+    actions = {}
+    for atn in sorted(nmmo.Action.edges(self.config)):
+      if atn.enabled(self.config):
+        actions[atn] = {}
+        for arg in sorted(atn.edges):
+          n = arg.N(self.config)
+          actions[atn][arg] = gym.spaces.Discrete(n)
+        actions[atn] = gym.spaces.Dict(actions[atn])
+    return gym.spaces.Dict(actions)
+
+  # pylint: disable=method-cache-max-size-none
+  @functools.lru_cache(maxsize=None)
+  def action_space(self, agent: AgentID):
     '''Neural MMO Action Space
 
     Args:
@@ -100,19 +142,7 @@ class Env(ParallelEnv):
         of discrete-valued arguments. These consist of both fixed, k-way
         choices (such as movement direction) and selections from the
         observation space (such as targeting)'''
-
-    actions = {}
-    for atn in sorted(nmmo.Action.edges(self.config)):
-      if atn.enabled(self.config):
-
-        actions[atn] = {}
-        for arg in sorted(atn.edges):
-          n = arg.N(self.config)
-          actions[atn][arg] = gym.spaces.Discrete(n)
-
-        actions[atn] = gym.spaces.Dict(actions[atn])
-
-    return gym.spaces.Dict(actions)
+    return self._atn_space
 
   ############################################################################
   # Core API
@@ -369,10 +399,10 @@ class Env(ParallelEnv):
     return actions
 
   def _make_dummy_obs(self):
-    dummy_tiles = np.zeros((0, len(Tile.State.attr_name_to_col)))
-    dummy_entities = np.zeros((0, len(Entity.State.attr_name_to_col)))
-    dummy_inventory = np.zeros((0, len(Item.State.attr_name_to_col)))
-    dummy_market = np.zeros((0, len(Item.State.attr_name_to_col)))
+    dummy_tiles = np.zeros((0, len(Tile.State.attr_name_to_col)), dtype=np.int16)
+    dummy_entities = np.zeros((0, len(Entity.State.attr_name_to_col)), dtype=np.int16)
+    dummy_inventory = np.zeros((0, len(Item.State.attr_name_to_col)), dtype=np.int16)
+    dummy_market = np.zeros((0, len(Item.State.attr_name_to_col)), dtype=np.int16)
     return Observation(self.config, self.realm.tick, 0,
                        dummy_tiles, dummy_entities, dummy_inventory, dummy_market)
 
@@ -381,7 +411,7 @@ class Env(ParallelEnv):
     market = Item.Query.for_sale(self.realm.datastore)
 
     # get tile map, to bypass the expensive tile window query
-    tile_map = Tile.Query.get_map(self.realm.datastore, self.config.MAP_SIZE)
+    tile_map = Tile.Query.get_map(self.realm.datastore, self.config.MAP_SIZE).astype(np.int16)
     radius = self.config.PLAYER_VISION_RADIUS
     tile_obs_size = ((2*radius+1)**2, len(Tile.State.attr_name_to_col))
 
