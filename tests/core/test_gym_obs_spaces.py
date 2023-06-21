@@ -2,7 +2,7 @@ import unittest
 
 import nmmo
 
-class TestGymSpaces(unittest.TestCase):
+class TestGymObsSpaces(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
     cls.config = nmmo.config.Default()
@@ -11,7 +11,7 @@ class TestGymSpaces(unittest.TestCase):
     for _ in range(3):
       cls.env.step({})
 
-  def test_obs_space(self):
+  def test_gym_obs_space(self):
     obs_spec = self.env.observation_space(1)
     obs, _, _, _ = self.env.step({})
 

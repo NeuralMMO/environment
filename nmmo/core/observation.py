@@ -1,4 +1,4 @@
-from functools import lru_cache
+from functools import lru_cache, cached_property
 
 import numpy as np
 
@@ -15,7 +15,7 @@ class BasicObs:
     self.values = values
     self.ids = values[:, id_col]
 
-  @property
+  @cached_property
   def len(self):
     return len(self.ids)
 
@@ -104,7 +104,7 @@ class Observation:
   @lru_cache(maxsize=None)
   def entity(self, entity_id):
     rows = self.entities.values[self.entities.ids == entity_id]
-    if rows.size == 0:
+    if rows.shape[0] == 0:
       return None
     return EntityState.parse_array(rows[0])
 
@@ -257,8 +257,8 @@ class Observation:
     # level limits are differently applied depending on item types
     type_flt = np.tile(np.array(list(item_skill.keys())), (self.inventory.len,1))
     level_flt = np.tile(np.array(list(item_skill.values())), (self.inventory.len,1))
-    item_type = np.tile(np.transpose(np.atleast_2d(item_type)), (1, len(item_skill)))
-    item_level = np.tile(np.transpose(np.atleast_2d(item_level)), (1, len(item_skill)))
+    item_type = np.tile(np.transpose(np.atleast_2d(item_type)), (1,len(item_skill)))
+    item_level = np.tile(np.transpose(np.atleast_2d(item_level)), (1,len(item_skill)))
     level_satisfied = np.any((item_type==type_flt) & (item_level<=level_flt), axis=1)
 
     use_mask[:self.inventory.len] = not_listed & level_satisfied

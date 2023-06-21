@@ -6,7 +6,7 @@ from nmmo.datastore.datastore import Datastore, DataTable
 
 
 class NumpyTable(DataTable):
-  def __init__(self, num_columns: int, initial_size: int, dtype=np.float32):
+  def __init__(self, num_columns: int, initial_size: int, dtype=np.int16):
     super().__init__(num_columns)
     self._dtype  = dtype
     self._initial_size = initial_size

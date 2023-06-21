@@ -412,7 +412,7 @@ class Env(ParallelEnv):
     market = Item.Query.for_sale(self.realm.datastore)
 
     # get tile map, to bypass the expensive tile window query
-    tile_map = Tile.Query.get_map(self.realm.datastore, self.config.MAP_SIZE).astype(np.int16)
+    tile_map = Tile.Query.get_map(self.realm.datastore, self.config.MAP_SIZE)
     radius = self.config.PLAYER_VISION_RADIUS
     tile_obs_size = ((2*radius+1)**2, len(Tile.State.attr_name_to_col))
 
