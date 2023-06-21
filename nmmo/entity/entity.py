@@ -218,7 +218,10 @@ class Entity(EntityState):
 
     self.realm = realm
     self.config: Config = realm.config
-    self.np_random = realm.np_random
+    # TODO: do not access realm._np_random directly
+    #   related to the whole NPC, scripted logic
+    # pylint: disable=protected-access
+    self._np_random = realm._np_random
 
     self.policy = name
     self.entity_id = entity_id

@@ -30,7 +30,7 @@ class Realm:
 
   def __init__(self, config, np_random):
     self.config = config
-    self.np_random = np_random # rng
+    self._np_random = np_random # rng
     assert isinstance(
         config, nmmo.config.Config
     ), f"Config {config} is not a config instance (did you pass the class?)"
@@ -40,7 +40,7 @@ class Realm:
     # Generate maps if they do not exist
     # NOTE: Map generation interferes with determinism.
     #   To ensure determinism, provide seed to env.reset()
-    config.MAP_GENERATOR(config).generate_all_maps(np_random)
+    config.MAP_GENERATOR(config).generate_all_maps(self._np_random)
 
     self.datastore = NumpyDatastore()
     for s in [TileState, EntityState, ItemState, EventState]:
@@ -50,14 +50,14 @@ class Realm:
     self.exchange = None
 
     # Load the world file
-    self.map = Map(config, self)
+    self.map = Map(config, self, self._np_random)
 
     self.log_helper = LogHelper.create(self)
     self.event_log = EventLogger(self)
 
     # Entity handlers
-    self.players = PlayerManager(self)
-    self.npcs = NPCManager(self)
+    self.players = PlayerManager(self, self._np_random)
+    self.npcs = NPCManager(self, self._np_random)
 
     # Global item registry
     self.items = {}
@@ -74,17 +74,17 @@ class Realm:
     Args:
         idx: Map index to load
     """
-    self.np_random = np_random
+    self._np_random = np_random
     self.log_helper.reset()
     self.event_log.reset()
 
-    map_id = map_id or self.np_random.integers(self.config.MAP_N) + 1
-    self.map.reset(map_id)
+    map_id = map_id or self._np_random.integers(self.config.MAP_N) + 1
+    self.map.reset(map_id, self._np_random)
     self.tick = 0
 
     # EntityState and ItemState tables must be empty after players/npcs.reset()
-    self.players.reset()
-    self.npcs.reset()
+    self.players.reset(self._np_random)
+    self.npcs.reset(self._np_random)
     assert EntityState.State.table(self.datastore).is_empty(), \
         "EntityState table is not empty"
     assert ItemState.State.table(self.datastore).is_empty(), \
@@ -172,7 +172,7 @@ class Realm:
       # TODO: we should be randomizing these, otherwise the lower ID agents
       # will always go first. --> ONLY SHUFFLE BUY
       if priority == Buy.priority:
-        self.np_random.shuffle(merged[priority])
+        self._np_random.shuffle(merged[priority])
 
       # CHECK ME: do we need this line?
       # ent_id, (atn, args) = merged[priority][0]

@@ -11,7 +11,7 @@ class MockRealm:
     self.config.PLAYERS = range(100)
     self.datastore = NumpyDatastore()
     self.datastore.register_object_type("Entity", EntityState.State.num_attributes)
-    self.np_random = np.random
+    self._np_random = np.random
 
 # pylint: disable=no-member
 class TestEntity(unittest.TestCase):

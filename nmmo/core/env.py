@@ -26,12 +26,14 @@ class Env(ParallelEnv):
   def __init__(self,
                config: Default = nmmo.config.Default(),
                seed = None):
-    self.np_random, self._np_seed = seeding.np_random(seed)
+    self._np_random = None
+    self._np_seed = None
+    self._reset_required = True
+    self.seed(seed)
     super().__init__()
 
     self.config = config
-    self.realm = realm.Realm(config, self.np_random)
-    self._reset_required = True
+    self.realm = realm.Realm(config, self._np_random)
     self.obs = None
     self._dummy_obs = None
 
@@ -142,9 +144,8 @@ class Env(ParallelEnv):
         but finite horizon: ~1000 timesteps for small maps and
         5000+ timesteps for large maps
     '''
-    if seed is not None:
-      self.np_random, self._np_seed = seeding.np_random(seed)
-    self.realm.reset(self.np_random, map_id)
+    self.seed(seed)
+    self.realm.reset(self._np_random, map_id)
     self._agents = list(self.realm.players.keys())
     self._dead_agents = set()
     self._episode_stats.clear()
@@ -154,7 +155,7 @@ class Env(ParallelEnv):
     for eid, ent in self.realm.players.items():
       if isinstance(ent.agent, Scripted):
         self.scripted_agents.add(eid)
-        ent.agent.np_random = self.np_random
+        ent.agent.set_rng(self._np_random)
 
     self._dummy_obs = self._make_dummy_obs()
     self.obs = self._compute_observations()
@@ -467,9 +468,16 @@ class Env(ParallelEnv):
     '''For conformity with the PettingZoo API only; rendering is external'''
 
   def seed(self, seed=None):
-    '''Reseeds the environment. reset() must be called after seed(), and before step().'''
-    self.np_random, self._np_seed = seeding.np_random(seed)
-    self._reset_required = True
+    '''Reseeds the environment. reset() must be called after seed(), and before step().
+       - self._np_seed is None: seed() has not been called, e.g. __init__() -> new RNG
+       - self._np_seed is set, and seed is not None: seed() or reset() with seed -> new RNG
+
+       If self._np_seed is set, but seed is None
+         probably called from reset() without seed, so don't change the RNG
+    '''
+    if self._np_seed is None or seed is not None:
+      self._np_random, self._np_seed = seeding.np_random(seed)
+      self._reset_required = True
 
   def state(self) -> np.ndarray:
     raise NotImplementedError
