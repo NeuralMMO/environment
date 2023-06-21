@@ -9,11 +9,11 @@ from nmmo.systems import combat
 
 
 class EntityGroup(Mapping):
-  def __init__(self, realm):
+  def __init__(self, realm, np_random):
     self.datastore = realm.datastore
     self.realm = realm
     self.config = realm.config
-    self.np_random = realm.np_random
+    self._np_random = np_random
 
     self.entities: Dict[int, Entity] = {}
     self.dead_this_tick: Dict[int, Entity] = {}
@@ -41,8 +41,8 @@ class EntityGroup(Mapping):
   def packet(self):
     return {k: v.packet() for k, v in self.corporeal.items()}
 
-  def reset(self):
-    self.np_random = self.realm.np_random # reset the RNG
+  def reset(self, np_random):
+    self._np_random = np_random # reset the RNG
     for ent in self.entities.values():
       # destroy the items
       if self.config.ITEM_SYSTEM_ENABLED:
@@ -86,13 +86,13 @@ class EntityGroup(Mapping):
 
 
 class NPCManager(EntityGroup):
-  def __init__(self, realm):
-    super().__init__(realm)
+  def __init__(self, realm, np_random):
+    super().__init__(realm, np_random)
     self.next_id = -1
     self.spawn_dangers = []
 
-  def reset(self):
-    super().reset()
+  def reset(self, np_random):
+    super().reset(np_random)
     self.next_id = -1
     self.spawn_dangers = []
 
@@ -108,14 +108,14 @@ class NPCManager(EntityGroup):
 
       if self.spawn_dangers:
         danger = self.spawn_dangers[-1]
-        r, c   = combat.spawn(config, danger, self.np_random)
+        r, c   = combat.spawn(config, danger, self._np_random)
       else:
         center = config.MAP_CENTER
         border = self.config.MAP_BORDER
         # pylint: disable=unbalanced-tuple-unpacking
-        r, c   = self.np_random.integers(border, center+border, 2).tolist()
+        r, c   = self._np_random.integers(border, center+border, 2).tolist()
 
-      npc = NPC.spawn(self.realm, (r, c), self.next_id)
+      npc = NPC.spawn(self.realm, (r, c), self.next_id, self._np_random)
       if npc:
         super().spawn(npc)
         self.next_id -= 1
@@ -137,15 +137,15 @@ class NPCManager(EntityGroup):
     return actions
 
 class PlayerManager(EntityGroup):
-  def __init__(self, realm):
-    super().__init__(realm)
+  def __init__(self, realm, np_random):
+    super().__init__(realm, np_random)
     self.loader_class = self.realm.config.PLAYER_LOADER
     self._agent_loader: spawn.SequentialLoader = None
     self.spawned = None
 
-  def reset(self):
-    super().reset()
-    self._agent_loader = self.loader_class(self.config, self.np_random)
+  def reset(self, np_random):
+    super().reset(np_random)
+    self._agent_loader = self.loader_class(self.config, self._np_random)
     self.spawned = set()
 
   def spawn_individual(self, r, c, idx):

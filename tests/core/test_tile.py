@@ -11,7 +11,7 @@ class MockRealm:
     self.datastore = NumpyDatastore()
     self.datastore.register_object_type("Tile", TileState.State.num_attributes)
     self.config = nmmo.config.Small()
-    self.np_random = np.random
+    self._np_random = np.random
 
 class MockEntity():
   def __init__(self, ent_id):
@@ -21,9 +21,10 @@ class TestTile(unittest.TestCase):
   # pylint: disable=no-member
   def test_tile(self):
     mock_realm = MockRealm()
-    tile = Tile(mock_realm, 10, 20)
+    np_random = np.random
+    tile = Tile(mock_realm, 10, 20, np_random)
 
-    tile.reset(material.Foilage, nmmo.config.Small())
+    tile.reset(material.Foilage, nmmo.config.Small(), np_random)
 
     self.assertEqual(tile.row.val, 10)
     self.assertEqual(tile.col.val, 20)

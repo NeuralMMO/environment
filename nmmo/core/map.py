@@ -12,7 +12,7 @@ class Map:
 
   Also tracks a sparse list of tile updates
   '''
-  def __init__(self, config, realm):
+  def __init__(self, config, realm, np_random):
     self.config = config
     self._repr  = None
     self.realm  = realm
@@ -23,7 +23,7 @@ class Map:
 
     for r in range(sz):
       for c in range(sz):
-        self.tiles[r, c] = Tile(realm, r, c)
+        self.tiles[r, c] = Tile(realm, r, c, np_random)
 
   @property
   def packet(self):
@@ -41,7 +41,7 @@ class Map:
 
     return self._repr
 
-  def reset(self, map_id):
+  def reset(self, map_id, np_random):
     '''Reuse the current tile objects to load a new map'''
     config = self.config
     self.update_list = OrderedSet() # critical for determinism
@@ -61,7 +61,7 @@ class Map:
       for c, idx in enumerate(row):
         mat  = materials[idx]
         tile = self.tiles[r, c]
-        tile.reset(mat, config)
+        tile.reset(mat, config, np_random)
 
     assert c == config.MAP_SIZE - 1
     assert r == config.MAP_SIZE - 1
