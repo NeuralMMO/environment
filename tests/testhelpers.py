@@ -383,7 +383,7 @@ def profile_env_step(action_target=True, tasks=None, condition=None):
   config.PLAYERS = [baselines.Sleeper] # the scripted agents doing nothing
   config.IMMORTAL = True # otherwise the agents will die
   config.PROVIDE_ACTION_TARGETS = action_target
-  env = nmmo.Env(config)
+  env = nmmo.Env(config, seed=0)
   if tasks is None:
     tasks = []
   env.reset(seed=0, make_task_fn=lambda: tasks)
