@@ -153,7 +153,7 @@ class TestObservationTile(unittest.TestCase):
       flt_idx = [row for sbj in subject for row in index.get(sbj,[])]
       return event_data[flt_idx]
 
-    event_data = EventState.Query.table(env.realm.datastore).astype(np.int16)
+    event_data = EventState.Query.table(env.realm.datastore)
     event_index = defaultdict()
     for row, id_ in enumerate(event_data[:,EventAttr['ent_id']]):
       if id_ in event_index:
@@ -163,10 +163,13 @@ class TestObservationTile(unittest.TestCase):
 
     # NOTE: the index-based approach returns the data in different order,
     #   and all the operations in the task system don't use the order info
-    arr = where_in_1d_with_index(event_data, [1,2,3], event_index)
-    sorted_idx = np.argsort(arr[:,0]) # event_id
-    self.assertTrue(np.array_equal(correct_where_in_1d(event_data, [1,2,3]),
-                                   arr[sorted_idx]))
+    def sort_event_data(event_data):
+      keys = [event_data[:,i] for i in range(1,8)]
+      sorted_idx = np.lexsort(keys)
+      return event_data[sorted_idx]
+    arr1 = sort_event_data(correct_where_in_1d(event_data, [1,2,3]))
+    arr2 = sort_event_data(where_in_1d_with_index(event_data, [1,2,3], event_index))
+    self.assertTrue(np.array_equal(arr1, arr2))
 
     print('---test_gs_where_in_1d---')
     print('reference:', timeit(

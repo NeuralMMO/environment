@@ -87,7 +87,7 @@ class TestEnv(unittest.TestCase):
           dead_agents.add(dead_id)
 
       # check dead and alive
-      entity_all = EntityState.Query.table(self.env.realm.datastore).astype(np.int16)
+      entity_all = EntityState.Query.table(self.env.realm.datastore)
       alive_agents = entity_all[:, Entity.State.attr_name_to_col["id"]]
       alive_agents = set(alive_agents[alive_agents > 0])
       for agent_id in alive_agents:

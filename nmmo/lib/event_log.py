@@ -11,7 +11,7 @@ from nmmo.lib.log import EventCode
 
 # pylint: disable=no-member
 EventState = SerializedState.subclass("Event", [
-  "id", # unique event id
+  "recorded", # event_log is write-only, no update or delete, so no need for row id
   "ent_id",
   "tick",
 
@@ -27,8 +27,7 @@ EventState = SerializedState.subclass("Event", [
 EventAttr = EventState.State.attr_name_to_col
 
 EventState.Query = SimpleNamespace(
-  table=lambda ds: ds.table("Event").where_neq(EventAttr["id"], 0),
-
+  table=lambda ds: ds.table("Event").where_eq(EventAttr["recorded"], 1),
   by_event=lambda ds, event_code: ds.table("Event").where_eq(
     EventAttr["event"], event_code),
 )
@@ -70,7 +69,7 @@ class EventLogger(EventCode):
   # define event logging
   def _create_event(self, entity: Entity, event_code: int):
     log = EventState(self.datastore)
-    log.id.update(log.datastore_record.id)
+    log.recorded.update(1)
     log.ent_id.update(entity.ent_id)
     # the tick increase by 1 after executing all actions
     log.tick.update(self.realm.tick+1)
@@ -156,9 +155,9 @@ class EventLogger(EventCode):
 
   def get_data(self, event_code=None, agents: List[int]=None):
     if event_code is None:
-      event_data = EventState.Query.table(self.datastore).astype(np.int32)
+      event_data = EventState.Query.table(self.datastore)
     elif event_code in self.valid_events:
-      event_data = EventState.Query.by_event(self.datastore, event_code).astype(np.int32)
+      event_data = EventState.Query.by_event(self.datastore, event_code)
     else:
       return None
 

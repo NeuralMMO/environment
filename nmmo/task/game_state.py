@@ -221,11 +221,11 @@ class GameStateGenerator:
 
   def generate(self, realm: Realm, env_obs: Dict[int, Observation]) -> GameState:
     # copy the datastore, by running astype
-    entity_all = EntityState.Query.table(realm.datastore).astype(np.int16)
+    entity_all = EntityState.Query.table(realm.datastore).copy()
     alive_agents = entity_all[:, EntityAttr["id"]]
     alive_agents = set(alive_agents[alive_agents > 0])
-    item_data = ItemState.Query.table(realm.datastore).astype(np.int16)
-    event_data = EventState.Query.table(realm.datastore).astype(np.int16)
+    item_data = ItemState.Query.table(realm.datastore).copy()
+    event_data = EventState.Query.table(realm.datastore).copy()
 
     return GameState(
       current_tick = realm.tick,
