@@ -17,7 +17,7 @@ class SkillGroup:
     self.entity = entity
 
     self.experience_calculator = experience.ExperienceCalculator()
-    self.skills  = OrderedSet()
+    self.skills  = OrderedSet() # critical for determinism
 
   def update(self):
     for skill in self.skills:

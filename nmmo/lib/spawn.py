@@ -1,14 +1,13 @@
-import numpy as np
-
 class SequentialLoader:
   '''config.PLAYER_LOADER that spreads out agent populations'''
-  def __init__(self, config):
+  def __init__(self, config, np_random):
     items = config.PLAYERS
 
     self.items = items
     self.idx   = -1
 
-    self.candidate_spawn_pos = spawn_concurrent(config)
+    # np_random is the env-level rng
+    self.candidate_spawn_pos = spawn_concurrent(config, np_random)
 
   def __iter__(self):
     return self
@@ -22,7 +21,7 @@ class SequentialLoader:
     # the basic SequentialLoader just provides a random spawn position
     return self.candidate_spawn_pos.pop()
 
-def spawn_continuous(config):
+def spawn_continuous(config, np_random):
   '''Generates spawn positions for new agents
 
   Randomly selects spawn positions around
@@ -38,10 +37,11 @@ def spawn_continuous(config):
   mmax = config.MAP_CENTER + config.MAP_BORDER
   mmin = config.MAP_BORDER
 
-  var  = np.random.randint(mmin, mmax)
-  fixed = np.random.choice([mmin, mmax])
+  # np_random is the env-level RNG, a drop-in replacement of numpy.random
+  var  = np_random.integers(mmin, mmax)
+  fixed = np_random.choice([mmin, mmax])
   r, c = int(var), int(fixed)
-  if np.random.rand() > 0.5:
+  if np_random.random() > 0.5:
     r, c = c, r
   return (r, c)
 
@@ -63,7 +63,7 @@ def get_edge_tiles(config):
 
   return sides
 
-def spawn_concurrent(config):
+def spawn_concurrent(config, np_random):
   '''Generates spawn positions for new agents
 
   Evenly spaces agents around the borders
@@ -108,7 +108,8 @@ def spawn_concurrent(config):
         spawn_positions.append(pos)
   else:
     # team_n = 1: to fit 128 agents in a small map, ignore spacing and spawn randomly
-    np.random.shuffle(sides)
+    # np_random is the env-level RNG, a drop-in replacement of numpy.random
+    np_random.shuffle(sides)
     spawn_positions = sides[:config.PLAYER_N]
 
   return spawn_positions

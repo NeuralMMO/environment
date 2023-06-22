@@ -1,5 +1,3 @@
-import numpy as np
-
 class Fixed():
   def __init__(self, item):
     self.item = item
@@ -13,7 +11,10 @@ class Drop:
     self.prob = prob
 
   def roll(self, realm, level):
-    if np.random.rand() < self.prob:
+    # TODO: do not access realm._np_random directly
+    #   related to skill.py, all harvest skills
+    # pylint: disable=protected-access
+    if realm._np_random.random() < self.prob:
       return self.item(realm, level)
 
     return None

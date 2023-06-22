@@ -1,15 +1,12 @@
 # pylint: disable=R0401
-
-import random
-
 from nmmo.core import action
 from nmmo.systems.ai import utils
 
 
-def random_direction():
-  return random.choice(action.Direction.edges)
+def random_direction(np_random):
+  return np_random.choice(action.Direction.edges)
 
-def random_safe(tiles, ent):
+def random_safe(tiles, ent, np_random):
   r, c  = ent.pos
   cands = []
   if not tiles[r-1, c].void:
@@ -21,9 +18,9 @@ def random_safe(tiles, ent):
   if not tiles[r, c+1].void:
     cands.append(action.East)
 
-  return random.choice(cands)
+  return np_random.choice(cands)
 
-def habitable(tiles, ent):
+def habitable(tiles, ent, np_random):
   r, c  = ent.pos
   cands = []
   if tiles[r-1, c].habitable:
@@ -38,9 +35,9 @@ def habitable(tiles, ent):
   if len(cands) == 0:
     return action.North
 
-  return random.choice(cands)
+  return np_random.choice(cands)
 
-def towards(direction):
+def towards(direction, np_random):
   if direction == (-1, 0):
     return action.North
   if direction == (1, 0):
@@ -50,19 +47,19 @@ def towards(direction):
   if direction == (0, 1):
     return action.East
 
-  return random.choice(action.Direction.edges)
+  return np_random.choice(action.Direction.edges)
 
-def bullrush(ent, targ):
+def bullrush(ent, targ, np_random):
   direction = utils.directionTowards(ent, targ)
-  return towards(direction)
+  return towards(direction, np_random)
 
-def pathfind(tiles, ent, targ):
+def pathfind(tiles, ent, targ, np_random):
   direction = utils.aStar(tiles, ent.pos, targ.pos)
-  return towards(direction)
+  return towards(direction, np_random)
 
-def antipathfind(tiles, ent, targ):
+def antipathfind(tiles, ent, targ, np_random):
   er, ec = ent.pos
   tr, tc = targ.pos
   goal   = (2*er - tr , 2*ec-tc)
   direction = utils.aStar(tiles, ent.pos, goal)
-  return towards(direction)
+  return towards(direction, np_random)

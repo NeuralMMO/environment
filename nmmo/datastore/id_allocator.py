@@ -4,7 +4,7 @@ class IdAllocator:
   def __init__(self, max_id):
     # Key 0 is reserved as padding
     self.max_id = 1
-    self.free  = OrderedSet()
+    self.free = OrderedSet()
     self.expand(max_id)
 
   def full(self):
@@ -17,5 +17,5 @@ class IdAllocator:
     return self.free.pop(0)
 
   def expand(self, max_id):
-    self.free.update(OrderedSet(range(self.max_id, max_id)))
+    self.free.update(range(self.max_id, max_id))
     self.max_id = max_id

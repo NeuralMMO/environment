@@ -1,6 +1,3 @@
-
-import random
-
 from nmmo.entity import entity
 from nmmo.core import action as Action
 from nmmo.systems import combat, droptable
@@ -85,8 +82,10 @@ class NPC(entity.Entity):
 
     return False
 
+  # NOTE: passing np_random here is a hack
+  #   Ideally, it should be passed to __init__ and also used in action generation
   @staticmethod
-  def spawn(realm, pos, iden):
+  def spawn(realm, pos, iden, np_random):
     config = realm.config
 
     # check the position
@@ -107,7 +106,7 @@ class NPC(entity.Entity):
     ent.spawn_danger = danger
 
     # Select combat focus
-    style = random.choice((Action.Melee, Action.Range, Action.Mage))
+    style = np_random.choice((Action.Melee, Action.Range, Action.Mage))
     ent.skills.style = style
 
     # Compute level
@@ -134,7 +133,7 @@ class NPC(entity.Entity):
 
     # Equipment to instantiate
     if config.EQUIPMENT_SYSTEM_ENABLED:
-      lvl     = level - random.random()
+      lvl     = level - np_random.random()
       ilvl    = int(5 * lvl)
 
       offense = int(config.NPC_BASE_DAMAGE + lvl*config.NPC_LEVEL_DAMAGE)
@@ -143,11 +142,11 @@ class NPC(entity.Entity):
       ent.equipment = Equipment(ilvl, offense, offense, offense, defense, defense, defense)
 
       armor =  [Item.Hat, Item.Top, Item.Bottom]
-      ent.droptable.add(random.choice(armor))
+      ent.droptable.add(np_random.choice(armor))
 
     if config.PROFESSION_SYSTEM_ENABLED:
       tools =  [Item.Rod, Item.Gloves, Item.Pickaxe, Item.Axe, Item.Chisel]
-      ent.droptable.add(random.choice(tools))
+      ent.droptable.add(np_random.choice(tools))
 
     return ent
 

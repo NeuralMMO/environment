@@ -66,9 +66,6 @@ class NameComparable(type):
 class IterableNameComparable(Iterable, NameComparable):
   pass
 
-def seed():
-  return int(np.random.randint(0, 2**32))
-
 def linf(pos1, pos2):
   # pos could be a single (r,c) or a vector of (r,c)s
   diff = np.abs(np.array(pos1) - np.array(pos2))

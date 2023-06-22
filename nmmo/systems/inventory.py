@@ -103,7 +103,7 @@ class Inventory:
       self.capacity         = config.ITEM_INVENTORY_CAPACITY
 
     self._item_stacks: Dict[Tuple, Item.Stack] = {}
-    self.items: OrderedSet[Item.Item] = OrderedSet([])
+    self.items: OrderedSet[Item.Item] = OrderedSet([]) # critical for correct functioning
 
   @property
   def space(self):

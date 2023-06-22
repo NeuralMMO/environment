@@ -1,9 +1,7 @@
 import functools
-import random
 from typing import Any, Dict, List, Callable
 from collections import defaultdict
 from copy import copy
-from ordered_set import OrderedSet
 
 import gym
 import numpy as np
@@ -14,10 +12,12 @@ from nmmo.core import realm
 from nmmo.core.config import Default
 from nmmo.core.observation import Observation
 from nmmo.core.tile import Tile
+from nmmo.core import action as Action
 from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
 from nmmo.task import task_api
 from nmmo.task.game_state import GameStateGenerator
+from nmmo.lib import seeding
 from scripted.baselines import Scripted
 
 class Env(ParallelEnv):
@@ -27,20 +27,23 @@ class Env(ParallelEnv):
   def __init__(self,
                config: Default = nmmo.config.Default(),
                seed = None):
-    self._init_random(seed)
-
+    self._np_random = None
+    self._np_seed = None
+    self._reset_required = True
+    self.seed(seed)
     super().__init__()
 
     self.config = config
-    self.realm = realm.Realm(config)
+    self.realm = realm.Realm(config, self._np_random)
     self.obs = None
     self._dummy_obs = None
 
     self.possible_agents = list(range(1, config.PLAYER_N + 1))
+    self._agents = None
     self._dead_agents = set()
     self._episode_stats = defaultdict(lambda: defaultdict(float))
     self._dead_this_tick = None
-    self.scripted_agents = OrderedSet()
+    self.scripted_agents = set()
 
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
     self.game_state = None
@@ -48,33 +51,21 @@ class Env(ParallelEnv):
     self.tasks = task_api.nmmo_default_task(self.possible_agents)
     self.agent_task_map = None
 
-  # pylint: disable=method-cache-max-size-none
-  @functools.lru_cache(maxsize=None)
-  def observation_space(self, agent: int):
-    '''Neural MMO Observation Space
-
-    Args:
-        agent: Agent ID
-
-    Returns:
-        observation: gym.spaces object contained the structured observation
-        for the specified agent. Each visible object is represented by
-        continuous and discrete vectors of attributes. A 2-layer attentional
-        encoder can be used to convert this structured observation into
-        a flat vector embedding.'''
-
+  @functools.cached_property
+  def _obs_space(self):
     def box(rows, cols):
       return gym.spaces.Box(
-          low=-2**20, high=2**20,
+          low=-2**15, high=2**15-1,
           shape=(rows, cols),
-          dtype=np.float32)
+          dtype=np.int16)
+    def mask_box(length):
+      return gym.spaces.Box(low=0, high=1, shape=(length,), dtype=np.int8)
 
     obs_space = {
-      "CurrentTick": gym.spaces.Discrete(1),
-      "AgentId": gym.spaces.Discrete(1),
+      "CurrentTick": gym.spaces.Discrete(self.config.HORIZON+1),
+      "AgentId": gym.spaces.Discrete(self.config.PLAYER_N+1),
       "Tile": box(self.config.MAP_N_OBS, Tile.State.num_attributes),
-      "Entity": box(self.config.PLAYER_N_OBS, Entity.State.num_attributes),
-    }
+      "Entity": box(self.config.PLAYER_N_OBS, Entity.State.num_attributes)}
 
     if self.config.ITEM_SYSTEM_ENABLED:
       obs_space["Inventory"] = box(self.config.INVENTORY_N_OBS, Item.State.num_attributes)
@@ -83,17 +74,65 @@ class Env(ParallelEnv):
       obs_space["Market"] = box(self.config.MARKET_N_OBS, Item.State.num_attributes)
 
     if self.config.PROVIDE_ACTION_TARGETS:
-      obs_space['ActionTargets'] = self.action_space(None)
+      mask_spec = {}
+      mask_spec[Action.Move] = gym.spaces.Dict(
+        {Action.Direction: mask_box(len(Action.Direction.edges))})
+      if self.config.COMBAT_SYSTEM_ENABLED:
+        mask_spec[Action.Attack] = gym.spaces.Dict({
+          Action.Style: mask_box(3),
+          Action.Target: mask_box(self.config.PLAYER_N_OBS)})
+      if self.config.ITEM_SYSTEM_ENABLED:
+        mask_spec[Action.Use] = gym.spaces.Dict(
+          {Action.InventoryItem: mask_box(self.config.INVENTORY_N_OBS)})
+        mask_spec[Action.Destroy] = gym.spaces.Dict(
+          {Action.InventoryItem: mask_box(self.config.INVENTORY_N_OBS)})
+        mask_spec[Action.Give] = gym.spaces.Dict({
+          Action.InventoryItem: mask_box(self.config.INVENTORY_N_OBS),
+          Action.Target: mask_box(self.config.PLAYER_N_OBS)})
+      if self.config.EXCHANGE_SYSTEM_ENABLED:
+        mask_spec[Action.Buy] = gym.spaces.Dict(
+          {Action.MarketItem: mask_box(self.config.MARKET_N_OBS)})
+        mask_spec[Action.Sell] = gym.spaces.Dict({
+          Action.InventoryItem: mask_box(self.config.INVENTORY_N_OBS),
+          Action.Price: mask_box(self.config.PRICE_N_OBS)})
+        mask_spec[Action.GiveGold] = gym.spaces.Dict({
+          Action.Price: mask_box(self.config.PRICE_N_OBS),
+          Action.Target: mask_box(self.config.PLAYER_N_OBS)})
+      if self.config.COMMUNICATION_SYSTEM_ENABLED:
+        mask_spec[Action.Comm] = gym.spaces.Dict(
+          {Action.Token: mask_box(self.config.COMMUNICATION_NUM_TOKENS)})
+      obs_space['ActionTargets'] = gym.spaces.Dict(mask_spec)
 
     return gym.spaces.Dict(obs_space)
 
-  def _init_random(self, seed):
-    if seed is not None:
-      np.random.seed(seed)
-      random.seed(seed)
-
+  # pylint: disable=method-cache-max-size-none
   @functools.lru_cache(maxsize=None)
-  def action_space(self, agent):
+  def observation_space(self, agent: AgentID):
+    '''Neural MMO Observation Space
+
+    Args:
+        agent: Agent ID
+
+    Returns:
+        observation: gym.spaces object contained the structured observation
+        for the specified agent.'''
+    return self._obs_space
+
+  @functools.cached_property
+  def _atn_space(self):
+    actions = {}
+    for atn in sorted(nmmo.Action.edges(self.config)):
+      if atn.enabled(self.config):
+        actions[atn] = {}
+        for arg in sorted(atn.edges):
+          n = arg.N(self.config)
+          actions[atn][arg] = gym.spaces.Discrete(n)
+        actions[atn] = gym.spaces.Dict(actions[atn])
+    return gym.spaces.Dict(actions)
+
+  # pylint: disable=method-cache-max-size-none
+  @functools.lru_cache(maxsize=None)
+  def action_space(self, agent: AgentID):
     '''Neural MMO Action Space
 
     Args:
@@ -105,19 +144,7 @@ class Env(ParallelEnv):
         of discrete-valued arguments. These consist of both fixed, k-way
         choices (such as movement direction) and selections from the
         observation space (such as targeting)'''
-
-    actions = {}
-    for atn in sorted(nmmo.Action.edges(self.config)):
-      if atn.enabled(self.config):
-
-        actions[atn] = {}
-        for arg in sorted(atn.edges):
-          n = arg.N(self.config)
-          actions[atn][arg] = gym.spaces.Discrete(n)
-
-        actions[atn] = gym.spaces.Dict(actions[atn])
-
-    return gym.spaces.Dict(actions)
+    return self._atn_space
 
   ############################################################################
   # Core API
@@ -147,9 +174,9 @@ class Env(ParallelEnv):
         but finite horizon: ~1000 timesteps for small maps and
         5000+ timesteps for large maps
     '''
-
-    self._init_random(seed)
-    self.realm.reset(map_id)
+    self.seed(seed)
+    self.realm.reset(self._np_random, map_id)
+    self._agents = list(self.realm.players.keys())
     self._dead_agents = set()
     self._episode_stats.clear()
     self._dead_this_tick = {}
@@ -158,6 +185,7 @@ class Env(ParallelEnv):
     for eid, ent in self.realm.players.items():
       if isinstance(ent.agent, Scripted):
         self.scripted_agents.add(eid)
+        ent.agent.set_rng(self._np_random)
 
     self._dummy_obs = self._make_dummy_obs()
     self.obs = self._compute_observations()
@@ -169,6 +197,8 @@ class Env(ParallelEnv):
       for task in self.tasks:
         task.reset()
     self.agent_task_map = self._map_task_to_agent()
+
+    self._reset_required = False
 
     return {a: o.to_gym() for a,o in self.obs.items()}
 
@@ -274,7 +304,7 @@ class Env(ParallelEnv):
 
           Provided for conformity with PettingZoo
     '''
-    assert self.obs is not None, 'step() called before reset'
+    assert not self._reset_required, 'step() called before reset'
     # Add in scripted agents' actions, if any
     if self.scripted_agents:
       actions = self._compute_scripted_agent_actions(actions)
@@ -284,6 +314,9 @@ class Env(ParallelEnv):
     actions = self._validate_actions(actions)
     # Execute actions
     self._dead_this_tick = self.realm.step(actions)
+    # the list of "current" agents, both alive and dead_this_tick
+    self._agents = list(set(list(self.realm.players.keys()) + list(self._dead_this_tick.keys())))
+
     dones = {}
     for agent_id in self.agents:
       if agent_id in self._dead_this_tick or \
@@ -353,22 +386,24 @@ class Env(ParallelEnv):
 
   def _compute_scripted_agent_actions(self, actions: Dict[int, Dict[str, Dict[str, Any]]]):
     '''Compute actions for scripted agents and add them into the action dict'''
-    for eid in self.scripted_agents:
-      # remove the dead scripted agent from the list
-      if eid in self._dead_agents or eid not in self.realm.players:
-        self.scripted_agents.discard(eid)
-        continue
+    dead_agents = set()
+    for agent_id in self.scripted_agents:
+      if agent_id in self.realm.players:
+        # override the provided scripted agents' actions
+        actions[agent_id] = self.realm.players[agent_id].agent(self.obs[agent_id])
+      else:
+        dead_agents.add(agent_id)
 
-      # override the provided scripted agents' actions
-      actions[eid] = self.realm.players[eid].agent(self.obs[eid])
+    # remove the dead scripted agent from the list
+    self.scripted_agents -= dead_agents
 
     return actions
 
   def _make_dummy_obs(self):
-    dummy_tiles = np.zeros((0, len(Tile.State.attr_name_to_col)))
-    dummy_entities = np.zeros((0, len(Entity.State.attr_name_to_col)))
-    dummy_inventory = np.zeros((0, len(Item.State.attr_name_to_col)))
-    dummy_market = np.zeros((0, len(Item.State.attr_name_to_col)))
+    dummy_tiles = np.zeros((0, len(Tile.State.attr_name_to_col)), dtype=np.int16)
+    dummy_entities = np.zeros((0, len(Entity.State.attr_name_to_col)), dtype=np.int16)
+    dummy_inventory = np.zeros((0, len(Item.State.attr_name_to_col)), dtype=np.int16)
+    dummy_market = np.zeros((0, len(Item.State.attr_name_to_col)), dtype=np.int16)
     return Observation(self.config, self.realm.tick, 0,
                        dummy_tiles, dummy_entities, dummy_inventory, dummy_market)
 
@@ -455,16 +490,24 @@ class Env(ParallelEnv):
 
   @property
   def agents(self) -> List[AgentID]:
-    '''For conformity with the PettingZoo API only; rendering is external'''
-    # "current" agents, which return obs: both alive and dead_this_tick
-    agents = set(list(self.realm.players.keys()) + list(self._dead_this_tick.keys()))
-    return list(agents)
+    '''For conformity with the PettingZoo API'''
+    # returns the list of "current" agents, both alive and dead_this_tick
+    return self._agents
 
   def close(self):
     '''For conformity with the PettingZoo API only; rendering is external'''
 
   def seed(self, seed=None):
-    return self._init_random(seed)
+    '''Reseeds the environment. reset() must be called after seed(), and before step().
+       - self._np_seed is None: seed() has not been called, e.g. __init__() -> new RNG
+       - self._np_seed is set, and seed is not None: seed() or reset() with seed -> new RNG
+
+       If self._np_seed is set, but seed is None
+         probably called from reset() without seed, so don't change the RNG
+    '''
+    if self._np_seed is None or seed is not None:
+      self._np_random, self._np_seed = seeding.np_random(seed)
+      self._reset_required = True
 
   def state(self) -> np.ndarray:
     raise NotImplementedError

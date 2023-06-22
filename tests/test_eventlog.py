@@ -78,21 +78,21 @@ class TestEventLog(unittest.TestCase):
     log_data = [list(row) for row in event_log.get_data()]
 
     self.assertListEqual(log_data, [
-      [ 1,  1, 1, EventCode.EAT_FOOD, 0, 0, 0, 0, 0],
-      [ 2,  2, 1, EventCode.DRINK_WATER, 0, 0, 0, 0, 0],
-      [ 3,  2, 1, EventCode.SCORE_HIT, 1, 0, 50, 0, 0],
-      [ 4,  3, 1, EventCode.PLAYER_KILL, 0, 5, 0, 0, 5],
-      [ 5,  4, 2, EventCode.CONSUME_ITEM, 16, 8, 1, 0, 0],
-      [ 6,  4, 2, EventCode.GIVE_ITEM, 0, 0, 0, 0, 0],
-      [ 7,  5, 2, EventCode.DESTROY_ITEM, 0, 0, 0, 0, 0],
-      [ 8,  6, 2, EventCode.HARVEST_ITEM, 13, 3, 1, 0, 0],
-      [ 9,  7, 3, EventCode.GIVE_GOLD, 0, 0, 0, 0, 0],
-      [10,  8, 3, EventCode.LIST_ITEM, 16, 5, 1, 11, 0],
-      [11,  9, 3, EventCode.EARN_GOLD, 0, 0, 0, 15, 0],
-      [12, 10, 3, EventCode.BUY_ITEM, 13, 7, 1, 21, 0],
-      [13, 12, 4, EventCode.LEVEL_UP, 4, 3, 0, 0, 0],
-      [14, 12, 5, EventCode.GO_FARTHEST, 0, 0, 6, 0, 0],
-      [15, 12, 5, EventCode.EQUIP_ITEM, 2, 4, 1, 0, 0]])
+      [1,  1, 1, EventCode.EAT_FOOD, 0, 0, 0, 0, 0],
+      [1,  2, 1, EventCode.DRINK_WATER, 0, 0, 0, 0, 0],
+      [1,  2, 1, EventCode.SCORE_HIT, 1, 0, 50, 0, 0],
+      [1,  3, 1, EventCode.PLAYER_KILL, 0, 5, 0, 0, 5],
+      [1,  4, 2, EventCode.CONSUME_ITEM, 16, 8, 1, 0, 0],
+      [1,  4, 2, EventCode.GIVE_ITEM, 0, 0, 0, 0, 0],
+      [1,  5, 2, EventCode.DESTROY_ITEM, 0, 0, 0, 0, 0],
+      [1,  6, 2, EventCode.HARVEST_ITEM, 13, 3, 1, 0, 0],
+      [1,  7, 3, EventCode.GIVE_GOLD, 0, 0, 0, 0, 0],
+      [1,  8, 3, EventCode.LIST_ITEM, 16, 5, 1, 11, 0],
+      [1,  9, 3, EventCode.EARN_GOLD, 0, 0, 0, 15, 0],
+      [1, 10, 3, EventCode.BUY_ITEM, 13, 7, 1, 21, 0],
+      [1, 12, 4, EventCode.LEVEL_UP, 4, 3, 0, 0, 0],
+      [1, 12, 5, EventCode.GO_FARTHEST, 0, 0, 6, 0, 0],
+      [1, 12, 5, EventCode.EQUIP_ITEM, 2, 4, 1, 0, 0]])
 
 if __name__ == '__main__':
   unittest.main()

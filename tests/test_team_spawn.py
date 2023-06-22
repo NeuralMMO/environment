@@ -7,10 +7,10 @@ from nmmo.lib import spawn
 
 
 class TeamLoader(spawn.SequentialLoader):
-  def __init__(self, config, team_helper: TeamHelper):
+  def __init__(self, config, np_random, team_helper: TeamHelper):
     assert config.PLAYERS == [Agent], \
       "TeamLoader only supports config.PLAYERS == [Agent]"
-    super().__init__(config)
+    super().__init__(config, np_random)
     self.team_helper = team_helper
 
     self.candidate_spawn_pos = \
@@ -32,7 +32,8 @@ class TestTeamSpawn(unittest.TestCase):
 
     config = nmmo.config.Small()
     config.PLAYER_N = num_teams * team_size
-    config.PLAYER_LOADER = lambda config: TeamLoader(config, team_helper)
+    config.PLAYER_LOADER =\
+      lambda config, np_random: TeamLoader(config, np_random, team_helper)
 
     assert config.PLAYER_N == num_teams * team_size,\
       "config.PLAYER_N must be num_teams * team_size"
