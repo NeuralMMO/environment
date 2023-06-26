@@ -7,8 +7,6 @@ from typing import Tuple
 import numpy as np
 
 from nmmo.lib.utils import in_bounds
-from functools import lru_cache
-
 
 def validTarget(ent, targ, rng):
    if targ is None or not targ.alive:

@@ -101,8 +101,8 @@ def test_fps_all_med_100_pop(benchmark):
   benchmark_config(benchmark, Medium, 100, AllGameSystems)
 
 
-import time
-if __name__ == '__main__':
+import time, cProfile, io, pstats
+def set_seed_test():
   RANDOM_SEED = 5000
   conf = create_config(Medium, Terrain, Resource, Combat, NPC)
   conf.PLAYER_N = 1
@@ -115,6 +115,17 @@ if __name__ == '__main__':
   for _ in range(1024):
     env.step({})
   print(f"Total time {time.time()-start}")
+
+if __name__ == '__main__':
+  with open('profile.run','a') as f:
+    pr = cProfile.Profile()
+    pr.enable()
+    set_seed_test()
+    pr.disable()
+    s = io.StringIO()
+    ps = pstats.Stats(pr,stream=s).sort_stats('cumtime')
+    ps.print_stats()
+    f.write(s.getvalue())
 
 '''
 def benchmark_env(benchmark, env, nent):

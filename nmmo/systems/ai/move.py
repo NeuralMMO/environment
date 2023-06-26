@@ -13,31 +13,56 @@ def random_safe(map, ent, np_random):
   if not tiles[r-1, c].void:
     cands.append(action.North)
   if not tiles[r+1, c].void:
-    cands.append(action.South)
+    cands.append(action.North)
   if not tiles[r, c-1].void:
-    cands.append(action.West)
+    cands.append(action.North)
   if not tiles[r, c+1].void:
-    cands.append(action.East)
+    cands.append(action.North)
 
   return np_random.choice(cands)
 
 def habitable(map, ent, np_random):
   r, c  = ent.pos
-  tiles = map.tiles
-  cands = []
-  if tiles[r-1, c].habitable:
-    cands.append(action.North)
-  if tiles[r+1, c].habitable:
-    cands.append(action.South)
-  if tiles[r, c-1].habitable:
-    cands.append(action.West)
-  if tiles[r, c+1].habitable:
-    cands.append(action.East)
+  tiles = map.habitable_tiles
+  direction = np_random.integers(0,4)
+  if direction == 0:
+    if tiles[r-1, c]:
+      return action.North
+    if tiles[r+1, c]:
+      return action.South
+    if tiles[r, c-1]:
+      return action.West
+    if tiles[r, c+1]:
+      return action.East
+  elif direction == 1:
+    if tiles[r+1, c]:
+      return action.South
+    if tiles[r, c-1]:
+      return action.West
+    if tiles[r, c+1]:
+      return action.East
+    if tiles[r-1, c]:
+      return action.North
+  elif direction == 2:
+    if tiles[r, c-1]:
+      return action.West
+    if tiles[r, c+1]:
+      return action.East
+    if tiles[r-1, c]:
+      return action.North
+    if tiles[r+1, c]:
+      return action.South
+  else:
+    if tiles[r, c+1]:
+      return action.East
+    if tiles[r-1, c]:
+      return action.North
+    if tiles[r+1, c]:
+      return action.South
+    if tiles[r, c-1]:
+      return action.West
 
-  if len(cands) == 0:
-    return action.North
-
-  return np_random.choice(cands)
+  return action.North
 
 def towards(direction, np_random):
   if direction == (-1, 0):
@@ -55,7 +80,6 @@ def bullrush(ent, targ, np_random):
   direction = utils.directionTowards(ent, targ)
   return towards(direction, np_random)
 
-import time
 def pathfind(map, ent, targ, np_random):
   direction = utils.aStar(map, ent.pos, targ.pos)
   return towards(direction, np_random)
