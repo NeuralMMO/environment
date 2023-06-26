@@ -9,9 +9,7 @@ import numpy as np
 from nmmo.lib.utils import in_bounds
 
 def validTarget(ent, targ, rng):
-   if targ is None or not targ.alive:
-      return False
-   if lInfty(ent.pos, targ.pos) > rng:
+   if targ is None or not targ.alive or lInfty(ent.pos, targ.pos) > rng:
       return False
    return True
 
@@ -48,10 +46,6 @@ def closestTarget(ent, tiles, rng=1):
 
          for e in tiles[sr + d, sc + r].entities.values():
             if e is not ent and validTarget(ent, e, rng): return e
-
-def distance(ent, targ):
-   # used in scripted/behavior.py, attack() to determine attack range
-   return lInfty(ent.pos, targ.pos)
 
 def lInf(ent, targ):
    sr, sc = ent.pos

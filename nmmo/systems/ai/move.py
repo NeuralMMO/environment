@@ -4,7 +4,7 @@ from nmmo.systems.ai import utils
 
 
 def random_direction(np_random):
-  return np_random.choice(action.Direction.edges)
+  return action.Direction.edges[np_random.integers(0,len(action.Direction.edges))]
 
 def random_safe(map, ent, np_random):
   r, c  = ent.pos

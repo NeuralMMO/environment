@@ -2,8 +2,8 @@ from __future__ import annotations
 from typing import Dict, Iterable, Tuple, MutableMapping, Set
 from dataclasses import dataclass
 from copy import deepcopy
-from abc import ABC, abstractmethod
 from collections import defaultdict
+from abc import ABC, abstractmethod
 import functools
 
 import numpy as np

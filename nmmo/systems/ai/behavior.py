@@ -55,16 +55,15 @@ def evade(realm, actions, entity):
 
 def hunt(realm, actions, entity):
    #Move args
-   distance = utils.distance(entity, entity.target)
+   distance = utils.lInfty(entity.pos, entity.target.pos)
 
-   direction = None
-   if distance == 0:
-      direction = move.random_direction(realm._np_random)
-   elif distance > 1:
-      direction = move.pathfind(realm.map, entity, entity.target, realm._np_random)
-
-   if direction is not None:
-      actions[nmmo.action.Move] = {nmmo.action.Direction: direction}
+   if distance > 1:
+      actions[nmmo.action.Move] = {nmmo.action.Direction: move.pathfind(realm.map,
+                                                                        entity,
+                                                                        entity.target,
+                                                                        realm._np_random)}
+   elif distance == 0:
+      actions[nmmo.action.Move] = {nmmo.action.Direction: move.random_direction(realm._np_random)}
 
    attack(realm, actions, entity)
 
