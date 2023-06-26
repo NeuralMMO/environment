@@ -101,6 +101,21 @@ def test_fps_all_med_100_pop(benchmark):
   benchmark_config(benchmark, Medium, 100, AllGameSystems)
 
 
+import time
+if __name__ == '__main__':
+  RANDOM_SEED = 5000
+  conf = create_config(Medium, Terrain, Resource, Combat, NPC)
+  conf.PLAYER_N = 1
+  conf.PLAYERS = [baselines.Random]
+
+  env = nmmo.Env(conf)
+
+  start = time.time()
+  env.reset(seed=RANDOM_SEED)
+  for _ in range(1024):
+    env.step({})
+  print(f"Total time {time.time()-start}")
+
 '''
 def benchmark_env(benchmark, env, nent):
   env.config.PLAYER_N = nent

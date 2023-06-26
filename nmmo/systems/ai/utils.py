@@ -7,6 +7,7 @@ from typing import Tuple
 import numpy as np
 
 from nmmo.lib.utils import in_bounds
+from functools import lru_cache
 
 
 def validTarget(ent, targ, rng):
@@ -88,10 +89,15 @@ def lInfty(start, goal):
    gr, gc = goal
    return max(abs(gr - sr), abs(gc - sc))
 
-def aStar(tiles, start, goal, cutoff=100):
+CUTOFF = 100
+def aStar(map, start, goal):
+   cutoff = CUTOFF
+   tiles = map.tiles
    if start == goal:
       return (0, 0)
-
+   if (start,goal) in map.pathfinding_cache:
+      return map.pathfinding_cache[(start,goal)]
+   initial_goal = goal
    pq = [(0, start)]
 
    backtrace = {}
@@ -135,11 +141,14 @@ def aStar(tiles, start, goal, cutoff=100):
             backtrace[nxt] = cur
 
    while goal in backtrace and backtrace[goal] != start:
+      gr, gc = goal
       goal = backtrace[goal]
+      sr, sc = goal
+      map.pathfinding_cache[(goal,initial_goal)] = (gr - sr, gc - sc)
 
    sr, sc = start
    gr, gc = goal
-
+   map.pathfinding_cache[(start,initial_goal)] = (gr - sr, gc - sc)
    return (gr - sr, gc - sc)
 # End A*
 

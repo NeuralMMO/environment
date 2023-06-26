@@ -17,6 +17,7 @@ class Map:
     self._repr  = None
     self.realm  = realm
     self.update_list = None
+    self.pathfinding_cache = {} # Avoid recalculating A*, paths don't move
 
     sz          = config.MAP_SIZE
     self.tiles  = np.zeros((sz, sz), dtype=object)

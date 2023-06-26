@@ -26,7 +26,7 @@ def update(entity):
 def pathfind(realm, actions, entity, target):
    # TODO: do not access realm._np_random directly. ALSO see below for all other uses
    actions[nmmo.action.Move] = {
-      nmmo.action.Direction: move.pathfind(realm.map.tiles, entity, target, realm._np_random)}
+      nmmo.action.Direction: move.pathfind(realm.map, entity, target, realm._np_random)}
 
 def explore(realm, actions, entity):
    sz   = realm.config.TERRAIN_SIZE
@@ -46,11 +46,11 @@ def explore(realm, actions, entity):
 
 def meander(realm, actions, entity):
    actions[nmmo.action.Move] = {
-      nmmo.action.Direction: move.habitable(realm.map.tiles, entity, realm._np_random)}
+      nmmo.action.Direction: move.habitable(realm.map, entity, realm._np_random)}
 
 def evade(realm, actions, entity):
    actions[nmmo.action.Move] = {
-      nmmo.action.Direction: move.antipathfind(realm.map.tiles, entity, entity.attacker,
+      nmmo.action.Direction: move.antipathfind(realm.map, entity, entity.attacker,
                                                realm._np_random)}
 
 def hunt(realm, actions, entity):
@@ -61,7 +61,7 @@ def hunt(realm, actions, entity):
    if distance == 0:
       direction = move.random_direction(realm._np_random)
    elif distance > 1:
-      direction = move.pathfind(realm.map.tiles, entity, entity.target, realm._np_random)
+      direction = move.pathfind(realm.map, entity, entity.target, realm._np_random)
 
    if direction is not None:
       actions[nmmo.action.Move] = {nmmo.action.Direction: direction}
