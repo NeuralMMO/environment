@@ -105,7 +105,7 @@ import time, cProfile, io, pstats
 def set_seed_test():
   RANDOM_SEED = 5000
   conf = create_config(Medium, Terrain, Resource, Combat, NPC)
-  conf.PLAYER_N = 1
+  conf.PLAYER_N = 10
   conf.PLAYERS = [baselines.Random]
 
   env = nmmo.Env(conf)

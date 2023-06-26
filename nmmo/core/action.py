@@ -138,7 +138,7 @@ class Move(Node):
     realm.map.tiles[r_new, c_new].add_entity(entity)
 
     # exploration record keeping. moved from entity.py, History.update()
-    dist_from_spawn = utils.linf(entity.spawn_pos, (r_new, c_new))
+    dist_from_spawn = utils.linf_single(entity.spawn_pos, (r_new, c_new))
     if dist_from_spawn > entity.history.exploration:
       entity.history.exploration = dist_from_spawn
       if entity.is_player:
@@ -263,7 +263,7 @@ class Attack(Node):
       return None
 
     #Can't attack out of range
-    if utils.linf(entity.pos, target.pos) > style.attack_range(config):
+    if utils.linf_single(entity.pos, target.pos) > style.attack_range(config):
       return None
 
     #Execute attack
