@@ -37,39 +37,23 @@ class GameState:
   env_obs: Dict[int, Observation] # env passes the obs of only alive agents
 
   entity_data: np.ndarray # a copied, whole Entity ds table
-  entity_index: Dict[int, Iterable] # precomputed index for where_in_1d
   item_data: np.ndarray # a copied, whole Item ds table
-  item_index: Dict[int, Iterable]
   event_data: np.ndarray # a copied, whole Event log table
-  event_index: Dict[int, Iterable]
 
   cache_result: MutableMapping # cache for general memoization
 
-  # add helper functions below
-  @functools.lru_cache
-  def entity_or_none(self, ent_id):
-    flt_ent = self.entity_data[:, EntityAttr['id']] == ent_id
-    if np.any(flt_ent):
-      return EntityState.parse_array(self.entity_data[flt_ent][0])
-    return None
-
-  def where_in_id(self, data_type, subject: Iterable[int]):
-    k = (data_type, subject)
-    if k in self.cache_result:
-      return self.cache_result[k]
-
+  # Helper Functions
+  def where_in_1d(self, data_type, subject: Iterable[int]):
+    assert data_type in ['entity', 'item', 'event'], 'data_type must be in entity, item, event'
     if data_type == 'entity':
-      flt_idx = [row for sbj in subject for row in self.entity_index.get(sbj,[])]
-      self.cache_result[k] = self.entity_data[flt_idx]
-    if data_type == 'item':
-      flt_idx = [row for sbj in subject for row in self.item_index.get(sbj,[])]
-      self.cache_result[k] = self.item_data[flt_idx]
-    if data_type == 'event':
-      flt_idx = [row for sbj in subject for row in self.event_index.get(sbj,[])]
-      self.cache_result[k] = self.event_data[flt_idx]
-    if data_type in ['entity', 'item', 'event']:
-      return self.cache_result[k]
-
+      flt_idx = np.isin(self.entity_data[:, EntityAttr["id"]], subject).nonzero()[0]
+      return self.entity_data[flt_idx]
+    elif data_type == 'item':
+      flt_idx = np.isin(self.item_data[:, ItemAttr["owner_id"]], subject).nonzero()[0]
+      return self.item_data[flt_idx]
+    elif data_type == 'event':
+      flt_idx = np.isin(self.event_data[:, EventAttr["ent_id"]], subject).nonzero()[0]
+      return self.event_data[flt_idx]
     raise ValueError("data_type must be in entity, item, event")
 
   def get_subject_view(self, subject: Group):
@@ -168,7 +152,7 @@ class GroupView:
 
   @functools.cached_property
   def _sbj_ent(self):
-    return self._gs.where_in_id('entity', self._subject.agents)
+    return self._gs.where_in_1d('entity', self._subject.agents)
 
   @functools.cached_property
   def entity(self):
@@ -176,7 +160,7 @@ class GroupView:
 
   @functools.cached_property
   def _sbj_item(self):
-    return self._gs.where_in_id('item', self._subject.agents)
+    return self._gs.where_in_1d('item', self._subject.agents)
 
   @functools.cached_property
   def item(self):
@@ -184,7 +168,7 @@ class GroupView:
 
   @functools.cached_property
   def _sbj_event(self):
-    return self._gs.where_in_id('event', self._subject.agents)
+    return self._gs.where_in_1d('event', self._subject.agents)
 
   @functools.cached_property
   def event(self):
@@ -234,20 +218,7 @@ class GameStateGenerator:
       alive_agents = alive_agents,
       env_obs = env_obs,
       entity_data = entity_all,
-      entity_index = self._precompute_index(entity_all, EntityAttr["id"]),
       item_data = item_data,
-      item_index = self._precompute_index(item_data, ItemAttr['owner_id']),
       event_data = event_data,
-      event_index = self._precompute_index(event_data, EventAttr['ent_id']),
       cache_result = {}
     )
-
-  @staticmethod
-  def _precompute_index(table, id_col):
-    index = defaultdict()
-    for row, id_ in enumerate(table[:,id_col]):
-      if id_ in index:
-        index[id_].append(row)
-      else:
-        index[id_] = [row]
-    return index
