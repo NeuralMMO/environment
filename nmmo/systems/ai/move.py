@@ -13,11 +13,11 @@ def random_safe(realm_map, ent, np_random):
   if not tiles[r-1, c].void:
     cands.append(action.North)
   if not tiles[r+1, c].void:
-    cands.append(action.North)
+    cands.append(action.South)
   if not tiles[r, c-1].void:
-    cands.append(action.North)
+    cands.append(action.West)
   if not tiles[r, c+1].void:
-    cands.append(action.North)
+    cands.append(action.East)
 
   return np_random.choice(cands)
 
