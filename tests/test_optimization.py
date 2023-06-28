@@ -7,15 +7,15 @@ import nmmo
 from scripted.baselines import Random
 
 def rollout():
-    config = nmmo.config.Default()
-    config.PLAYERS = [Random]
-    env = nmmo.Env(config)
-    env.reset()
-    start = copy.deepcopy(env.realm)
-    for _ in range(64):
-        env.step({})
-    end = copy.deepcopy(env.realm)
-    return (start, end)
+  config = nmmo.config.Default()
+  config.PLAYERS = [Random]
+  env = nmmo.Env(config)
+  env.reset()
+  start = copy.deepcopy(env.realm)
+  for _ in range(64):
+    env.step({})
+  end = copy.deepcopy(env.realm)
+  return (start, end)
 
 class TestOptimization(unittest.TestCase):
 

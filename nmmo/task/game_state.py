@@ -2,7 +2,6 @@ from __future__ import annotations
 from typing import Dict, Iterable, Tuple, MutableMapping, Set
 from dataclasses import dataclass
 from copy import deepcopy
-from collections import defaultdict
 from abc import ABC, abstractmethod
 import functools
 
@@ -48,10 +47,10 @@ class GameState:
     if data_type == 'entity':
       flt_idx = np.isin(self.entity_data[:, EntityAttr["id"]], subject).nonzero()[0]
       return self.entity_data[flt_idx]
-    elif data_type == 'item':
+    if data_type == 'item':
       flt_idx = np.isin(self.item_data[:, ItemAttr["owner_id"]], subject).nonzero()[0]
       return self.item_data[flt_idx]
-    elif data_type == 'event':
+    if data_type == 'event':
       flt_idx = np.isin(self.event_data[:, EventAttr["ent_id"]], subject).nonzero()[0]
       return self.event_data[flt_idx]
     raise ValueError("data_type must be in entity, item, event")

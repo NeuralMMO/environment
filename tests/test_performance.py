@@ -1,3 +1,7 @@
+# import time
+import cProfile
+import io
+import pstats
 
 import nmmo
 from nmmo.core.config import (NPC, AllGameSystems, Combat, Communication,
@@ -100,30 +104,28 @@ def test_fps_no_npc_med_100_pop(benchmark):
 def test_fps_all_med_100_pop(benchmark):
   benchmark_config(benchmark, Medium, 100, AllGameSystems)
 
-
-import time, cProfile, io, pstats
 def set_seed_test():
-  RANDOM_SEED = 5000
+  random_seed = 5000
   conf = create_config(Medium, Terrain, Resource, Combat, NPC)
   conf.PLAYER_N = 10
   conf.PLAYERS = [baselines.Random]
 
   env = nmmo.Env(conf)
 
-  start = time.time()
-  env.reset(seed=RANDOM_SEED)
+  # start = time.time()
+  env.reset(seed=random_seed)
   for _ in range(1024):
     env.step({})
-  print(f"Total time {time.time()-start}")
+  # print(f"Total time {time.time()-start}")
 
 if __name__ == '__main__':
-  with open('profile.run','a') as f:
+  with open('profile.run','a', encoding="utf-8") as f:
     pr = cProfile.Profile()
     pr.enable()
     set_seed_test()
     pr.disable()
     s = io.StringIO()
-    ps = pstats.Stats(pr,stream=s).sort_stats('cumtime')
+    ps = pstats.Stats(pr,stream=s).sort_stats('tottime')
     ps.print_stats()
     f.write(s.getvalue())
 
