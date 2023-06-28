@@ -16,7 +16,7 @@ def validTarget(ent, targ, rng):
 
 def validResource(ent, tile, rng):
    return tile is not None and tile.state.tex in (
-      'foilage', 'water') and distance(ent, tile) <= rng
+      'foilage', 'water') and lInfty(ent.pos, tile.pos) <= rng
 
 
 def directionTowards(ent, targ):
@@ -82,13 +82,13 @@ def lInfty(start, goal):
    return max(abs(gr - sr), abs(gc - sc))
 
 CUTOFF = 100
-def aStar(map, start, goal):
+def aStar(realm_map, start, goal):
    cutoff = CUTOFF
-   tiles = map.tiles
+   tiles = realm_map.tiles
    if start == goal:
       return (0, 0)
-   if (start,goal) in map.pathfinding_cache:
-      return map.pathfinding_cache[(start,goal)]
+   if (start,goal) in realm_map.pathfinding_cache:
+      return realm_map.pathfinding_cache[(start,goal)]
    initial_goal = goal
    pq = [(0, start)]
 
@@ -136,11 +136,11 @@ def aStar(map, start, goal):
       gr, gc = goal
       goal = backtrace[goal]
       sr, sc = goal
-      map.pathfinding_cache[(goal,initial_goal)] = (gr - sr, gc - sc)
+      realm_map.pathfinding_cache[(goal,initial_goal)] = (gr - sr, gc - sc)
 
    sr, sc = start
    gr, gc = goal
-   map.pathfinding_cache[(start,initial_goal)] = (gr - sr, gc - sc)
+   realm_map.pathfinding_cache[(start,initial_goal)] = (gr - sr, gc - sc)
    return (gr - sr, gc - sc)
 # End A*
 
