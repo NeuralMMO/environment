@@ -113,27 +113,3 @@ def spawn_concurrent(config, np_random):
     spawn_positions = sides[:config.PLAYER_N]
 
   return spawn_positions
-
-def get_team_spawn_positions(config, num_teams):
-  '''Generates spawn positions for new teams
-  Agents in the same team spawn together in the same tile
-  Evenly spaces teams around the square map borders
-
-  Returns:
-      list of tuple(int, int):
-
-  position:
-      The position (row, col) to spawn the given teams
-  '''
-  teams_per_sides = (num_teams + 3) // 4 # 1-4 -> 1, 5-8 -> 2, etc.
-
-  sides = get_edge_tiles(config)
-  assert len(sides[0]) >= 4*teams_per_sides, 'Map too small for teams'
-
-  team_spawn_positions = []
-  for side in sides:
-    for i in range(teams_per_sides):
-      idx = int(len(side)*(i+1)/(teams_per_sides + 1))
-      team_spawn_positions.append(side[idx])
-
-  return team_spawn_positions
