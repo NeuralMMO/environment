@@ -1,8 +1,8 @@
-# pylint: disable=R0401
+# pylint: disable=cyclic-import
 from nmmo.core import action
 from nmmo.systems.ai import utils
 
-# pylint: disable=E1136
+# pylint: disable=unsubscriptable-object
 def random_direction(np_random):
   return action.Direction.edges[np_random.integers(0,len(action.Direction.edges))]
 
