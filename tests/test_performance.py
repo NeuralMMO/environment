@@ -126,7 +126,7 @@ def set_seed_test_complex():
                           pred_kwargs={'event': 'EAT_FOOD', 'N': 10})
   tasks += make_same_task(FullyArmed, range(128),
                           pred_kwargs={'combat_style': Melee, 'level': 3, 'num_agent': 1})
-  profile_env_step(tasks=tasks) 
+  profile_env_step(tasks=tasks)
 
 if __name__ == '__main__':
   with open('profile.run','a', encoding="utf-8") as f:

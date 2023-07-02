@@ -194,7 +194,8 @@ class GroupView:
     return EventView(self._gs, self._subject, self._sbj_event)
 
   def __getattribute__(self, attr):
-    if attr in {'_gs','_subject','_sbj_ent','_sbj_item','entity','item','event','obs', '_subject_hash'}:
+    if attr in {'_gs','_subject','_sbj_ent','_sbj_item',
+    'entity','item','event','obs', '_subject_hash'}:
       return object.__getattribute__(self, attr)
 
     # Cached optimization
