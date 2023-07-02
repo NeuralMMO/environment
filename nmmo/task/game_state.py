@@ -19,6 +19,7 @@ from nmmo.systems.item import ItemState
 from nmmo.core.tile import TileState
 
 EntityAttr = EntityState.State.attr_name_to_col
+EntityAttrKeys = EntityAttr.keys()
 EventAttr = EventState.State.attr_name_to_col
 ItemAttr = ItemState.State.attr_name_to_col
 TileAttr = TileState.State.attr_name_to_col
@@ -86,7 +87,9 @@ class ArrayView(ABC):
     self._name = name
     self._gs = gs
     self._subject = subject
+    self._hash = hash(subject) ^ hash(name)
     self._arr = arr
+    self._cache = self._gs.cache_result
 
   def __len__(self):
     return len(self._arr)
@@ -96,11 +99,11 @@ class ArrayView(ABC):
     raise NotImplementedError
 
   def __getattr__(self, attr) -> np.ndarray:
-    k = (self._subject, self._name+'_'+attr)
-    if k in self._gs.cache_result:
-      return self._gs.cache_result[k]
+    k = (self._hash, attr)
+    if k in self._cache:
+      return self._cache[k]
     v = object.__getattribute__(self, 'get_attribute')(attr)
-    self._gs.cache_result[k] = v
+    self._cache[k] = v
     return v
 
 class ItemView(ArrayView):
@@ -163,6 +166,7 @@ class GroupView:
   def __init__(self, gs: GameState, subject: Group):
     self._gs = gs
     self._subject = subject
+    self._subject_hash = hash(subject)
     self.obs = GroupObsView(gs, subject)
 
   @functools.cached_property
@@ -190,21 +194,22 @@ class GroupView:
     return EventView(self._gs, self._subject, self._sbj_event)
 
   def __getattribute__(self, attr):
-    if attr in ['_gs','_subject','_sbj_ent','_sbj_item','entity','item','event','obs']:
+    if attr in {'_gs','_subject','_sbj_ent','_sbj_item','entity','item','event','obs', '_subject_hash'}:
       return object.__getattribute__(self, attr)
 
     # Cached optimization
-    k = (self._subject, attr)
-    if k in self._gs.cache_result:
-      return self._gs.cache_result[k]
+    k = (self._subject_hash, attr)
+    cache = self._gs.cache_result
+    if k in cache:
+      return cache[k]
 
     try:
       # Get property
-      if attr in EntityAttr.keys():
+      if attr in EntityAttrKeys:
         v = getattr(self.entity, attr)
       else:
         v = object.__getattribute__(self, attr)
-      self._gs.cache_result[k] = v
+      cache[k] = v
       return v
     except AttributeError:
       # View behavior
