@@ -58,7 +58,6 @@ class GameState:
       return self.cache_result[k]
 
     if data_type == 'entity':
-      # flt_idx = [self.entity_index[sbj] for sbj in subject if sbj in self.entity_index]
       flt_idx = [row for sbj in subject for row in self.entity_index.get(sbj,[])]
       self.cache_result[k] = self.entity_data[flt_idx]
     if data_type == 'item':
@@ -233,9 +232,9 @@ class GameStateGenerator:
       alive_agents = alive_agents,
       env_obs = env_obs,
       entity_data = entity_all,
-      entity_index = precompute_index(entity_all, ItemAttr['owner_id']),
+      entity_index = precompute_index(entity_all, EntityAttr["id"]),
       item_data = item_data,
-      item_index = precompute_index(item_data, EntityAttr["id"]),
+      item_index = precompute_index(item_data, ItemAttr["owner_id"]),
       event_data = event_data,
       event_index = precompute_index(event_data, EventAttr['ent_id']),
       cache_result = {}
