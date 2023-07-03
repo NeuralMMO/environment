@@ -2,25 +2,6 @@
 from nmmo.core import action
 from nmmo.systems.ai import utils
 
-# pylint: disable=unsubscriptable-object
-def random_direction(np_random):
-  return action.Direction.edges[np_random.integers(0,len(action.Direction.edges))]
-
-def random_safe(realm_map, ent, np_random):
-  r, c  = ent.pos
-  tiles = realm_map.tiles
-  cands = []
-  if not tiles[r-1, c].void:
-    cands.append(action.North)
-  if not tiles[r+1, c].void:
-    cands.append(action.South)
-  if not tiles[r, c-1].void:
-    cands.append(action.West)
-  if not tiles[r, c+1].void:
-    cands.append(action.East)
-
-  return np_random.choice(cands)
-
 def habitable(realm_map, ent, np_random):
   r, c  = ent.pos
   tiles = realm_map.habitable_tiles

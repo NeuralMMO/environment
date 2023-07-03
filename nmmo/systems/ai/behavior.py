@@ -5,7 +5,6 @@ import numpy as np
 import nmmo
 from nmmo.systems.ai import move, utils
 
-
 def update(entity):
   '''Update validity of tracked entities'''
   if not utils.validTarget(entity, entity.attacker, entity.vision):
@@ -51,12 +50,10 @@ def meander(realm, actions, entity):
   actions[nmmo.action.Move] = {
     nmmo.action.Direction: move.habitable(realm.map, entity, realm._np_random)}
 
-
 def evade(realm, actions, entity):
   actions[nmmo.action.Move] = {
     nmmo.action.Direction: move.antipathfind(realm.map, entity, entity.attacker,
                                                 realm._np_random)}
-
 
 def hunt(realm, actions, entity):
   # Move args
@@ -69,7 +66,7 @@ def hunt(realm, actions, entity):
                                                                       realm._np_random)}
   elif distance == 0:
     actions[nmmo.action.Move] = {
-        nmmo.action.Direction: move.random_direction(realm._np_random)}
+        nmmo.action.Direction: move.habitable(realm.map, entity, realm._np_random)}
 
   attack(realm, actions, entity)
 
