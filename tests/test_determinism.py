@@ -1,4 +1,5 @@
 import unittest
+from timeit import timeit
 import numpy as np
 from tqdm import tqdm
 
@@ -13,10 +14,20 @@ RANDOM_SEED = np.random.randint(0, 100000)
 
 
 class TestDeterminism(unittest.TestCase):
-  def test_gym_np_random(self):
-    _, _np_seed_1 = seeding.np_random(RANDOM_SEED)
-    _, _np_seed_2 = seeding.np_random(RANDOM_SEED)
-    self.assertEqual(_np_seed_1, _np_seed_2)
+  def test_np_random_get_direction(self):
+    # pylint: disable=protected-access,bad-builtin,unnecessary-lambda
+    np_random_1, np_seed_1 = seeding.np_random(RANDOM_SEED)
+    np_random_2, np_seed_2 = seeding.np_random(RANDOM_SEED)
+    self.assertEqual(np_seed_1, np_seed_2)
+
+    # also test get_direction, which was added for speed optimization
+    self.assertTrue(np.array_equal(np_random_1._dir_seq, np_random_2._dir_seq))
+
+    print('---test_np_random_get_direction---')
+    print('np_random.integers():', timeit(lambda: np_random_1.integers(0,4),
+                                          number=100000, globals=globals()))
+    print('np_random.get_direction():', timeit(lambda: np_random_1.get_direction(),
+                                                number=100000, globals=globals()))
 
   def test_map_determinism(self):
     config = nmmo.config.Default()

@@ -11,7 +11,7 @@ DIRECTIONS = [ # row delta, col delta, action
 def habitable(realm_map, ent, np_random):
   r, c = ent.pos
   is_habitable = realm_map.habitable_tiles
-  start = np_random.integers(4)
+  start = np_random.get_direction()
   for i in range(4):
     dr, dc, act = DIRECTIONS[start + i]
     if is_habitable[r + dr, c + dc]:
