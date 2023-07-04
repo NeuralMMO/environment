@@ -9,8 +9,8 @@ from gym import error
 
 
 class RandomNumberGenerator(np.random.Generator):
-  def __init__(self, *kwargs):
-    super().__init__(*kwargs)
+  def __init__(self, bit_generator):
+    super().__init__(bit_generator)
     self._dir_seq_len = 1024
     self._wrap = self._dir_seq_len - 1
     self._dir_seq = self.integers(0, 4, size=self._dir_seq_len).astype(np.uint8)
