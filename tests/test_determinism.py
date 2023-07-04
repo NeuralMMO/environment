@@ -26,7 +26,7 @@ class TestDeterminism(unittest.TestCase):
     print('---test_np_random_get_direction---')
     print('np_random.integers():', timeit(lambda: np_random_1.integers(0,4),
                                           number=100000, globals=globals()))
-    print('np_random.get_directions():', timeit(lambda: np_random_1.get_direction(),
+    print('np_random.get_direction():', timeit(lambda: np_random_1.get_direction(),
                                                 number=100000, globals=globals()))
 
   def test_map_determinism(self):
