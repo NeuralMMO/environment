@@ -50,6 +50,7 @@ class Env(ParallelEnv):
     # Default task: rewards 1 each turn agent is alive
     self.tasks = task_api.nmmo_default_task(self.possible_agents)
     self.agent_task_map = None
+    self._dummy_task_embedding = np.zeros(self.config.TASK_EMBED_DIM, dtype=np.float32)
 
   @functools.cached_property
   def _obs_space(self):
@@ -65,7 +66,9 @@ class Env(ParallelEnv):
       "CurrentTick": gym.spaces.Discrete(self.config.HORIZON+1),
       "AgentId": gym.spaces.Discrete(self.config.PLAYER_N+1),
       "Tile": box(self.config.MAP_N_OBS, Tile.State.num_attributes),
-      "Entity": box(self.config.PLAYER_N_OBS, Entity.State.num_attributes)}
+      "Entity": box(self.config.PLAYER_N_OBS, Entity.State.num_attributes),
+      "Task": gym.spaces.Box(low=-np.inf, high=-np.inf, shape=(self.config.TASK_EMBED_DIM,)),
+    }
 
     if self.config.ITEM_SYSTEM_ENABLED:
       obs_space["Inventory"] = box(self.config.INVENTORY_N_OBS, Item.State.num_attributes)
@@ -187,16 +190,16 @@ class Env(ParallelEnv):
         self.scripted_agents.add(eid)
         ent.agent.set_rng(self._np_random)
 
-    self._dummy_obs = self._make_dummy_obs()
-    self.obs = self._compute_observations()
-    self._gamestate_generator = GameStateGenerator(self.realm, self.config)
-
     if make_task_fn is not None:
       self.tasks = make_task_fn()
     else:
       for task in self.tasks:
         task.reset()
     self.agent_task_map = self._map_task_to_agent()
+
+    self._dummy_obs = self._make_dummy_obs()
+    self.obs = self._compute_observations()
+    self._gamestate_generator = GameStateGenerator(self.realm, self.config)
 
     self._reset_required = False
 
@@ -205,8 +208,16 @@ class Env(ParallelEnv):
   def _map_task_to_agent(self):
     agent_task_map: Dict[int, List[task_api.Task]] = {}
     for task in self.tasks:
+      if task.embedding is None:
+        task.set_embedding(self._dummy_task_embedding)
+      # validate task embedding
+      assert self._obs_space['Task'].contains(task.embedding), "Task embedding is not valid"
+
+      # map task to agents
       for agent_id in task.assignee:
         if agent_id in agent_task_map:
+          # NOTE: only the first task is used for traning
+          #   but all tasks are used for calculate the reward. Is this correct behavior?
           agent_task_map[agent_id].append(task)
         else:
           agent_task_map[agent_id] = [task]
@@ -404,7 +415,7 @@ class Env(ParallelEnv):
     dummy_entities = np.zeros((0, len(Entity.State.attr_name_to_col)), dtype=np.int16)
     dummy_inventory = np.zeros((0, len(Item.State.attr_name_to_col)), dtype=np.int16)
     dummy_market = np.zeros((0, len(Item.State.attr_name_to_col)), dtype=np.int16)
-    return Observation(self.config, self.realm.tick, 0,
+    return Observation(self.config, self.realm.tick, 0, self._dummy_task_embedding,
                        dummy_tiles, dummy_entities, dummy_inventory, dummy_market)
 
   def _compute_observations(self):
@@ -440,9 +451,13 @@ class Env(ParallelEnv):
 
         # NOTE: the tasks for each agent is in self.agent_task_map, and task embeddings are
         #   available in each task instance, via task.embedding
-        # CHECK ME: do we pass in self.agent_task_map[agent_id],
-        #   so that we can include task embedding in the obs?
-        obs[agent_id] = Observation(self.config, self.realm.tick, agent_id,
+        #   For now, only the first tasks' embedding is passed in
+        # TODO: can the embeddings of multiple tasks be superposed while preserving the
+        #   task-specific information? This needs research
+        task_embedding = self._dummy_task_embedding
+        if agent_id in self.agent_task_map:
+          task_embedding = self.agent_task_map[agent_id][0].embedding # NOTE: first task only
+        obs[agent_id] = Observation(self.config, self.realm.tick, agent_id, task_embedding,
                                     visible_tiles, visible_entities, inventory, market)
     return obs
 

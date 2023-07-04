@@ -277,7 +277,7 @@ class TestTaskAPI(unittest.TestCase):
         self.assertEqual(infos[1]['task'][env.tasks[0].name]['completed'], True)
 
     # test the task_spec_with_embedding
-    task_embedding = np.array([1,2,3])
+    task_embedding = np.ones(config.TASK_EMBED_DIM, dtype=np.float32)
     task_spec_with_embedding = ('team', PracticeFormation, {'dist': 1, 'num_tick': goal_tick},
                                 {'embedding': task_embedding})
     env.reset(make_task_fn=lambda: make_team_tasks(teams, [task_spec_with_embedding]))
@@ -295,6 +295,9 @@ class TestTaskAPI(unittest.TestCase):
     self.assertEqual(task.kwargs, task_spec[2])
     self.assertEqual(task.assignee, tuple(teams[0]))
     self.assertTrue(np.array_equal(task.embedding, task_embedding))
+
+    obs_spec = env.observation_space(1)
+    self.assertTrue(obs_spec['Task'].contains(task.embedding))
 
   def test_completed_tasks_in_info(self):
     # pylint: disable=no-value-for-parameter,no-member

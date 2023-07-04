@@ -144,13 +144,17 @@ class Config(Template):
   def game_system_enabled(self, name) -> bool:
     return hasattr(self, name)
 
-
   PROVIDE_ACTION_TARGETS       = True
   '''Flag used to provide action targets mask'''
 
   PLAYERS                      = [Agent]
   '''Player classes from which to spawn'''
 
+  HORIZON = 1024
+  '''Number of steps before the environment resets'''
+
+  TASK_EMBED_DIM = 1024
+  '''Dimensionality of task embeddings'''
 
   ############################################################################
   ### Population Parameters
@@ -197,11 +201,6 @@ class Config(Template):
 
   PLAYER_DEATH_FOG             = None
   '''How long before spawning death fog. None for no death fog'''
-
-  ############################################################################
-  ### Map Parameters
-  HORIZON = 1024
-  '''Number of steps before the environment resets'''
 
 
   ############################################################################

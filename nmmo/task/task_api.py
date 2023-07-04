@@ -51,6 +51,9 @@ class Task(ABC):
   def embedding(self):
     return self._embedding
 
+  def set_embedding(self, embedding):
+    self._embedding = embedding
+
   def _map_progress_to_reward(self, gs) -> float:
     """ The default reward is the diff between the old and new progress.
         Once the task is completed, no more reward is provided.
