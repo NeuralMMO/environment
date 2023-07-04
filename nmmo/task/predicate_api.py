@@ -53,12 +53,12 @@ class Predicate(ABC):
     for group in self._groups:
       group.update(gs)
     # Calculate score
-    # cache = gs.cache_result
-    if self.name in gs.cache_result:
-      progress = gs.cache_result[self.name]
+    cache = gs.cache_result
+    if self.name in cache:
+      progress = cache[self.name]
     else:
       progress = max(min(self._evaluate(gs)*1.0,1.0),0.0)
-      gs.cache_result[self.name] = progress
+      cache[self.name] = progress
     return progress
 
   def _reset(self, config: Config):

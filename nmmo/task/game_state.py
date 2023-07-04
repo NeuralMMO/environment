@@ -2,17 +2,16 @@ from __future__ import annotations
 from typing import Dict, Iterable, Tuple, MutableMapping, Set
 from dataclasses import dataclass
 from copy import deepcopy
-from abc import ABC, abstractmethod
 from collections import defaultdict
-import functools
 
+from abc import ABC, abstractmethod
+import functools
 import numpy as np
 
 from nmmo.core.config import Config
 from nmmo.core.realm import Realm
 from nmmo.core.observation import Observation
 from nmmo.task.group import Group
-
 from nmmo.entity.entity import EntityState
 from nmmo.lib.event_log import EventState, ATTACK_COL_MAP, ITEM_COL_MAP, LEVEL_COL_MAP
 from nmmo.lib.log import EventCode
@@ -20,6 +19,7 @@ from nmmo.systems.item import ItemState
 from nmmo.core.tile import TileState
 
 EntityAttr = EntityState.State.attr_name_to_col
+EntityAttrKeys = EntityAttr.keys()
 EventAttr = EventState.State.attr_name_to_col
 ItemAttr = ItemState.State.attr_name_to_col
 TileAttr = TileState.State.attr_name_to_col
@@ -87,7 +87,9 @@ class ArrayView(ABC):
     self._name = name
     self._gs = gs
     self._subject = subject
+    self._hash = hash(subject) ^ hash(name)
     self._arr = arr
+    self._cache = self._gs.cache_result
 
   def __len__(self):
     return len(self._arr)
@@ -97,11 +99,11 @@ class ArrayView(ABC):
     raise NotImplementedError
 
   def __getattr__(self, attr) -> np.ndarray:
-    k = (self._subject, self._name+'_'+attr)
-    if k in self._gs.cache_result:
-      return self._gs.cache_result[k]
+    k = (self._hash, attr)
+    if k in self._cache:
+      return self._cache[k]
     v = object.__getattribute__(self, 'get_attribute')(attr)
-    self._gs.cache_result[k] = v
+    self._cache[k] = v
     return v
 
 class ItemView(ArrayView):
@@ -164,6 +166,7 @@ class GroupView:
   def __init__(self, gs: GameState, subject: Group):
     self._gs = gs
     self._subject = subject
+    self._subject_hash = hash(subject)
     self.obs = GroupObsView(gs, subject)
 
   @functools.cached_property
@@ -191,21 +194,23 @@ class GroupView:
     return EventView(self._gs, self._subject, self._sbj_event)
 
   def __getattribute__(self, attr):
-    if attr in ['_gs','_subject','_sbj_ent','_sbj_item','entity','item','event','obs']:
+    if attr in {'_gs','_subject','_sbj_ent','_sbj_item',
+    'entity','item','event','obs', '_subject_hash'}:
       return object.__getattribute__(self, attr)
 
     # Cached optimization
-    k = (self._subject, attr)
-    if k in self._gs.cache_result:
-      return self._gs.cache_result[k]
+    k = (self._subject_hash, attr)
+    cache = self._gs.cache_result
+    if k in cache:
+      return cache[k]
 
     try:
       # Get property
-      if attr in EntityAttr.keys():
+      if attr in EntityAttrKeys:
         v = getattr(self.entity, attr)
       else:
         v = object.__getattribute__(self, attr)
-      self._gs.cache_result[k] = v
+      cache[k] = v
       return v
     except AttributeError:
       # View behavior
@@ -226,7 +231,6 @@ class GameStateGenerator:
     alive_agents = set(alive_agents[alive_agents > 0])
     item_data = ItemState.Query.table(realm.datastore).copy()
     event_data = EventState.Query.table(realm.datastore).copy()
-
     return GameState(
       current_tick = realm.tick,
       config = self.config,
@@ -234,20 +238,19 @@ class GameStateGenerator:
       alive_agents = alive_agents,
       env_obs = env_obs,
       entity_data = entity_all,
-      entity_index = self._precompute_index(entity_all, EntityAttr["id"]),
+      entity_index = precompute_index(entity_all, EntityAttr["id"]),
       item_data = item_data,
-      item_index = self._precompute_index(item_data, ItemAttr['owner_id']),
+      item_index = precompute_index(item_data, ItemAttr["owner_id"]),
       event_data = event_data,
-      event_index = self._precompute_index(event_data, EventAttr['ent_id']),
+      event_index = precompute_index(event_data, EventAttr['ent_id']),
       cache_result = {}
     )
 
-  @staticmethod
-  def _precompute_index(table, id_col):
-    index = defaultdict()
-    for row, id_ in enumerate(table[:,id_col]):
-      if id_ in index:
-        index[id_].append(row)
-      else:
-        index[id_] = [row]
-    return index
+def precompute_index(table, id_col):
+  index = defaultdict()
+  for row, id_ in enumerate(table[:,id_col]):
+    if id_ in index:
+      index[id_].append(row)
+    else:
+      index[id_] = [row]
+  return index

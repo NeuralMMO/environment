@@ -17,9 +17,11 @@ class Map:
     self._repr  = None
     self.realm  = realm
     self.update_list = None
+    self.pathfinding_cache = {} # Avoid recalculating A*, paths don't move
 
     sz          = config.MAP_SIZE
     self.tiles  = np.zeros((sz, sz), dtype=object)
+    self.habitable_tiles = np.zeros((sz,sz))
 
     for r in range(sz):
       for c in range(sz):
@@ -62,6 +64,7 @@ class Map:
         mat  = materials[idx]
         tile = self.tiles[r, c]
         tile.reset(mat, config, np_random)
+        self.habitable_tiles[r, c] = tile.habitable
 
     assert c == config.MAP_SIZE - 1
     assert r == config.MAP_SIZE - 1

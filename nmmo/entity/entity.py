@@ -314,7 +314,7 @@ class Entity(EntityState):
 
   @property
   def pos(self):
-    return int(self.row.val), int(self.col.val)
+    return self.row.val, self.col.val
 
   @property
   def alive(self):

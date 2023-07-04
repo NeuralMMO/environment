@@ -1,8 +1,16 @@
+# import time
+import cProfile
+import io
+import pstats
 
 import nmmo
 from nmmo.core.config import (NPC, AllGameSystems, Combat, Communication,
                               Equipment, Exchange, Item, Medium, Profession,
                               Progression, Resource, Small, Terrain)
+from nmmo.task.task_api import nmmo_default_task, make_same_task
+from nmmo.task.base_predicates import CountEvent, FullyArmed
+from nmmo.systems.skill import Melee
+from tests.testhelpers import profile_env_step
 from scripted import baselines
 
 
@@ -100,6 +108,36 @@ def test_fps_no_npc_med_100_pop(benchmark):
 def test_fps_all_med_100_pop(benchmark):
   benchmark_config(benchmark, Medium, 100, AllGameSystems)
 
+def set_seed_test():
+  random_seed = 5000
+  conf = create_config(Medium, Terrain, Resource, Combat, NPC)
+  conf.PLAYER_N = 10
+  conf.PLAYERS = [baselines.Random]
+
+  env = nmmo.Env(conf)
+
+  env.reset(seed=random_seed)
+  for _ in range(1024):
+    env.step({})
+
+def set_seed_test_complex():
+  tasks = nmmo_default_task(range(128))
+  tasks += make_same_task(CountEvent, range(128),
+                          pred_kwargs={'event': 'EAT_FOOD', 'N': 10})
+  tasks += make_same_task(FullyArmed, range(128),
+                          pred_kwargs={'combat_style': Melee, 'level': 3, 'num_agent': 1})
+  profile_env_step(tasks=tasks)
+
+if __name__ == '__main__':
+  with open('profile.run','a', encoding="utf-8") as f:
+    pr = cProfile.Profile()
+    pr.enable()
+    set_seed_test_complex()
+    pr.disable()
+    s = io.StringIO()
+    ps = pstats.Stats(pr,stream=s).sort_stats('tottime')
+    ps.print_stats()
+    f.write(s.getvalue())
 
 '''
 def benchmark_env(benchmark, env, nent):
