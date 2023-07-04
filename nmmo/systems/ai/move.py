@@ -2,46 +2,20 @@
 from nmmo.core import action
 from nmmo.systems.ai import utils
 
+DIRECTIONS = [ # row delta, col delta, action
+      (-1, 0, action.North),
+      (1, 0, action.South),
+      (0, -1, action.West),
+      (0, 1, action.East)] * 2
+
 def habitable(realm_map, ent, np_random):
-  r, c  = ent.pos
-  tiles = realm_map.habitable_tiles
-  direction = np_random.integers(0,4)
-  if direction == 0:
-    if tiles[r-1, c]:
-      return action.North
-    if tiles[r+1, c]:
-      return action.South
-    if tiles[r, c-1]:
-      return action.West
-    if tiles[r, c+1]:
-      return action.East
-  elif direction == 1:
-    if tiles[r+1, c]:
-      return action.South
-    if tiles[r, c-1]:
-      return action.West
-    if tiles[r, c+1]:
-      return action.East
-    if tiles[r-1, c]:
-      return action.North
-  elif direction == 2:
-    if tiles[r, c-1]:
-      return action.West
-    if tiles[r, c+1]:
-      return action.East
-    if tiles[r-1, c]:
-      return action.North
-    if tiles[r+1, c]:
-      return action.South
-  else:
-    if tiles[r, c+1]:
-      return action.East
-    if tiles[r-1, c]:
-      return action.North
-    if tiles[r+1, c]:
-      return action.South
-    if tiles[r, c-1]:
-      return action.West
+  r, c = ent.pos
+  is_habitable = realm_map.habitable_tiles
+  start = np_random.integers(4)
+  for i in range(4):
+    dr, dc, act = DIRECTIONS[start + i]
+    if is_habitable[r + dr, c + dc]:
+      return act
 
   return action.North
 
