@@ -106,7 +106,13 @@ class NPC(entity.Entity):
     ent.spawn_danger = danger
 
     # Select combat focus
-    style = np_random.choice((Action.Melee, Action.Range, Action.Mage))
+    style = np_random.integers(0,3)
+    if style == 0:
+      style = Action.Melee
+    elif style == 1:
+      style = Action.Range
+    else:
+      style = Action.Mage
     ent.skills.style = style
 
     # Compute level

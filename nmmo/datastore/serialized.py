@@ -38,8 +38,10 @@ class SerializedAttribute():
     return self._val
 
   def update(self, value):
-    value = min(self._max, max(self._min, value))
-
+    if value > self._max:
+      value = self._max
+    elif value < self._min:
+      value = self._min
     self.datastore_record.update(self._column, value)
     self._val = value
 
