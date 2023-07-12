@@ -302,6 +302,7 @@ class TestTaskAPI(unittest.TestCase):
   def test_completed_tasks_in_info(self):
     # pylint: disable=no-value-for-parameter,no-member
     config = ScriptedAgentTestConfig()
+    config.ALLOW_MULTI_TASKS_PER_AGENT = True
     env = Env(config)
 
     # make predicate class from function

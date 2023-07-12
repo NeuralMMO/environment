@@ -216,11 +216,15 @@ class Env(ParallelEnv):
       # map task to agents
       for agent_id in task.assignee:
         if agent_id in agent_task_map:
-          # NOTE: only the first task is used for traning
-          #   but all tasks are used for calculate the reward. Is this correct behavior?
           agent_task_map[agent_id].append(task)
         else:
           agent_task_map[agent_id] = [task]
+
+    # for now we only support one task per agent
+    if self.config.ALLOW_MULTI_TASKS_PER_AGENT is False:
+      for agent_tasks in agent_task_map.values():
+        assert len(agent_tasks) == 1, "Only one task per agent is supported"
+
     return agent_task_map
 
   def step(self, actions: Dict[int, Dict[str, Dict[str, Any]]]):
@@ -451,7 +455,7 @@ class Env(ParallelEnv):
 
         # NOTE: the tasks for each agent is in self.agent_task_map, and task embeddings are
         #   available in each task instance, via task.embedding
-        #   For now, only the first tasks' embedding is passed in
+        #   For now, each agent is assigned to a single task, so we just use the first task
         # TODO: can the embeddings of multiple tasks be superposed while preserving the
         #   task-specific information? This needs research
         task_embedding = self._dummy_task_embedding
