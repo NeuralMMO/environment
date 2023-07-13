@@ -153,6 +153,9 @@ class Config(Template):
   HORIZON = 1024
   '''Number of steps before the environment resets'''
 
+  CURRICULUM_FILE_PATH = None
+  '''Path to a curriculum task file containing a list of task specs for training'''
+
   TASK_EMBED_DIM = 1024
   '''Dimensionality of task embeddings'''
 

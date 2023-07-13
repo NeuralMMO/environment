@@ -2,6 +2,7 @@ import functools
 from typing import Any, Dict, List, Callable
 from collections import defaultdict
 from copy import copy
+import dill
 
 import gym
 import numpy as np
@@ -51,6 +52,14 @@ class Env(ParallelEnv):
     self.tasks = task_api.nmmo_default_task(self.possible_agents)
     self.agent_task_map = None
     self._dummy_task_embedding = np.zeros(self.config.TASK_EMBED_DIM, dtype=np.float32)
+
+    # curriculum file path, if provided, should exist
+    self.curriculum_file_path = config.CURRICULUM_FILE_PATH
+    if self.curriculum_file_path is not None:
+      # try to open the file to check if it exists
+      with open(self.curriculum_file_path, 'rb') as f:
+        task_spec = dill.load(f) # pylint: disable=unused-variable
+      f.close()
 
   @functools.cached_property
   def _obs_space(self):
@@ -155,7 +164,8 @@ class Env(ParallelEnv):
   # TODO: This doesn't conform to the PettingZoo API
   # pylint: disable=arguments-renamed
   def reset(self, map_id=None, seed=None, options=None,
-            make_task_fn: Callable=None):
+            make_task_fn: Callable=None,
+            sample_training_tasks=False):
     '''OpenAI Gym API reset function
 
     Loads a new game map and returns initial observations
@@ -190,7 +200,9 @@ class Env(ParallelEnv):
         self.scripted_agents.add(eid)
         ent.agent.set_rng(self._np_random)
 
-    if make_task_fn is not None:
+    if self.curriculum_file_path is not None and sample_training_tasks is True:
+      self.tasks = self._sample_training_tasks()
+    elif make_task_fn is not None:
       self.tasks = make_task_fn()
     else:
       for task in self.tasks:
@@ -204,6 +216,23 @@ class Env(ParallelEnv):
     self._reset_required = False
 
     return {a: o.to_gym() for a,o in self.obs.items()}
+
+  def _sample_training_tasks(self):
+    with open(self.curriculum_file_path, 'rb') as f:
+      # curriculum file may have been changed, so read the file when sampling
+      task_spec = dill.load(f)
+    f.close()
+
+    sampling_weights = []
+    for single_spec in task_spec:
+      weight = 1 # default
+      if len(single_spec) == 4 and 'sampling_weight' in single_spec[3]:
+        weight = single_spec[3]['sampling_weight']
+      sampling_weights.append(weight)
+    sampled_spec = self._np_random.choice(task_spec, size=len(self.possible_agents),
+                                          p=sampling_weights/np.sum(sampling_weights))
+
+    return task_api.make_team_tasks(self.possible_agents, sampled_spec)
 
   def _map_task_to_agent(self):
     agent_task_map: Dict[int, List[task_api.Task]] = {}

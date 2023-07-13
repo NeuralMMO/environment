@@ -47,6 +47,7 @@ setup(
     'psutil==5.9.3',
     'py==1.11.0',
     'tqdm<5',
+    'dill==0.3.6',
   ],
   extras_require=extra,
   python_requires=">=3.7",

@@ -182,13 +182,19 @@ VALID_TARGET = ['left_team', 'left_team_leader',
                 'right_team', 'right_team_leader',
                 'my_team_leader']
 
-def make_team_tasks(teams, task_spec) -> List[Task]:
+def make_team_tasks(teams: Union[Iterable[int], Dict],
+                    task_spec) -> List[Task]:
   """
-    task_spec: a list of tuples (reward_to, eval_fn, **kwargs)
+  Args:
+    teams: a Dict with { team_id: [agent_id]} or a List of agent ids
+    task_spec: a list of tuples (reward_to, eval_fn, pred_fn_kwargs, task_kwargs)
     
     each tuple is assigned to the teams
   """
   tasks = []
+  if not isinstance(teams, Dict):
+    # convert agent id list to the team dict format
+    teams = {idx: [agent_id] for idx, agent_id in enumerate(teams)}
   team_list = list(teams.keys())
   team_helper = TeamHelper(teams)
   for idx in range(min(len(team_list), len(task_spec))):
@@ -209,6 +215,9 @@ def make_team_tasks(teams, task_spec) -> List[Task]:
       task_cls = task_kwargs.pop('task_cls')
     else:
       task_cls = Task
+
+    if 'sampling_weight' in task_kwargs: # necessary for sampling, not needed here
+      task_kwargs.pop('sampling_weight')
 
     # reserve 'target' for relative agent mapping
     if 'target' in pred_fn_kwargs:
