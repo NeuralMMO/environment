@@ -71,6 +71,10 @@ def linf(pos1, pos2):
   diff = np.abs(np.array(pos1) - np.array(pos2))
   return np.max(diff, axis=-1)
 
+def linf_single(pos1, pos2):
+  # pos is a single (r,c) to avoid uneccessary function calls
+  return max(abs(pos1[0]-pos2[0]), abs(pos1[1]-pos2[1]))
+
 #Bounds checker
 def in_bounds(r, c, shape, border=0):
   R, C = shape

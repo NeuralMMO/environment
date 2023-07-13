@@ -25,6 +25,8 @@ class Group(Sequence, Set):
     self._sd: GroupView = None
     self._gs: GameState = None
 
+    self._hash = hash(self._agents)
+
   @property
   def agents(self):
     return self._agents
@@ -42,7 +44,7 @@ class Group(Sequence, Set):
     return len(self._agents)
 
   def __hash__(self):
-    return hash(self._agents)
+    return self._hash
 
   def __getitem__(self, key):
     if len(self) == 1 and key == 0:
