@@ -9,7 +9,7 @@ from nmmo.task.task_api import OngoingTask, make_team_tasks
 from nmmo.task import constraint as c
 
 
-EVENT_NUMBER_GOAL = [1, 2, 3, 4, 5, 7, 9, 12, 15, 20, 30, 50]
+EVENT_NUMBER_GOAL = [3, 4, 5, 7, 9, 12, 15, 20, 30, 50]
 INFREQUENT_GOAL = list(range(1, 10))
 STAY_ALIVE_GOAL = [50, 100, 150, 200, 300, 500]
 TEAM_NUMBER_GOAL = [10, 20, 30, 50, 70, 100]
@@ -39,6 +39,7 @@ HARVEST_ITEM = c.weapons + c.ammunition + c.consumables
 
     task_kwargs are the optional, additional args that go into the task.
       * 'task_cls' specifies the task class to be used. If not provided, the standard Task is used.
+      * `sampling_weight` specifies the weight of the task in the curriculum sampling. Default is 1
       """
 task_spec = []
 
@@ -47,8 +48,9 @@ task_spec = []
 essential_skills = ['GO_FARTHEST', 'EAT_FOOD', 'DRINK_WATER',
                     'SCORE_HIT', 'HARVEST_ITEM', 'LEVEL_UP']
 for event_code in essential_skills:
-  task_spec += [('agent', CountEvent, {'event': event_code, 'N': cnt})
-                for cnt in EVENT_NUMBER_GOAL]
+  for cnt in EVENT_NUMBER_GOAL:
+    task_spec += [('agent', CountEvent, {'event': event_code, 'N': cnt},
+                   {'sampling_weight': 30})]
 
 # item/market skills, which happen less frequently or should not do too much
 item_skills = ['CONSUME_ITEM', 'GIVE_ITEM', 'DESTROY_ITEM', 'EQUIP_ITEM',
@@ -60,7 +62,8 @@ for event_code in item_skills:
 # find resource tiles
 for resource in m.Harvestable:
   for reward_to in ['agent', 'team']:
-    task_spec.append((reward_to, CanSeeTile, {'tile_type': resource}))
+    task_spec.append((reward_to, CanSeeTile, {'tile_type': resource},
+                      {'sampling_weight': 10})) # sample this more
 
 # stay alive ... like ... for 300 ticks
 # i.e., getting incremental reward for each tick alive as an individual or a team
@@ -106,13 +109,14 @@ for dist in [30, 50, 70, 100, 150, 200, 300, 500]: # summed over all team member
 
 # level up a skill
 for skill in SKILLS:
-  for level in LEVEL_GOAL:
+  for level in LEVEL_GOAL[1:]:
     # since this is an agent task, num_agent must be 1
-    task_spec.append(('agent', AttainSkill, {'skill': skill, 'level': level, 'num_agent': 1}))
+    task_spec.append(('agent', AttainSkill, {'skill': skill, 'level': level, 'num_agent': 1},
+                      {'sampling_weight': 10*(5-level) if level < 5 else 1}))
 
 # make attain skill a team task by varying the number of agents
 for skill in SKILLS:
-  for level in LEVEL_GOAL:
+  for level in LEVEL_GOAL[1:]:
     for num_agent in AGENT_NUM_GOAL:
       if level + num_agent <= 6 or num_agent == 1: # heuristic prune
         task_spec.append(('team', AttainSkill,
@@ -121,7 +125,8 @@ for skill in SKILLS:
 # practice specific combat style
 for style in COMBAT_STYLE:
   for cnt in EVENT_NUMBER_GOAL:
-    task_spec.append(('agent', ScoreHit, {'combat_style': style, 'N': cnt}))
+    task_spec.append(('agent', ScoreHit, {'combat_style': style, 'N': cnt},
+                                         {'sampling_weight': 5}))
   for cnt in TEAM_NUMBER_GOAL:
     task_spec.append(('team', ScoreHit, {'combat_style': style, 'N': cnt}))
 
@@ -135,26 +140,30 @@ for agent_type in ['player', 'npc']: # c.AGENT_TYPE_CONSTRAINT
 
 # hoarding gold -- evaluated on the current gold
 for amount in EVENT_NUMBER_GOAL:
-  task_spec.append(('agent', HoardGold, {'amount': amount}))
+  task_spec.append(('agent', HoardGold, {'amount': amount},
+                    {'sampling_weight': 3}))
 for amount in TEAM_NUMBER_GOAL:
   task_spec.append(('team', HoardGold, {'amount': amount}))
 
 # earning gold -- evaluated on the total gold earned by selling items
 # does NOT include looted gold
 for amount in EVENT_NUMBER_GOAL:
-  task_spec.append(('agent', EarnGold, {'amount': amount}))
+  task_spec.append(('agent', EarnGold, {'amount': amount},
+                    {'sampling_weight': 3}))
 for amount in TEAM_NUMBER_GOAL:
   task_spec.append(('team', EarnGold, {'amount': amount}))
 
 # spending gold, by buying items
 for amount in EVENT_NUMBER_GOAL:
-  task_spec.append(('agent', SpendGold, {'amount': amount}))
+  task_spec.append(('agent', SpendGold, {'amount': amount},
+                    {'sampling_weight': 3}))
 for amount in TEAM_NUMBER_GOAL:
   task_spec.append(('team', SpendGold, {'amount': amount}))
 
 # making profits by trading -- only buying and selling are counted
 for amount in EVENT_NUMBER_GOAL:
-  task_spec.append(('agent', MakeProfit, {'amount': amount}))
+  task_spec.append(('agent', MakeProfit, {'amount': amount},
+                    {'sampling_weight': 3}))
 for amount in TEAM_NUMBER_GOAL:
   task_spec.append(('team', MakeProfit, {'amount': amount}))
 
@@ -172,7 +181,8 @@ for item in ALL_ITEM:
     for quantity in ITEM_NUM_GOAL:
       if level + quantity <= 6 or quantity == 1: # heuristic prune
         task_spec.append(('agent', OwnItem,
-                          {'item': item, 'level': level, 'quantity': quantity}))
+                          {'item': item, 'level': level, 'quantity': quantity},
+                          {'sampling_weight': 4-level if level < 4 else 1}))
 
     # team task
     for quantity in TEAM_ITEM_GOAL:
@@ -185,7 +195,8 @@ for item in EQUIP_ITEM:
   for level in LEVEL_GOAL:
     # agent task
     task_spec.append(('agent', EquipItem,
-                      {'item': item, 'level': level, 'num_agent': 1}))
+                      {'item': item, 'level': level, 'num_agent': 1},
+                      {'sampling_weight': 4-level if level < 4 else 1}))
 
     # team task
     for num_agent in AGENT_NUM_GOAL:
@@ -200,7 +211,8 @@ for item in c.consumables:
     for quantity in ITEM_NUM_GOAL:
       if level + quantity <= 6 or quantity == 1: # heuristic prune
         task_spec.append(('agent', ConsumeItem,
-                          {'item': item, 'level': level, 'quantity': quantity}))
+                          {'item': item, 'level': level, 'quantity': quantity},
+                          {'sampling_weight': 4-level if level < 4 else 1}))
 
     # team task
     for quantity in TEAM_ITEM_GOAL:
@@ -215,7 +227,8 @@ for item in HARVEST_ITEM:
     for quantity in ITEM_NUM_GOAL:
       if level + quantity <= 6 or quantity == 1: # heuristic prune
         task_spec.append(('agent', HarvestItem,
-                          {'item': item, 'level': level, 'quantity': quantity}))
+                          {'item': item, 'level': level, 'quantity': quantity},
+                          {'sampling_weight': 4-level if level < 4 else 1}))
 
     # team task
     for quantity in TEAM_ITEM_GOAL:
@@ -230,7 +243,8 @@ for item in ALL_ITEM:
     for quantity in ITEM_NUM_GOAL:
       if level + quantity <= 6 or quantity == 1: # heuristic prune
         task_spec.append(('agent', ListItem,
-                          {'item': item, 'level': level, 'quantity': quantity}))
+                          {'item': item, 'level': level, 'quantity': quantity},
+                          {'sampling_weight': 4-level if level < 4 else 1}))
 
     # team task
     for quantity in TEAM_ITEM_GOAL:
@@ -245,7 +259,8 @@ for item in ALL_ITEM:
     for quantity in ITEM_NUM_GOAL:
       if level + quantity <= 6 or quantity == 1: # heuristic prune
         task_spec.append(('agent', BuyItem,
-                          {'item': item, 'level': level, 'quantity': quantity}))
+                          {'item': item, 'level': level, 'quantity': quantity},
+                          {'sampling_weight': 4-level if level < 4 else 1}))
 
     # team task
     for quantity in TEAM_ITEM_GOAL:
@@ -268,7 +283,7 @@ if __name__ == '__main__':
   from contextlib import contextmanager
   import multiprocessing as mp
   import numpy as np
-  import pickle
+  import dill
 
   @contextmanager
   def create_pool(num_proc):
@@ -294,7 +309,7 @@ if __name__ == '__main__':
       if idx > 0 and idx % 50 == 0:
         print(idx, 'task specs checked.')
 
-  # 3590 task specs: divide the specs into chunks
+  # 3495 task specs: divide the specs into chunks
   num_cores = psutil.cpu_count(logical=False)
   spec_chunks = np.array_split(task_spec, num_cores)
   with create_pool(num_cores) as pool:
@@ -304,6 +319,9 @@ if __name__ == '__main__':
   # if len(sample_task) > 1:
   #   print(sample_task[-1].name)
 
+  # for now, we only use the 1535 tasks with reward_to=agent
+  flt_spec = [spec for spec in task_spec if spec[0] == 'agent']
+
   # test if the task spec is pickalable
-  with open('manual_curriculum.pkl', 'wb') as f:
-    pickle.dump(task_spec, f)
+  with open('sample_curriculum.pkl', 'wb') as f:
+    dill.dump(flt_spec, f)
