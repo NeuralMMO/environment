@@ -81,7 +81,6 @@ class FileReplayHelper(ReplayHelper):
     replay_file = f'{filename_prefix}.replay.json'
     metadata_file = f'{filename_prefix}.metadata.pkl'
 
-    logging.info('Saving replay to %s ...', replay_file)
 
     data = json.dumps({
       'map': self.map,
@@ -91,6 +90,8 @@ class FileReplayHelper(ReplayHelper):
     if compress:
       replay_file = f'{filename_prefix}.replay.lzma'
       data = lzma.compress(data, format=lzma.FORMAT_ALONE)
+
+    logging.info('Saving replay to %s ...', replay_file)
 
     with open(replay_file, 'wb') as out:
       out.write(data)
