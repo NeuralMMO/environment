@@ -7,7 +7,6 @@ import inspect
 from nmmo.task.group import Group
 from nmmo.task.predicate_api import Predicate, make_predicate, arg_to_string
 from nmmo.task import base_predicates as bp
-from nmmo.lib.team_helper import TeamHelper
 
 class Task(ABC):
   """ A task is used to calculate rewards for agents in assignee
@@ -173,92 +172,3 @@ def nmmo_default_task(agent_list: Iterable[int], test_mode=None) -> List[Task]:
 
   # the default is to use the predicate class
   return make_same_task(bp.StayAlive, agent_list, task_cls=OngoingTask)
-
-######################################################################
-# TODO: a lot to improve below
-
-REWARD_TO = ['agent', 'team']
-VALID_TARGET = ['left_team', 'left_team_leader',
-                'right_team', 'right_team_leader',
-                'my_team_leader']
-
-def make_team_tasks(teams: Union[Iterable[int], Dict],
-                    task_spec) -> List[Task]:
-  """
-  Args:
-    teams: a Dict with { team_id: [agent_id]} or a List of agent ids
-    task_spec: a list of tuples (reward_to, eval_fn, pred_fn_kwargs, task_kwargs)
-    
-    each tuple is assigned to the teams
-  """
-  tasks = []
-  if not isinstance(teams, Dict):
-    # convert agent id list to the team dict format
-    teams = {idx: [agent_id] for idx, agent_id in enumerate(teams)}
-  team_list = list(teams.keys())
-  team_helper = TeamHelper(teams)
-  for idx in range(min(len(team_list), len(task_spec))):
-    team_id = team_list[idx]
-
-    # see if task_spec has the task embedding
-    if len(task_spec[idx]) == 3:
-      reward_to, pred_fn, pred_fn_kwargs = task_spec[team_id]
-      task_kwargs = {}
-    elif len(task_spec[idx]) == 4:
-      reward_to, pred_fn, pred_fn_kwargs, task_kwargs = task_spec[team_id]
-    else:
-      raise ValueError('Wrong task spec format')
-
-    assert reward_to in REWARD_TO, 'Wrong reward target'
-
-    if 'task_cls' in task_kwargs:
-      task_cls = task_kwargs.pop('task_cls')
-    else:
-      task_cls = Task
-
-    if 'sampling_weight' in task_kwargs: # necessary for sampling, not needed here
-      task_kwargs.pop('sampling_weight')
-
-    # reserve 'target' for relative agent mapping
-    if 'target' in pred_fn_kwargs:
-      target = pred_fn_kwargs.pop('target')
-      assert target in VALID_TARGET, 'Invalid target'
-      # translate target to specific agent ids using team_helper
-      target = team_helper.get_target_agent(team_id, target)
-      pred_fn_kwargs['target'] = target
-
-    # handle some special cases and instantiate the predicate first
-    predicate = None
-    if isinstance(pred_fn, FunctionType):
-      # if a function is provided as a predicate
-      pred_cls = make_predicate(pred_fn)
-
-    # TODO: should create a test for these
-    if (pred_fn in [bp.AllDead]) or \
-       (pred_fn in [bp.StayAlive] and 'target' in pred_fn_kwargs):
-      # use the target as the predicate subject
-      pred_fn_kwargs.pop('target') # remove target
-      predicate = pred_cls(Group(target), **pred_fn_kwargs)
-
-    # create the task
-    if reward_to == 'team':
-      assignee = team_helper.teams[team_id]
-      if predicate is None:
-        predicate = pred_cls(Group(assignee), **pred_fn_kwargs)
-        tasks.append(predicate.create_task(task_cls=task_cls, **task_kwargs))
-      else:
-        # this branch is for the cases like AllDead, StayAlive
-        tasks.append(predicate.create_task(assignee=assignee, task_cls=task_cls,
-                                           **task_kwargs))
-
-    elif reward_to == 'agent':
-      agent_list = team_helper.teams[team_id]
-      if predicate is None:
-        tasks += make_same_task(pred_cls, agent_list, pred_kwargs=pred_fn_kwargs,
-                                task_cls=task_cls, task_kwargs=task_kwargs)
-      else:
-        # this branch is for the cases like AllDead, StayAlive
-        tasks += [predicate.create_task(assignee=agent_id, task_cls=task_cls, **task_kwargs)
-                  for agent_id in agent_list]
-
-  return tasks

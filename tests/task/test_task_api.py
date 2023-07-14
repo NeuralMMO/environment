@@ -6,7 +6,8 @@ import numpy as np
 import nmmo
 from nmmo.core.env import Env
 from nmmo.task.predicate_api import make_predicate, Predicate
-from nmmo.task.task_api import Task, make_team_tasks, OngoingTask
+from nmmo.task.task_api import Task, OngoingTask
+from nmmo.task.task_spec import TaskSpec, make_task_from_spec
 from nmmo.task.group import Group
 from nmmo.task.constraint import ScalarConstraint, GroupConstraint, AGENT_LIST_CONSTRAINT
 from nmmo.task.base_predicates import TickGE, CanSeeGroup, AllMembersWithinRange, StayAlive
@@ -227,7 +228,9 @@ class TestTaskAPI(unittest.TestCase):
 
     # team should stay together within 1 tile for 10 ticks
     goal_tick = 10
-    task_spec = ('team', PracticeFormation, {'dist': 1, 'num_tick': goal_tick})
+    task_spec = TaskSpec(eval_fn=PracticeFormation,
+                         eval_fn_kwargs={'dist': 1, 'num_tick': goal_tick},
+                         reward_to='team')
 
     # create the test task from the task spec
     teams = {0:[1,2,3], 1:[4,5], 2:[6,7], 3:[8,9], 4:[10,11]}
@@ -237,7 +240,7 @@ class TestTaskAPI(unittest.TestCase):
     config.IMMORTAL = True
 
     env = Env(config)
-    env.reset(make_task_fn=lambda: make_team_tasks(teams, [task_spec]))
+    env.reset(make_task_fn=lambda: make_task_from_spec(teams, [task_spec]))
 
     # check the task information
     task = env.tasks[0]
@@ -250,7 +253,7 @@ class TestTaskAPI(unittest.TestCase):
                      'TickGE(gs, subject, num_tick)')
     self.assertEqual(task.get_signature(), ['gs', 'subject', 'dist', 'num_tick'])
     self.assertEqual(task.subject, tuple(teams[0]))
-    self.assertEqual(task.kwargs, task_spec[2])
+    self.assertEqual(task.kwargs, task_spec.eval_fn_kwargs)
     self.assertEqual(task.assignee, tuple(teams[0]))
 
     # check the agent-task map
@@ -278,9 +281,11 @@ class TestTaskAPI(unittest.TestCase):
 
     # test the task_spec_with_embedding
     task_embedding = np.ones(config.TASK_EMBED_DIM, dtype=np.float32)
-    task_spec_with_embedding = ('team', PracticeFormation, {'dist': 1, 'num_tick': goal_tick},
-                                {'embedding': task_embedding})
-    env.reset(make_task_fn=lambda: make_team_tasks(teams, [task_spec_with_embedding]))
+    task_spec_with_embedding = TaskSpec(eval_fn=PracticeFormation,
+                                        eval_fn_kwargs={'dist': 1, 'num_tick': goal_tick},
+                                        reward_to='team',
+                                        embedding=task_embedding)
+    env.reset(make_task_fn=lambda: make_task_from_spec(teams, [task_spec_with_embedding]))
 
     task = env.tasks[0]
     self.assertEqual(task.name,
@@ -292,7 +297,7 @@ class TestTaskAPI(unittest.TestCase):
                      'TickGE(gs, subject, num_tick)')
     self.assertEqual(task.get_signature(), ['gs', 'subject', 'dist', 'num_tick'])
     self.assertEqual(task.subject, tuple(teams[0]))
-    self.assertEqual(task.kwargs, task_spec[2])
+    self.assertEqual(task.kwargs, task_spec.eval_fn_kwargs)
     self.assertEqual(task.assignee, tuple(teams[0]))
     self.assertTrue(np.array_equal(task.embedding, task_embedding))
 
@@ -347,38 +352,23 @@ class TestTaskAPI(unittest.TestCase):
 
     # DONE
 
-  def test_make_tasks_with_task_spec(self):
-    """
-    task_spec is a list of tuple (reward_to, evaluation function, eval_fn_kwargs, task_kwargs)
-    each tuple in the task_spec will create tasks for a team in teams
-
-    reward_to: must be in ['team', 'agent']
-      * 'team' create a single team task, in which all team members get rewarded
-      * 'agent' create a task for each agent, in which only the agent gets rewarded
-
-    evaluation functions from the base_predicates.py or could be custom functions like above
-
-    eval_fn_kwargs are the additional args that go into predicate. There are also special keys
-      * 'target' must be ['left_team', 'right_team', 'left_team_leader', 'right_team_leader']
-          these str will be translated into the actual agent ids
-
-    task_kwargs are the optional, additional args that go into the task.
-      * 'task_cls' specifies the task class to be used. 
-         If not provided, the standard Task is used.
-    """
+  def test_make_task_from_spec(self):
     teams = {0:[1,2,3], 1:[4,5,6]}
+    test_embedding = np.array([1,2,3])
     task_spec = [
-      ('agent', TickGE, {'num_tick': 20}),
-      ('agent', StayAlive, {}, {'task_cls': OngoingTask}),
-      ('team', StayAlive, {'target': 'my_team_leader'}, {'task_cls': OngoingTask}),
-      ('team', StayAlive, {'target': 'left_team'},
-       {'task_cls': OngoingTask, 'reward_multiplier': 2, 'embedding': np.array([1,2,3])}),
+      TaskSpec(eval_fn=TickGE, eval_fn_kwargs={'num_tick': 20}),
+      TaskSpec(eval_fn=StayAlive, eval_fn_kwargs={}, task_cls=OngoingTask),
+      TaskSpec(eval_fn=StayAlive, eval_fn_kwargs={'target': 'my_team_leader'},
+               task_cls=OngoingTask, reward_to='team'),
+      TaskSpec(eval_fn=StayAlive, eval_fn_kwargs={'target': 'left_team'},
+               task_cls=OngoingTask, task_kwargs={'reward_multiplier': 2},
+               reward_to='team', embedding=test_embedding),
     ]
 
     task_list = []
     # testing each task spec, individually
     for single_spec in task_spec:
-      task_list.append(make_team_tasks(teams, [single_spec]))
+      task_list.append(make_task_from_spec(teams, [single_spec]))
 
     # check the task names
     self.assertEqual(task_list[0][0].name,
