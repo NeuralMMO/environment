@@ -41,7 +41,6 @@ class Env(ParallelEnv):
     self.possible_agents = list(range(1, config.PLAYER_N + 1))
     self._agents = None
     self._dead_agents = set()
-    self._episode_stats = defaultdict(lambda: defaultdict(float))
     self._dead_this_tick = None
     self.scripted_agents = set()
 
@@ -178,7 +177,6 @@ class Env(ParallelEnv):
     self.realm.reset(self._np_random, map_id)
     self._agents = list(self.realm.players.keys())
     self._dead_agents = set()
-    self._episode_stats.clear()
     self._dead_this_tick = {}
 
     # check if there are scripted agents
@@ -323,7 +321,6 @@ class Env(ParallelEnv):
         self.realm.tick >= self.config.HORIZON or \
         (self.config.RESET_ON_DEATH and len(self._dead_agents) > 0):
         self._dead_agents.add(agent_id)
-        self._episode_stats[agent_id]["death_tick"] = self.realm.tick
         dones[agent_id] = True
       else:
         dones[agent_id] = False
@@ -333,15 +330,6 @@ class Env(ParallelEnv):
     gym_obs = {a: o.to_gym() for a,o in self.obs.items()}
 
     rewards, infos = self._compute_rewards()
-    for k,r in rewards.items():
-      self._episode_stats[k]['reward'] += r
-
-    # When the episode ends, add the episode stats to the info of the last agents
-    if len(self._dead_agents) == len(self.possible_agents):
-      for agent_id, stats in self._episode_stats.items():
-        if agent_id not in infos:
-          infos[agent_id] = {}
-        infos[agent_id]["episode_stats"] = stats
 
     # NOTE: all obs, rewards, dones, infos have data for each agent in self.agents
     return gym_obs, rewards, dones, infos
