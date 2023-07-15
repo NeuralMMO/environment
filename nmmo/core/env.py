@@ -16,7 +16,7 @@ from nmmo.core.tile import Tile
 from nmmo.core import action as Action
 from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
-from nmmo.task import task_api
+from nmmo.task import task_api, task_spec
 from nmmo.task.game_state import GameStateGenerator
 from nmmo.lib import seeding
 from scripted.baselines import Scripted
@@ -58,7 +58,7 @@ class Env(ParallelEnv):
     if self.curriculum_file_path is not None:
       # try to open the file to check if it exists
       with open(self.curriculum_file_path, 'rb') as f:
-        task_spec = dill.load(f) # pylint: disable=unused-variable
+        curriculum = dill.load(f) # pylint: disable=unused-variable
       f.close()
 
   @functools.cached_property
@@ -220,19 +220,14 @@ class Env(ParallelEnv):
   def _sample_training_tasks(self):
     with open(self.curriculum_file_path, 'rb') as f:
       # curriculum file may have been changed, so read the file when sampling
-      task_spec = dill.load(f)
+      curriculum = dill.load(f) # a list of TaskSpec
     f.close()
 
-    sampling_weights = []
-    for single_spec in task_spec:
-      weight = 1 # default
-      if len(single_spec) == 4 and 'sampling_weight' in single_spec[3]:
-        weight = single_spec[3]['sampling_weight']
-      sampling_weights.append(weight)
-    sampled_spec = self._np_random.choice(task_spec, size=len(self.possible_agents),
+    sampling_weights = [spec.sampling_weight for spec in curriculum]
+    sampled_spec = self._np_random.choice(curriculum, size=len(self.possible_agents),
                                           p=sampling_weights/np.sum(sampling_weights))
 
-    return task_api.make_team_tasks(self.possible_agents, sampled_spec)
+    return task_spec.make_task_from_spec(self.possible_agents, sampled_spec)
 
   def _map_task_to_agent(self):
     agent_task_map: Dict[int, List[task_api.Task]] = {}
