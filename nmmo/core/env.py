@@ -75,7 +75,7 @@ class Env(ParallelEnv):
       "AgentId": gym.spaces.Discrete(self.config.PLAYER_N+1),
       "Tile": box(self.config.MAP_N_OBS, Tile.State.num_attributes),
       "Entity": box(self.config.PLAYER_N_OBS, Entity.State.num_attributes),
-      "Task": gym.spaces.Box(low=-np.inf, high=-np.inf, shape=(self.config.TASK_EMBED_DIM,)),
+      "Task": gym.spaces.Box(low=-2**15, high=2**15-1, shape=(self.config.TASK_EMBED_DIM,)),
     }
 
     if self.config.ITEM_SYSTEM_ENABLED:
