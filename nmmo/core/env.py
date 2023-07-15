@@ -2,6 +2,7 @@ import functools
 from typing import Any, Dict, List, Callable
 from collections import defaultdict
 from copy import copy
+import dill
 
 import gym
 import numpy as np
@@ -15,7 +16,7 @@ from nmmo.core.tile import Tile
 from nmmo.core import action as Action
 from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
-from nmmo.task import task_api
+from nmmo.task import task_api, task_spec
 from nmmo.task.game_state import GameStateGenerator
 from nmmo.lib import seeding
 from scripted.baselines import Scripted
@@ -49,6 +50,15 @@ class Env(ParallelEnv):
     # Default task: rewards 1 each turn agent is alive
     self.tasks = task_api.nmmo_default_task(self.possible_agents)
     self.agent_task_map = None
+    self._dummy_task_embedding = np.zeros(self.config.TASK_EMBED_DIM, dtype=np.float32)
+
+    # curriculum file path, if provided, should exist
+    self.curriculum_file_path = config.CURRICULUM_FILE_PATH
+    if self.curriculum_file_path is not None:
+      # try to open the file to check if it exists
+      with open(self.curriculum_file_path, 'rb') as f:
+        curriculum = dill.load(f) # pylint: disable=unused-variable
+      f.close()
 
   @functools.cached_property
   def _obs_space(self):
@@ -64,7 +74,9 @@ class Env(ParallelEnv):
       "CurrentTick": gym.spaces.Discrete(self.config.HORIZON+1),
       "AgentId": gym.spaces.Discrete(self.config.PLAYER_N+1),
       "Tile": box(self.config.MAP_N_OBS, Tile.State.num_attributes),
-      "Entity": box(self.config.PLAYER_N_OBS, Entity.State.num_attributes)}
+      "Entity": box(self.config.PLAYER_N_OBS, Entity.State.num_attributes),
+      "Task": gym.spaces.Box(low=-np.inf, high=-np.inf, shape=(self.config.TASK_EMBED_DIM,)),
+    }
 
     if self.config.ITEM_SYSTEM_ENABLED:
       obs_space["Inventory"] = box(self.config.INVENTORY_N_OBS, Item.State.num_attributes)
@@ -151,7 +163,8 @@ class Env(ParallelEnv):
   # TODO: This doesn't conform to the PettingZoo API
   # pylint: disable=arguments-renamed
   def reset(self, map_id=None, seed=None, options=None,
-            make_task_fn: Callable=None):
+            make_task_fn: Callable=None,
+            sample_training_tasks=False):
     '''OpenAI Gym API reset function
 
     Loads a new game map and returns initial observations
@@ -185,29 +198,55 @@ class Env(ParallelEnv):
         self.scripted_agents.add(eid)
         ent.agent.set_rng(self._np_random)
 
-    self._dummy_obs = self._make_dummy_obs()
-    self.obs = self._compute_observations()
-    self._gamestate_generator = GameStateGenerator(self.realm, self.config)
-
-    if make_task_fn is not None:
+    if self.curriculum_file_path is not None and sample_training_tasks is True:
+      self.tasks = self._sample_training_tasks()
+    elif make_task_fn is not None:
       self.tasks = make_task_fn()
     else:
       for task in self.tasks:
         task.reset()
     self.agent_task_map = self._map_task_to_agent()
 
+    self._dummy_obs = self._make_dummy_obs()
+    self.obs = self._compute_observations()
+    self._gamestate_generator = GameStateGenerator(self.realm, self.config)
+
     self._reset_required = False
 
     return {a: o.to_gym() for a,o in self.obs.items()}
 
+  def _sample_training_tasks(self):
+    with open(self.curriculum_file_path, 'rb') as f:
+      # curriculum file may have been changed, so read the file when sampling
+      curriculum = dill.load(f) # a list of TaskSpec
+    f.close()
+
+    sampling_weights = [spec.sampling_weight for spec in curriculum]
+    sampled_spec = self._np_random.choice(curriculum, size=len(self.possible_agents),
+                                          p=sampling_weights/np.sum(sampling_weights))
+
+    return task_spec.make_task_from_spec(self.possible_agents, sampled_spec)
+
   def _map_task_to_agent(self):
     agent_task_map: Dict[int, List[task_api.Task]] = {}
     for task in self.tasks:
+      if task.embedding is None:
+        task.set_embedding(self._dummy_task_embedding)
+      # validate task embedding
+      assert self._obs_space['Task'].contains(task.embedding), "Task embedding is not valid"
+
+      # map task to agents
       for agent_id in task.assignee:
         if agent_id in agent_task_map:
           agent_task_map[agent_id].append(task)
         else:
           agent_task_map[agent_id] = [task]
+
+    # for now we only support one task per agent
+    if self.config.ALLOW_MULTI_TASKS_PER_AGENT is False:
+      for agent_tasks in agent_task_map.values():
+        assert len(agent_tasks) == 1, "Only one task per agent is supported"
+
     return agent_task_map
 
   def step(self, actions: Dict[int, Dict[str, Dict[str, Any]]]):
@@ -392,7 +431,7 @@ class Env(ParallelEnv):
     dummy_entities = np.zeros((0, len(Entity.State.attr_name_to_col)), dtype=np.int16)
     dummy_inventory = np.zeros((0, len(Item.State.attr_name_to_col)), dtype=np.int16)
     dummy_market = np.zeros((0, len(Item.State.attr_name_to_col)), dtype=np.int16)
-    return Observation(self.config, self.realm.tick, 0,
+    return Observation(self.config, self.realm.tick, 0, self._dummy_task_embedding,
                        dummy_tiles, dummy_entities, dummy_inventory, dummy_market)
 
   def _compute_observations(self):
@@ -428,9 +467,13 @@ class Env(ParallelEnv):
 
         # NOTE: the tasks for each agent is in self.agent_task_map, and task embeddings are
         #   available in each task instance, via task.embedding
-        # CHECK ME: do we pass in self.agent_task_map[agent_id],
-        #   so that we can include task embedding in the obs?
-        obs[agent_id] = Observation(self.config, self.realm.tick, agent_id,
+        #   For now, each agent is assigned to a single task, so we just use the first task
+        # TODO: can the embeddings of multiple tasks be superposed while preserving the
+        #   task-specific information? This needs research
+        task_embedding = self._dummy_task_embedding
+        if agent_id in self.agent_task_map:
+          task_embedding = self.agent_task_map[agent_id][0].embedding # NOTE: first task only
+        obs[agent_id] = Observation(self.config, self.realm.tick, agent_id, task_embedding,
                                     visible_tiles, visible_entities, inventory, market)
     return obs
 

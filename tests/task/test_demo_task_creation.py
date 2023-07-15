@@ -7,6 +7,7 @@ from nmmo.lib.log import EventCode
 from nmmo.systems import skill
 from nmmo.task import predicate_api as p
 from nmmo.task import task_api as t
+from nmmo.task import task_spec as ts
 from nmmo.task import base_predicates as bp
 from nmmo.task.game_state import GameState
 from nmmo.task.group import Group
@@ -83,6 +84,7 @@ class TestDemoTask(unittest.TestCase):
 
     # Test rollout
     config = ScriptedAgentTestConfig()
+    config.ALLOW_MULTI_TASKS_PER_AGENT = True
     env = Env(config)
 
     # Creating and testing "team" tasks
@@ -230,10 +232,14 @@ class TestDemoTask(unittest.TestCase):
          If not provided, the standard Task is used.
     """
     task_spec = [ # (reward_to, predicate function, kwargs)
-      ('team', bp.CountEvent, {'event': 'PLAYER_KILL', 'N': 1}), # one task
-      ('agent', bp.CountEvent, {'event': 'PLAYER_KILL', 'N': 2}),
-      ('agent', bp.AllDead, {'target': 'left_team'}),
-      ('team', bp.CanSeeAgent, {'target': 'right_team_leader'}, {'task_cls': t.OngoingTask}),
+      ts.TaskSpec(eval_fn=bp.CountEvent, eval_fn_kwargs={'event': 'PLAYER_KILL', 'N': 1},
+                  reward_to='team'),
+      ts.TaskSpec(eval_fn=bp.CountEvent, eval_fn_kwargs={'event': 'PLAYER_KILL', 'N': 2},
+                  reward_to='agent'),
+      ts.TaskSpec(eval_fn=bp.AllDead, eval_fn_kwargs={'target': 'left_team'},
+                  reward_to='agent'),
+      ts.TaskSpec(eval_fn=bp.CanSeeAgent, eval_fn_kwargs={'target': 'right_team_leader'},
+                  task_cls=t.OngoingTask, reward_to='team'),
     ]
 
     # NOTE: len(teams) and len(task_spec) don't need to match
@@ -242,7 +248,7 @@ class TestDemoTask(unittest.TestCase):
     config = ScriptedAgentTestConfig()
     env = Env(config)
 
-    env.reset(make_task_fn=lambda: t.make_team_tasks(teams, task_spec))
+    env.reset(make_task_fn=lambda: ts.make_task_from_spec(teams, task_spec))
 
     self.assertEqual(len(env.tasks), 6) # 6 tasks were created
     self.assertEqual(env.tasks[0].name, # team 0 task assigned to agents 1,2,3

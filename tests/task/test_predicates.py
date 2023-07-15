@@ -36,6 +36,7 @@ class TestBasePredicate(unittest.TestCase):
     config.PLAYERS = [Sleeper]
     config.PLAYER_N = NUM_AGENT
     config.IMMORTAL = True
+    config.ALLOW_MULTI_TASKS_PER_AGENT = True
 
     # OngoingTask keeps evaluating and returns progress as the reward
     #   vs. Task stops evaluating once the task is completed, returns reward = delta(progress)

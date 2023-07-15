@@ -42,6 +42,7 @@ class Observation:
     config,
     current_tick: int,
     agent_id: int,
+    task_embedding,
     tiles,
     entities,
     inventory,
@@ -50,6 +51,7 @@ class Observation:
     self.config = config
     self.current_tick = current_tick
     self.agent_id = agent_id
+    self.task_embedding = task_embedding
 
     self.tiles = tiles[0:config.MAP_N_OBS]
     self.entities = BasicObs(entities[0:config.PLAYER_N_OBS],
@@ -117,6 +119,7 @@ class Observation:
     gym_obs = {
       "CurrentTick": self.current_tick,
       "AgentId": self.agent_id,
+      "Task": self.task_embedding,
       "Tile": None, # np.zeros((self.config.MAP_N_OBS, self.tiles.shape[1])),
       "Entity": np.zeros((self.config.PLAYER_N_OBS,
                           self.entities.values.shape[1]), dtype=np.int16)}
