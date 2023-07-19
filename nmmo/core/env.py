@@ -163,8 +163,7 @@ class Env(ParallelEnv):
   # TODO: This doesn't conform to the PettingZoo API
   # pylint: disable=arguments-renamed
   def reset(self, map_id=None, seed=None, options=None,
-            make_task_fn: Callable=None,
-            sample_training_tasks=False):
+            make_task_fn: Callable=None):
     '''OpenAI Gym API reset function
 
     Loads a new game map and returns initial observations
@@ -198,7 +197,7 @@ class Env(ParallelEnv):
         self.scripted_agents.add(eid)
         ent.agent.set_rng(self._np_random)
 
-    if self.curriculum_file_path is not None and sample_training_tasks is True:
+    if self.curriculum_file_path is not None:
       self.tasks = self._sample_training_tasks()
     elif make_task_fn is not None:
       self.tasks = make_task_fn()
@@ -219,7 +218,6 @@ class Env(ParallelEnv):
     with open(self.curriculum_file_path, 'rb') as f:
       # curriculum file may have been changed, so read the file when sampling
       curriculum = dill.load(f) # a list of TaskSpec
-    f.close()
 
     sampling_weights = [spec.sampling_weight for spec in curriculum]
     sampled_spec = self._np_random.choice(curriculum, size=len(self.possible_agents),
@@ -503,6 +501,8 @@ class Env(ParallelEnv):
       task_rewards, task_infos = task.compute_rewards(self.game_state)
       for agent_id, reward in task_rewards.items():
         if agent_id in agents:
+          if reward > 0:
+            print("task reward", agent_id, task.name, reward)
           rewards[agent_id] = rewards.get(agent_id,0) + reward
           infos[agent_id]['task'][task.name] = task_infos[agent_id] # progress
 
