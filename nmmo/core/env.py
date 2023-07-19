@@ -501,8 +501,6 @@ class Env(ParallelEnv):
       task_rewards, task_infos = task.compute_rewards(self.game_state)
       for agent_id, reward in task_rewards.items():
         if agent_id in agents:
-          if reward > 0:
-            print("task reward", agent_id, task.name, reward)
           rewards[agent_id] = rewards.get(agent_id,0) + reward
           infos[agent_id]['task'][task.name] = task_infos[agent_id] # progress
 
