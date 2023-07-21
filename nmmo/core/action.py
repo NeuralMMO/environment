@@ -109,7 +109,6 @@ class Action(Node):
   def args(stim, entity, config):
     raise NotImplementedError
 
-
 class Move(Node):
   priority = 60
   nodeType = NodeType.SELECTION
@@ -204,7 +203,6 @@ class West(Node):
 class Stay(Node):
   delta = (0, 0)
 
-
 class Attack(Node):
   priority = 50
   nodeType = NodeType.SELECTION
@@ -235,14 +233,6 @@ class Attack(Node):
 
     rets = list(rets)
     return rets
-
-  # CHECK ME: do we need l1 distance function?
-  #   systems/ai/utils.py also has various distance functions
-  #   which we may want to clean up
-  # def l1(pos, cent):
-  #   r, c = pos
-  #   r_cent, c_cent = cent
-  #   return abs(r - r_cent) + abs(c - c_cent)
 
   def call(realm, entity, style, target):
     if style is None or target is None:
@@ -300,7 +290,6 @@ class Style(Node):
   def deserialize(realm, entity, index):
     return deserialize_fixed_arg(Style, index)
 
-
 class Target(Node):
   argType = None
 
@@ -313,11 +302,10 @@ class Target(Node):
     if index >= realm.config.PLAYER_N_OBS or index < 0: # checking for the "None" target
       return None
 
-    radius = realm.config.PLAYER_VISION_RADIUS
     entity_obs = Entity.Query.window(
         realm.datastore,
         entity.row.val, entity.col.val,
-        radius
+        realm.config.PLAYER_VISION_RADIUS
     )
 
     if index >= entity_obs.shape[0]:
@@ -360,7 +348,6 @@ class Mage(Node):
   def skill(entity):
     return entity.skills.mage
 
-
 class InventoryItem(Node):
   argType  = None
 
@@ -368,7 +355,6 @@ class InventoryItem(Node):
   def N(cls, config):
     return config.INVENTORY_N_OBS + 1 # +1 for the "None" item
 
-  # TODO(kywch): What does args do?
   def args(stim, entity, config):
     return stim.exchange.items()
 
@@ -507,7 +493,6 @@ class Give(Node):
 
     realm.event_log.record(EventCode.GIVE_ITEM, entity)
 
-
 class GiveGold(Node):
   priority = 30
 
@@ -555,7 +540,6 @@ class GiveGold(Node):
 
     realm.event_log.record(EventCode.GIVE_GOLD, entity)
 
-
 class MarketItem(Node):
   argType  = None
 
@@ -563,7 +547,6 @@ class MarketItem(Node):
   def N(cls, config):
     return config.MARKET_N_OBS + 1 # +1 for the "None" item
 
-  # TODO(kywch): What does args do?
   def args(stim, entity, config):
     return stim.exchange.items()
 
@@ -691,7 +674,6 @@ class Price(Node):
   def deserialize(realm, entity, index):
     return deserialize_fixed_arg(Price, index)
 
-
 class Token(Node):
   argType  = Fixed
 
@@ -708,7 +690,6 @@ class Token(Node):
 
   def deserialize(realm, entity, index):
     return deserialize_fixed_arg(Token, index)
-
 
 class Comm(Node):
   argType  = Fixed
