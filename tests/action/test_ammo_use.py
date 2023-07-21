@@ -29,8 +29,8 @@ class TestAmmoUse(ScriptedTestTemplate):
           + np.sum(gym_obs['ActionTargets'][action.Buy][action.MarketItem])
     for atn in [action.Use, action.Give, action.Destroy, action.Sell]:
       mask += np.sum(gym_obs['ActionTargets'][atn][action.InventoryItem])
-    # MarketItem and InventoryTarget have no-action flags, which sum up to 5
-    self.assertEqual(mask, 5)
+    # If MarketItem and InventoryTarget have no-action flags, these sum up to 5
+    self.assertEqual(mask, 5*int(self.config.PROVIDE_NOOP_ACTION_TARGET))
 
   def test_ammo_fire_all(self):
     env = self._setup_env(random_seed=RANDOM_SEED)
@@ -141,7 +141,7 @@ class TestAmmoUse(ScriptedTestTemplate):
     # First tick actions: SELL level-0 ammo
     env.step({ ent_id: { action.Sell:
         { action.InventoryItem: env.obs[ent_id].inventory.sig(ent_ammo, 0),
-          action.Price: sell_price } }
+          action.Price: action.Price.index(sell_price) } }
         for ent_id, ent_ammo in self.ammo.items() })
 
     # check if the ammos were listed

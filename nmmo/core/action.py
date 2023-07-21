@@ -24,7 +24,8 @@ class NodeType(Enum):
 class Node(metaclass=utils.IterableNameComparable):
   @classmethod
   def init(cls, config):
-    pass
+    # noop_action is used in some of the N() methods
+    cls.noop_action = 1 if config.PROVIDE_NOOP_ACTION_TARGET else 0
 
   @staticproperty
   def edges():
@@ -283,7 +284,7 @@ class Target(Node):
 
   @classmethod
   def N(cls, config):
-    return config.PLAYER_N_OBS # +1 for the "None" target
+    return config.PLAYER_N_OBS + cls.noop_action
 
   def deserialize(realm, entity, index: int, obs: Observation):
     if index >= len(obs.entities.ids):
@@ -325,7 +326,7 @@ class InventoryItem(Node):
 
   @classmethod
   def N(cls, config):
-    return config.INVENTORY_N_OBS # +1 for the "None" item
+    return config.INVENTORY_N_OBS + cls.noop_action
 
   def deserialize(realm, entity, index: int, obs: Observation):
     if index >= len(obs.inventory.ids):
@@ -491,10 +492,8 @@ class GiveGold(Node):
     if not isinstance(amount, int):
       amount = amount.val
 
-    if not (amount > 0 and entity.gold.val > 0): # no gold to give
+    if amount > entity.gold.val: # no gold to give
       return
-
-    amount = min(amount, entity.gold.val)
 
     entity.gold.decrement(amount)
     target.gold.increment(amount)
@@ -506,7 +505,7 @@ class MarketItem(Node):
 
   @classmethod
   def N(cls, config):
-    return config.MARKET_N_OBS # +1 for the "None" item
+    return config.MARKET_N_OBS + cls.noop_action
 
   def deserialize(realm, entity, index: int, obs: Observation):
     if index >= len(obs.market.ids):
@@ -613,14 +612,20 @@ class Price(Node):
   @classmethod
   def init(cls, config):
     # gold should be > 0
-    Price.classes = init_discrete(range(1, config.PRICE_N_OBS+1))
+    cls.price_range = range(1, config.PRICE_N_OBS+1)
+    Price.classes = init_discrete(cls.price_range)
+
+  @classmethod
+  def index(cls, price):
+    try:
+      return cls.price_range.index(price)
+    except ValueError:
+      # use the max price, which is config.PRICE_N_OBS
+      return len(cls.price_range) - 1
 
   @staticproperty
   def edges():
     return Price.classes
-
-  def args(stim, entity, config):
-    return Price.edges
 
   def deserialize(realm, entity, index, obs: Observation):
     return deserialize_fixed_arg(Price, index)

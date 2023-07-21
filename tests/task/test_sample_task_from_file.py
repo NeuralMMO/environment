@@ -12,7 +12,7 @@ class TestSampleTaskFromFile(unittest.TestCase):
 
     # env.reset() samples and instantiates a task for each agent
     #   when sample_traning_tasks is set True
-    env.reset(sample_training_tasks=True)
+    env.reset()
 
     self.assertEqual(len(env.possible_agents), len(env.tasks))
     # for the training tasks, the task assignee and subject should be the same
