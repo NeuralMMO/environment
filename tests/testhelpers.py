@@ -370,7 +370,7 @@ class ScriptedTestTemplate(unittest.TestCase):
       elif atn == action.GiveGold:
         actions[ent_id] = { action.GiveGold:
           { action.Target: env.obs[ent_id].entities.index(cond['tgt_id']),
-           action.Price: cond['gold'] } }
+           action.Price: action.Price.index(cond['gold']) } }
 
       elif atn == action.Buy:
         mkt_idx = ent_obs.market.index(cond['item_id'])

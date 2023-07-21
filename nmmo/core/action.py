@@ -3,11 +3,11 @@
 
 from enum import Enum, auto
 import numpy as np
+from nmmo.core.observation import Observation
 
 from nmmo.lib import utils
 from nmmo.lib.utils import staticproperty
-from nmmo.systems.item import Item, Stack
-from nmmo.entity.entity import Entity
+from nmmo.systems.item import Stack
 from nmmo.lib.log import EventCode
 
 
@@ -24,7 +24,8 @@ class NodeType(Enum):
 class Node(metaclass=utils.IterableNameComparable):
   @classmethod
   def init(cls, config):
-    pass
+    # noop_action is used in some of the N() methods
+    cls.noop_action = 1 if config.PROVIDE_NOOP_ACTION_TARGET else 0
 
   @staticproperty
   def edges():
@@ -47,7 +48,7 @@ class Node(metaclass=utils.IterableNameComparable):
   def N(cls, config):
     return len(cls.edges)
 
-  def deserialize(realm, entity, index):
+  def deserialize(realm, entity, index, obs: Observation):
     return index
 
 class Fixed:
@@ -163,7 +164,7 @@ class Direction(Node):
   def edges():
     return [North, South, East, West, Stay]
 
-  def deserialize(realm, entity, index):
+  def deserialize(realm, entity, index, obs: Observation):
     return deserialize_fixed_arg(Direction, index)
 
 # a quick helper function
@@ -171,7 +172,7 @@ def deserialize_fixed_arg(arg, index):
   if isinstance(index, (int, np.int64)):
     if index < 0:
       return None # so that the action will be discarded
-    val = min(index-1, len(arg.edges)-1)
+    val = min(index, len(arg.edges)-1)
     return arg.edges[val]
 
   # if index is not int, it's probably already deserialized
@@ -275,7 +276,7 @@ class Style(Node):
   def edges():
     return [Melee, Range, Mage]
 
-  def deserialize(realm, entity, index):
+  def deserialize(realm, entity, index, obs: Observation):
     return deserialize_fixed_arg(Style, index)
 
 class Target(Node):
@@ -283,24 +284,12 @@ class Target(Node):
 
   @classmethod
   def N(cls, config):
-    return config.PLAYER_N_OBS + 1 # +1 for the "None" target
+    return config.PLAYER_N_OBS + cls.noop_action
 
-  def deserialize(realm, entity, index: int):
-    # NOTE: index is from the entity obs, NOT the entity id
-    if index >= realm.config.PLAYER_N_OBS or index < 0: # checking for the "None" target
+  def deserialize(realm, entity, index: int, obs: Observation):
+    if index >= len(obs.entities.ids):
       return None
-
-    entity_obs = Entity.Query.window(
-        realm.datastore,
-        entity.row.val, entity.col.val,
-        realm.config.PLAYER_VISION_RADIUS
-    )
-
-    if index >= entity_obs.shape[0]:
-      return None
-
-    entity_id = entity_obs[index, Entity.State.attr_name_to_col["id"]]
-    return realm.entity_or_none(entity_id)
+    return realm.entity_or_none(obs.entities.ids[index])
 
 class Melee(Node):
   nodeType = NodeType.ACTION
@@ -337,20 +326,12 @@ class InventoryItem(Node):
 
   @classmethod
   def N(cls, config):
-    return config.INVENTORY_N_OBS + 1 # +1 for the "None" item
+    return config.INVENTORY_N_OBS + cls.noop_action
 
-  def deserialize(realm, entity, index: int):
-    # NOTE: index is from the inventory, NOT item id
-    if index >= realm.config.INVENTORY_N_OBS or index < 0: # checking for the "None" item
+  def deserialize(realm, entity, index: int, obs: Observation):
+    if index >= len(obs.inventory.ids):
       return None
-
-    inventory = Item.Query.owned_by(realm.datastore, entity.id.val)
-
-    if index >= inventory.shape[0]:
-      return None
-
-    item_id = inventory[index, Item.State.attr_name_to_col["id"]]
-    return realm.items[item_id]
+    return realm.items.get(obs.inventory.ids[index])
 
 class Use(Node):
   priority = 10
@@ -511,10 +492,8 @@ class GiveGold(Node):
     if not isinstance(amount, int):
       amount = amount.val
 
-    if not (amount > 0 and entity.gold.val > 0): # no gold to give
+    if amount > entity.gold.val: # no gold to give
       return
-
-    amount = min(amount, entity.gold.val)
 
     entity.gold.decrement(amount)
     target.gold.increment(amount)
@@ -526,20 +505,13 @@ class MarketItem(Node):
 
   @classmethod
   def N(cls, config):
-    return config.MARKET_N_OBS + 1 # +1 for the "None" item
+    return config.MARKET_N_OBS + cls.noop_action
 
-  def deserialize(realm, entity, index: int):
-    # NOTE: index is from the market, NOT item id
-    if index >= realm.config.MARKET_N_OBS or index < 0: # checking for the "None" item
+  def deserialize(realm, entity, index: int, obs: Observation):
+    if index >= len(obs.market.ids):
       return None
 
-    market = Item.Query.for_sale(realm.datastore)
-
-    if index >= market.shape[0]:
-      return None
-
-    item_id = market[index, Item.State.attr_name_to_col["id"]]
-    return realm.items[item_id]
+    return realm.items.get(obs.market.ids[index])
 
 class Buy(Node):
   priority = 20
@@ -640,13 +612,22 @@ class Price(Node):
   @classmethod
   def init(cls, config):
     # gold should be > 0
-    Price.classes = init_discrete(range(1, config.PRICE_N_OBS+1))
+    cls.price_range = range(1, config.PRICE_N_OBS+1)
+    Price.classes = init_discrete(cls.price_range)
+
+  @classmethod
+  def index(cls, price):
+    try:
+      return cls.price_range.index(price)
+    except ValueError:
+      # use the max price, which is config.PRICE_N_OBS
+      return len(cls.price_range) - 1
 
   @staticproperty
   def edges():
     return Price.classes
 
-  def deserialize(realm, entity, index):
+  def deserialize(realm, entity, index, obs: Observation):
     return deserialize_fixed_arg(Price, index)
 
 class Token(Node):
@@ -660,7 +641,7 @@ class Token(Node):
   def edges():
     return Token.classes
 
-  def deserialize(realm, entity, index):
+  def deserialize(realm, entity, index, obs: Observation):
     return deserialize_fixed_arg(Token, index)
 
 class Comm(Node):

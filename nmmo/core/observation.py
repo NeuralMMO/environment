@@ -77,6 +77,8 @@ class Observation:
     else:
       assert market.size == 0
 
+    self._noop_action = 1 if config.PROVIDE_NOOP_ACTION_TARGET else 0
+
   # pylint: disable=method-cache-max-size-none
   @lru_cache(maxsize=None)
   def tile(self, r_delta, c_delta):
@@ -220,8 +222,11 @@ class Observation:
     assert self.config.COMBAT_MELEE_REACH == self.config.COMBAT_RANGE_REACH
     assert self.config.COMBAT_MELEE_REACH == self.config.COMBAT_MAGE_REACH
     assert self.config.COMBAT_RANGE_REACH == self.config.COMBAT_MAGE_REACH
-    attack_mask = np.zeros(self.config.PLAYER_N_OBS + 1, dtype=np.int8) # +1 for No action
-    attack_mask[-1] = 1 # No action
+
+    attack_mask = np.zeros(self.config.PLAYER_N_OBS + self._noop_action, dtype=np.int8)
+    if self.config.PROVIDE_NOOP_ACTION_TARGET:
+      attack_mask[-1] = 1
+
     if self.dummy_obs:
       return attack_mask
 
@@ -247,8 +252,10 @@ class Observation:
 
   def _make_use_mask(self):
     # empty inventory -- nothing to use
-    use_mask = np.zeros(self.config.INVENTORY_N_OBS + 1, dtype=np.int8) # +1 for No action
-    use_mask[-1] = 1 # No action
+    use_mask = np.zeros(self.config.INVENTORY_N_OBS + self._noop_action, dtype=np.int8)
+    if self.config.PROVIDE_NOOP_ACTION_TARGET:
+      use_mask[-1] = 1
+
     if not (self.config.ITEM_SYSTEM_ENABLED and self.inventory.len > 0)\
         or self.dummy_obs or self.agent_in_combat:
       return use_mask
@@ -296,8 +303,10 @@ class Observation:
     }
 
   def _make_destroy_item_mask(self):
-    destroy_mask = np.zeros(self.config.INVENTORY_N_OBS + 1, dtype=np.int8) # +1 for No action
-    destroy_mask[-1] = 1 # No action
+    destroy_mask = np.zeros(self.config.INVENTORY_N_OBS + self._noop_action, dtype=np.int8)
+    if self.config.PROVIDE_NOOP_ACTION_TARGET:
+      destroy_mask[-1] = 1
+
     # empty inventory -- nothing to destroy
     if not (self.config.ITEM_SYSTEM_ENABLED and self.inventory.len > 0)\
         or self.dummy_obs or self.agent_in_combat:
@@ -310,8 +319,9 @@ class Observation:
     return destroy_mask
 
   def _make_give_target_mask(self):
-    give_mask = np.zeros(self.config.PLAYER_N_OBS + 1, dtype=np.int8) # +1 for No action
-    give_mask[-1] = 1 # No action
+    give_mask = np.zeros(self.config.PLAYER_N_OBS + self._noop_action, dtype=np.int8)
+    if self.config.PROVIDE_NOOP_ACTION_TARGET:
+      give_mask[-1] = 1
     # empty inventory -- nothing to give
     if not (self.config.ITEM_SYSTEM_ENABLED and self.inventory.len > 0)\
         or self.dummy_obs or self.agent_in_combat:
@@ -339,8 +349,10 @@ class Observation:
     return mask
 
   def _make_sell_mask(self):
-    sell_mask = np.zeros(self.config.INVENTORY_N_OBS + 1, dtype=np.int8) # +1 for No action
-    sell_mask[-1] = 1 # No action
+    sell_mask = np.zeros(self.config.INVENTORY_N_OBS + self._noop_action, dtype=np.int8)
+    if self.config.PROVIDE_NOOP_ACTION_TARGET:
+      sell_mask[-1] = 1
+
     # empty inventory -- nothing to sell
     if not (self.config.EXCHANGE_SYSTEM_ENABLED and self.inventory.len > 0) \
       or self.dummy_obs or self.agent_in_combat:
@@ -353,8 +365,10 @@ class Observation:
     return sell_mask
 
   def _make_buy_mask(self):
-    buy_mask = np.zeros(self.config.MARKET_N_OBS + 1, dtype=np.int8) # +1 for No action
-    buy_mask[-1] = 1 # No action
+    buy_mask = np.zeros(self.config.MARKET_N_OBS + self._noop_action, dtype=np.int8)
+    if self.config.PROVIDE_NOOP_ACTION_TARGET:
+      buy_mask[-1] = 1
+
     if not self.config.EXCHANGE_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat:
       return buy_mask
 

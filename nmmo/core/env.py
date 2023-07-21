@@ -139,8 +139,7 @@ class Env(ParallelEnv):
   # TODO: This doesn't conform to the PettingZoo API
   # pylint: disable=arguments-renamed
   def reset(self, map_id=None, seed=None, options=None,
-            make_task_fn: Callable=None,
-            sample_training_tasks=False):
+            make_task_fn: Callable=None):
     '''OpenAI Gym API reset function
 
     Loads a new game map and returns initial observations
@@ -174,7 +173,7 @@ class Env(ParallelEnv):
         self.scripted_agents.add(eid)
         ent.agent.set_rng(self._np_random)
 
-    if self.curriculum_file_path is not None and sample_training_tasks is True:
+    if self.curriculum_file_path is not None:
       self.tasks = self._sample_training_tasks()
     elif make_task_fn is not None:
       self.tasks = make_task_fn()
@@ -195,7 +194,6 @@ class Env(ParallelEnv):
     with open(self.curriculum_file_path, 'rb') as f:
       # curriculum file may have been changed, so read the file when sampling
       curriculum = dill.load(f) # a list of TaskSpec
-    f.close()
 
     sampling_weights = [spec.sampling_weight for spec in curriculum]
     sampled_spec = self._np_random.choice(curriculum, size=len(self.possible_agents),
@@ -376,7 +374,7 @@ class Env(ParallelEnv):
           break
 
         for arg, val in sorted(args.items()):
-          obj = arg.deserialize(self.realm, entity, val)
+          obj = arg.deserialize(self.realm, entity, val, self.obs[ent_id])
           if obj is None:
             action_valid = False
             break
