@@ -122,9 +122,6 @@ class Move(Node):
 
     if not realm.map.is_valid_pos(r_new, c_new) or \
        realm.map.tiles[r_new, c_new].impassible:
-      if ent_id == 1:
-        print(f'Invalid move: {direction}')
-
       return
 
     if entity.status.freeze > 0:
