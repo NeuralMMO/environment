@@ -220,7 +220,8 @@ class Observation:
     assert self.config.COMBAT_MELEE_REACH == self.config.COMBAT_RANGE_REACH
     assert self.config.COMBAT_MELEE_REACH == self.config.COMBAT_MAGE_REACH
     assert self.config.COMBAT_RANGE_REACH == self.config.COMBAT_MAGE_REACH
-    attack_mask = np.zeros(self.config.PLAYER_N_OBS, dtype=np.int8)
+    attack_mask = np.zeros(self.config.PLAYER_N_OBS, dtype=np.int8) # +1 for No action xcxc
+    # attack_mask[-1] = 1 # No action (xcxc)
     if self.dummy_obs:
       return attack_mask
 
@@ -246,7 +247,8 @@ class Observation:
 
   def _make_use_mask(self):
     # empty inventory -- nothing to use
-    use_mask = np.zeros(self.config.INVENTORY_N_OBS, dtype=np.int8)
+    use_mask = np.zeros(self.config.INVENTORY_N_OBS, dtype=np.int8) # +1 for No action xcxc
+    # use_mask[-1] = 1 # No action (xcxc)
     if not (self.config.ITEM_SYSTEM_ENABLED and self.inventory.len > 0)\
         or self.dummy_obs or self.agent_in_combat:
       return use_mask
@@ -294,7 +296,8 @@ class Observation:
     }
 
   def _make_destroy_item_mask(self):
-    destroy_mask = np.zeros(self.config.INVENTORY_N_OBS, dtype=np.int8)
+    destroy_mask = np.zeros(self.config.INVENTORY_N_OBS, dtype=np.int8) # +1 for No action  xcxc
+    # destroy_mask[-1] = 1 # No action (xcxc)
     # empty inventory -- nothing to destroy
     if not (self.config.ITEM_SYSTEM_ENABLED and self.inventory.len > 0)\
         or self.dummy_obs or self.agent_in_combat:
@@ -307,7 +310,8 @@ class Observation:
     return destroy_mask
 
   def _make_give_target_mask(self):
-    give_mask = np.zeros(self.config.PLAYER_N_OBS, dtype=np.int8)
+    give_mask = np.zeros(self.config.PLAYER_N_OBS, dtype=np.int8) # +1 for No action xcxc
+    # give_mask[-1] = 1 # No action (xcxc)
     # empty inventory -- nothing to give
     if not (self.config.ITEM_SYSTEM_ENABLED and self.inventory.len > 0)\
         or self.dummy_obs or self.agent_in_combat:
@@ -335,7 +339,8 @@ class Observation:
     return mask
 
   def _make_sell_mask(self):
-    sell_mask = np.zeros(self.config.INVENTORY_N_OBS, dtype=np.int8)
+    sell_mask = np.zeros(self.config.INVENTORY_N_OBS, dtype=np.int8) # +1 for No action xcxc
+    # sell_mask[-1] = 1 # No action (xcxc)
     # empty inventory -- nothing to sell
     if not (self.config.EXCHANGE_SYSTEM_ENABLED and self.inventory.len > 0) \
       or self.dummy_obs or self.agent_in_combat:
@@ -348,7 +353,8 @@ class Observation:
     return sell_mask
 
   def _make_buy_mask(self):
-    buy_mask = np.zeros(self.config.MARKET_N_OBS, dtype=np.int8)
+    buy_mask = np.zeros(self.config.MARKET_N_OBS, dtype=np.int8) # +1 for No action xcxc
+    # buy_mask[-1] = 1 # No action (xcxc)
     if not self.config.EXCHANGE_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat:
       return buy_mask
 

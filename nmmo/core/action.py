@@ -8,7 +8,9 @@ from nmmo.core.observation import Observation
 from nmmo.lib import utils
 from nmmo.lib.utils import staticproperty
 from nmmo.systems.item import Item, Stack
+from nmmo.entity.entity import Entity
 from nmmo.lib.log import EventCode
+
 
 class NodeType(Enum):
   #Tree edges
@@ -49,9 +51,6 @@ class Node(metaclass=utils.IterableNameComparable):
   def deserialize(realm, entity, index, obs: Observation):
     return index
 
-  def args(stim, entity, config):
-    return []
-
 class Fixed:
   pass
 
@@ -75,7 +74,7 @@ class Action(Node):
     arguments = []
     for action in Action.edges(config):
       action.init(config)
-      for args in action.edges:
+      for args in action.edges: # pylint: disable=not-an-iterable
         args.init(config)
         if not 'edges' in args.__dict__:
           continue
@@ -104,10 +103,6 @@ class Action(Node):
     if config.COMMUNICATION_SYSTEM_ENABLED:
       edges.append(Comm)
     return edges
-
-  def args(stim, entity, config):
-    raise NotImplementedError
-
 
 class Move(Node):
   priority = 60
@@ -172,9 +167,6 @@ class Direction(Node):
   def edges():
     return [North, South, East, West, Stay]
 
-  def args(stim, entity, config):
-    return Direction.edges
-
   def deserialize(realm, entity, index, obs: Observation):
     return deserialize_fixed_arg(Direction, index)
 
@@ -206,7 +198,6 @@ class West(Node):
 class Stay(Node):
   delta = (0, 0)
 
-
 class Attack(Node):
   priority = 50
   nodeType = NodeType.SELECTION
@@ -237,14 +228,6 @@ class Attack(Node):
 
     rets = list(rets)
     return rets
-
-  # CHECK ME: do we need l1 distance function?
-  #   systems/ai/utils.py also has various distance functions
-  #   which we may want to clean up
-  # def l1(pos, cent):
-  #   r, c = pos
-  #   r_cent, c_cent = cent
-  #   return abs(r - r_cent) + abs(c - c_cent)
 
   def call(realm, entity, style, target):
     if style is None or target is None:
@@ -296,28 +279,20 @@ class Style(Node):
   def edges():
     return [Melee, Range, Mage]
 
-  def args(stim, entity, config):
-    return Style.edges
-
   def deserialize(realm, entity, index, obs: Observation):
     return deserialize_fixed_arg(Style, index)
-
 
 class Target(Node):
   argType = None
 
   @classmethod
   def N(cls, config):
-    return config.PLAYER_N_OBS
+    return config.PLAYER_N_OBS # +1 for the "None" target
 
   def deserialize(realm, entity, index: int, obs: Observation):
     if index >= len(obs.entities.ids):
       return None
     return realm.entity_or_none(obs.entities.ids[index])
-
-  def args(stim, entity, config):
-    #Should pass max range?
-    return Attack.in_range(entity, stim, config, None)
 
 class Melee(Node):
   nodeType = NodeType.ACTION
@@ -349,17 +324,12 @@ class Mage(Node):
   def skill(entity):
     return entity.skills.mage
 
-
 class InventoryItem(Node):
   argType  = None
 
   @classmethod
   def N(cls, config):
-    return config.INVENTORY_N_OBS
-
-  # TODO(kywch): What does args do?
-  def args(stim, entity, config):
-    return stim.exchange.items()
+    return config.INVENTORY_N_OBS # +1 for the "None" item
 
   def deserialize(realm, entity, index: int, obs: Observation):
     if index >= len(obs.inventory.ids):
@@ -488,7 +458,6 @@ class Give(Node):
 
     realm.event_log.record(EventCode.GIVE_ITEM, entity)
 
-
 class GiveGold(Node):
   priority = 30
 
@@ -536,17 +505,12 @@ class GiveGold(Node):
 
     realm.event_log.record(EventCode.GIVE_GOLD, entity)
 
-
 class MarketItem(Node):
   argType  = None
 
   @classmethod
   def N(cls, config):
-    return config.MARKET_N_OBS
-
-  # TODO(kywch): What does args do?
-  def args(stim, entity, config):
-    return stim.exchange.items()
+    return config.MARKET_N_OBS # +1 for the "None" item
 
   def deserialize(realm, entity, index: int, obs: Observation):
     if index >= len(obs.market.ids):
@@ -665,7 +629,6 @@ class Price(Node):
   def deserialize(realm, entity, index, obs: Observation):
     return deserialize_fixed_arg(Price, index)
 
-
 class Token(Node):
   argType  = Fixed
 
@@ -677,12 +640,8 @@ class Token(Node):
   def edges():
     return Token.classes
 
-  def args(stim, entity, config):
-    return Token.edges
-
   def deserialize(realm, entity, index, obs: Observation):
     return deserialize_fixed_arg(Token, index)
-
 
 class Comm(Node):
   argType  = Fixed

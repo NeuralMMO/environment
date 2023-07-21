@@ -1,7 +1,7 @@
 import functools
 from typing import Any, Dict, List, Callable
 from collections import defaultdict
-from copy import copy
+from copy import copy, deepcopy
 import dill
 
 import gym
@@ -13,7 +13,6 @@ from nmmo.core import realm
 from nmmo.core.config import Default
 from nmmo.core.observation import Observation
 from nmmo.core.tile import Tile
-from nmmo.core import action as Action
 from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
 from nmmo.task import task_api, task_spec
@@ -85,34 +84,11 @@ class Env(ParallelEnv):
       obs_space["Market"] = box(self.config.MARKET_N_OBS, Item.State.num_attributes)
 
     if self.config.PROVIDE_ACTION_TARGETS:
-      mask_spec = {}
-      mask_spec[Action.Move] = gym.spaces.Dict(
-        {Action.Direction: mask_box(len(Action.Direction.edges))})
-      if self.config.COMBAT_SYSTEM_ENABLED:
-        mask_spec[Action.Attack] = gym.spaces.Dict({
-          Action.Style: mask_box(3),
-          Action.Target: mask_box(self.config.PLAYER_N_OBS)})
-      if self.config.ITEM_SYSTEM_ENABLED:
-        mask_spec[Action.Use] = gym.spaces.Dict(
-          {Action.InventoryItem: mask_box(self.config.INVENTORY_N_OBS)})
-        mask_spec[Action.Destroy] = gym.spaces.Dict(
-          {Action.InventoryItem: mask_box(self.config.INVENTORY_N_OBS)})
-        mask_spec[Action.Give] = gym.spaces.Dict({
-          Action.InventoryItem: mask_box(self.config.INVENTORY_N_OBS),
-          Action.Target: mask_box(self.config.PLAYER_N_OBS)})
-      if self.config.EXCHANGE_SYSTEM_ENABLED:
-        mask_spec[Action.Buy] = gym.spaces.Dict(
-          {Action.MarketItem: mask_box(self.config.MARKET_N_OBS)})
-        mask_spec[Action.Sell] = gym.spaces.Dict({
-          Action.InventoryItem: mask_box(self.config.INVENTORY_N_OBS),
-          Action.Price: mask_box(self.config.PRICE_N_OBS)})
-        mask_spec[Action.GiveGold] = gym.spaces.Dict({
-          Action.Price: mask_box(self.config.PRICE_N_OBS),
-          Action.Target: mask_box(self.config.PLAYER_N_OBS)})
-      if self.config.COMMUNICATION_SYSTEM_ENABLED:
-        mask_spec[Action.Comm] = gym.spaces.Dict(
-          {Action.Token: mask_box(self.config.COMMUNICATION_NUM_TOKENS)})
-      obs_space['ActionTargets'] = gym.spaces.Dict(mask_spec)
+      mask_spec = deepcopy(self._atn_space)
+      for atn in mask_spec:
+        for arg in atn.edges:
+          mask_spec[atn][arg] = mask_box(mask_spec[atn][arg].n)
+      obs_space['ActionTargets'] = mask_spec
 
     return gym.spaces.Dict(obs_space)
 
