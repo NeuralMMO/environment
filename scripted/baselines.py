@@ -2,8 +2,8 @@
 # pylint: disable=all
 
 from typing import Dict
-
 from collections import defaultdict
+import numpy as np
 
 import nmmo
 from nmmo import material
@@ -105,11 +105,11 @@ class Scripted(nmmo.Agent):
 
     self.closestID = None
     if self.closest is not None:
-      self.closestID = self.closest.id
+      self.closestID = self.ob.entities.index(self.closest.id)
 
     self.attackerID = None
     if self.attacker is not None:
-      self.attackerID = self.attacker.id
+      self.attackerID = self.ob.entities.index(self.attacker.id)
 
     self.target     = None
     self.targetID   = None
