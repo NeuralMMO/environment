@@ -398,7 +398,7 @@ class Env(ParallelEnv):
           break
 
         for arg, val in sorted(args.items()):
-          obj = arg.deserialize(self.realm, entity, val)
+          obj = arg.deserialize(self.realm, entity, val, self.obs[ent_id])
           if obj is None:
             action_valid = False
             break

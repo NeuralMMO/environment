@@ -3,6 +3,7 @@
 
 from enum import Enum, auto
 import numpy as np
+from nmmo.core.observation import Observation
 
 from nmmo.lib import utils
 from nmmo.lib.utils import staticproperty
@@ -45,7 +46,7 @@ class Node(metaclass=utils.IterableNameComparable):
   def N(cls, config):
     return len(cls.edges)
 
-  def deserialize(realm, entity, index):
+  def deserialize(realm, entity, index, obs: Observation):
     return index
 
   def args(stim, entity, config):
@@ -126,6 +127,9 @@ class Move(Node):
 
     if not realm.map.is_valid_pos(r_new, c_new) or \
        realm.map.tiles[r_new, c_new].impassible:
+      if ent_id == 1:
+        print(f'Invalid move: {direction}')
+
       return
 
     if entity.status.freeze > 0:
@@ -171,7 +175,7 @@ class Direction(Node):
   def args(stim, entity, config):
     return Direction.edges
 
-  def deserialize(realm, entity, index):
+  def deserialize(realm, entity, index, obs: Observation):
     return deserialize_fixed_arg(Direction, index)
 
 # a quick helper function
@@ -179,7 +183,7 @@ def deserialize_fixed_arg(arg, index):
   if isinstance(index, (int, np.int64)):
     if index < 0:
       return None # so that the action will be discarded
-    val = min(index-1, len(arg.edges)-1)
+    val = min(index, len(arg.edges)-1)
     return arg.edges[val]
 
   # if index is not int, it's probably already deserialized
@@ -295,7 +299,7 @@ class Style(Node):
   def args(stim, entity, config):
     return Style.edges
 
-  def deserialize(realm, entity, index):
+  def deserialize(realm, entity, index, obs: Observation):
     return deserialize_fixed_arg(Style, index)
 
 
@@ -306,10 +310,10 @@ class Target(Node):
   def N(cls, config):
     return config.PLAYER_N_OBS
 
-  def deserialize(realm, entity, index: int):
-    # NOTE: index is the entity id
-    # CHECK ME: should index be renamed to ent_id?
-    return realm.entity_or_none(index)
+  def deserialize(realm, entity, index: int, obs: Observation):
+    if index >= len(obs.entities.ids):
+      return None
+    return realm.entity_or_none(obs.entities.ids[index])
 
   def args(stim, entity, config):
     #Should pass max range?
@@ -357,15 +361,10 @@ class InventoryItem(Node):
   def args(stim, entity, config):
     return stim.exchange.items()
 
-  def deserialize(realm, entity, index: int):
-    # NOTE: index is from the inventory, NOT item id
-    inventory = Item.Query.owned_by(realm.datastore, entity.id.val)
-
-    if index >= inventory.shape[0]:
+  def deserialize(realm, entity, index: int, obs: Observation):
+    if index >= len(obs.inventory.ids):
       return None
-
-    item_id = inventory[index, Item.State.attr_name_to_col["id"]]
-    return realm.items[item_id]
+    return realm.items.get(obs.inventory.ids[index])
 
 class Use(Node):
   priority = 10
@@ -549,15 +548,11 @@ class MarketItem(Node):
   def args(stim, entity, config):
     return stim.exchange.items()
 
-  def deserialize(realm, entity, index: int):
-    # NOTE: index is from the market, NOT item id
-    market = Item.Query.for_sale(realm.datastore)
-
-    if index >= market.shape[0]:
+  def deserialize(realm, entity, index: int, obs: Observation):
+    if index >= len(obs.market.ids):
       return None
 
-    item_id = market[index, Item.State.attr_name_to_col["id"]]
-    return realm.items[item_id]
+    return realm.items.get(obs.market.ids[index])
 
 class Buy(Node):
   priority = 20
@@ -667,7 +662,7 @@ class Price(Node):
   def args(stim, entity, config):
     return Price.edges
 
-  def deserialize(realm, entity, index):
+  def deserialize(realm, entity, index, obs: Observation):
     return deserialize_fixed_arg(Price, index)
 
 
@@ -685,7 +680,7 @@ class Token(Node):
   def args(stim, entity, config):
     return Token.edges
 
-  def deserialize(realm, entity, index):
+  def deserialize(realm, entity, index, obs: Observation):
     return deserialize_fixed_arg(Token, index)
 
 
