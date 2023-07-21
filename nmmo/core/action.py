@@ -7,8 +7,7 @@ from nmmo.core.observation import Observation
 
 from nmmo.lib import utils
 from nmmo.lib.utils import staticproperty
-from nmmo.systems.item import Item, Stack
-from nmmo.entity.entity import Entity
+from nmmo.systems.item import Stack
 from nmmo.lib.log import EventCode
 
 
