@@ -50,9 +50,6 @@ class Node(metaclass=utils.IterableNameComparable):
   def deserialize(realm, entity, index):
     return index
 
-  def args(stim, entity, config):
-    return []
-
 class Fixed:
   pass
 
@@ -76,7 +73,7 @@ class Action(Node):
     arguments = []
     for action in Action.edges(config):
       action.init(config)
-      for args in action.edges:
+      for args in action.edges: # pylint: disable=not-an-iterable
         args.init(config)
         if not 'edges' in args.__dict__:
           continue
@@ -105,9 +102,6 @@ class Action(Node):
     if config.COMMUNICATION_SYSTEM_ENABLED:
       edges.append(Comm)
     return edges
-
-  def args(stim, entity, config):
-    raise NotImplementedError
 
 class Move(Node):
   priority = 60
@@ -168,9 +162,6 @@ class Direction(Node):
   @staticproperty
   def edges():
     return [North, South, East, West, Stay]
-
-  def args(stim, entity, config):
-    return Direction.edges
 
   def deserialize(realm, entity, index):
     return deserialize_fixed_arg(Direction, index)
@@ -284,9 +275,6 @@ class Style(Node):
   def edges():
     return [Melee, Range, Mage]
 
-  def args(stim, entity, config):
-    return Style.edges
-
   def deserialize(realm, entity, index):
     return deserialize_fixed_arg(Style, index)
 
@@ -313,10 +301,6 @@ class Target(Node):
 
     entity_id = entity_obs[index, Entity.State.attr_name_to_col["id"]]
     return realm.entity_or_none(entity_id)
-
-  def args(stim, entity, config):
-    #Should pass max range?
-    return Attack.in_range(entity, stim, config, None)
 
 class Melee(Node):
   nodeType = NodeType.ACTION
@@ -354,9 +338,6 @@ class InventoryItem(Node):
   @classmethod
   def N(cls, config):
     return config.INVENTORY_N_OBS + 1 # +1 for the "None" item
-
-  def args(stim, entity, config):
-    return stim.exchange.items()
 
   def deserialize(realm, entity, index: int):
     # NOTE: index is from the inventory, NOT item id
@@ -547,9 +528,6 @@ class MarketItem(Node):
   def N(cls, config):
     return config.MARKET_N_OBS + 1 # +1 for the "None" item
 
-  def args(stim, entity, config):
-    return stim.exchange.items()
-
   def deserialize(realm, entity, index: int):
     # NOTE: index is from the market, NOT item id
     if index >= realm.config.MARKET_N_OBS or index < 0: # checking for the "None" item
@@ -668,9 +646,6 @@ class Price(Node):
   def edges():
     return Price.classes
 
-  def args(stim, entity, config):
-    return Price.edges
-
   def deserialize(realm, entity, index):
     return deserialize_fixed_arg(Price, index)
 
@@ -684,9 +659,6 @@ class Token(Node):
   @staticproperty
   def edges():
     return Token.classes
-
-  def args(stim, entity, config):
-    return Token.edges
 
   def deserialize(realm, entity, index):
     return deserialize_fixed_arg(Token, index)
