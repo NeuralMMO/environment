@@ -145,7 +145,10 @@ class Config(Template):
     return hasattr(self, name)
 
   PROVIDE_ACTION_TARGETS       = True
-  '''Flag used to provide action targets mask'''
+  '''Provide action targets mask'''
+
+  PROVIDE_NOOP_ACTION_TARGET         = False
+  '''Provide a no-op option for each action'''
 
   PLAYERS                      = [Agent]
   '''Player classes from which to spawn'''

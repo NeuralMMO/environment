@@ -365,11 +365,12 @@ class ScriptedTestTemplate(unittest.TestCase):
       if atn == action.Give:
         actions[ent_id] = { action.Give: {
           action.InventoryItem: env.obs[ent_id].inventory.sig(*cond['item_sig']),
-          action.Target: cond['tgt_id'] } }
+          action.Target: env.obs[ent_id].entities.index(cond['tgt_id']) } }
 
       elif atn == action.GiveGold:
         actions[ent_id] = { action.GiveGold:
-          { action.Target: cond['tgt_id'], action.Price: cond['gold'] } }
+          { action.Target: env.obs[ent_id].entities.index(cond['tgt_id']),
+           action.Price: action.Price.index(cond['gold']) } }
 
       elif atn == action.Buy:
         mkt_idx = ent_obs.market.index(cond['item_id'])
