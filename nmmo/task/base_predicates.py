@@ -64,6 +64,8 @@ def CanSeeAgent(gs: GameState, subject: Group, target: int):
 def CanSeeGroup(gs: GameState, subject: Group, target: Iterable[int]):
   """ Returns True if subject can see any of target
   """
+  if target is None:
+    return False
   return any(CanSeeAgent(gs, subject, agent) for agent in target)
 
 def DistanceTraveled(gs: GameState, subject: Group, dist: int):
