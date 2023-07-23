@@ -233,7 +233,8 @@ class TestTaskAPI(unittest.TestCase):
                          reward_to='team')
 
     # create the test task from the task spec
-    teams = {0:[1,2,3], 1:[4,5], 2:[6,7], 3:[8,9], 4:[10,11]}
+    teams = {1:[1,2,3], 3:[4,5], 6:[6,7], 9:[8,9], 14:[10,11]}
+    team_ids= list(teams.keys())
 
     config = ScriptedAgentTestConfig()
     config.PLAYERS =[Sleeper]
@@ -252,9 +253,9 @@ class TestTaskAPI(unittest.TestCase):
                      'return AllMembersWithinRange(gs, subject, dist) * '+
                      'TickGE(gs, subject, num_tick)')
     self.assertEqual(task.get_signature(), ['gs', 'subject', 'dist', 'num_tick'])
-    self.assertEqual(task.subject, tuple(teams[0]))
+    self.assertEqual(task.subject, tuple(teams[team_ids[0]]))
     self.assertEqual(task.kwargs, task_spec.eval_fn_kwargs)
-    self.assertEqual(task.assignee, tuple(teams[0]))
+    self.assertEqual(task.assignee, tuple(teams[team_ids[0]]))
 
     # check the agent-task map
     for agent_id, agent_tasks in env.agent_task_map.items():
@@ -296,9 +297,9 @@ class TestTaskAPI(unittest.TestCase):
                      'return AllMembersWithinRange(gs, subject, dist) * '+
                      'TickGE(gs, subject, num_tick)')
     self.assertEqual(task.get_signature(), ['gs', 'subject', 'dist', 'num_tick'])
-    self.assertEqual(task.subject, tuple(teams[0]))
+    self.assertEqual(task.subject, tuple(teams[team_ids[0]]))
     self.assertEqual(task.kwargs, task_spec.eval_fn_kwargs)
-    self.assertEqual(task.assignee, tuple(teams[0]))
+    self.assertEqual(task.assignee, tuple(teams[team_ids[0]]))
     self.assertTrue(np.array_equal(task.embedding, task_embedding))
 
     obs_spec = env.observation_space(1)
