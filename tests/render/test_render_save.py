@@ -51,6 +51,9 @@ if __name__ == '__main__':
 
   replay_helper = FileReplayHelper()
 
+  # the renderer is external to the env, so need to manually initiate it
+  renderer = WebsocketRenderer()
+
   for conf_name, config in conf_dict.items():
     env = nmmo.Env(config)
 
@@ -59,13 +62,12 @@ if __name__ == '__main__':
     env.realm.record_replay(replay_helper)
 
     env.reset(seed=RANDOM_SEED)
-
-    # the renderer is external to the env, so need to manually initiate it
-    renderer = WebsocketRenderer(env.realm)
+    renderer.set_realm(env.realm)
 
     for tick in tqdm(range(TEST_HORIZON)):
       env.step({})
       renderer.render_realm()
 
-    # NOTE: the web client has trouble loading the compressed replay file
-    replay_helper.save(f'replay_{conf_name}_seed_{RANDOM_SEED:04d}.json', compress=False)
+    # NOTE: save the data in uncompressed json format, since
+    #   the web client has trouble loading the compressed replay file
+    replay_helper.save(f'replay_{conf_name}_seed_{RANDOM_SEED:04d}.json')
