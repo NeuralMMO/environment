@@ -1,4 +1,3 @@
-
 class Agent:
   policy   = 'Neural'
 
@@ -18,3 +17,7 @@ class Agent:
     Args:
         obs: Agent observation provided by the environment
     '''
+
+class Scripted(Agent):
+  '''Base class for scripted agents'''
+  policy   = 'Scripted'

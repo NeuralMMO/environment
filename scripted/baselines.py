@@ -15,8 +15,8 @@ from nmmo.core.observation import Observation
 
 from scripted import attack, move
 
-class Scripted(nmmo.Agent):
-  '''Template class for scripted models.
+class Scripted(nmmo.Scripted):
+  '''Template class for baseline scripted models.
 
   You may either subclass directly or mirror the __call__ function'''
   scripted = True
