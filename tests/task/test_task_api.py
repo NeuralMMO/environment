@@ -6,11 +6,13 @@ import numpy as np
 import nmmo
 from nmmo.core.env import Env
 from nmmo.task.predicate_api import make_predicate, Predicate
-from nmmo.task.task_api import Task, OngoingTask
+from nmmo.task.task_api import Task, OngoingTask, HoldDurationTask
 from nmmo.task.task_spec import TaskSpec, make_task_from_spec
 from nmmo.task.group import Group
 from nmmo.task.constraint import ScalarConstraint, GroupConstraint, AGENT_LIST_CONSTRAINT
-from nmmo.task.base_predicates import TickGE, CanSeeGroup, AllMembersWithinRange, StayAlive
+from nmmo.task.base_predicates import (
+    TickGE, CanSeeGroup, AllMembersWithinRange, StayAlive, HoardGold
+)
 
 from nmmo.systems import item as Item
 from nmmo.core import action as Action
@@ -60,28 +62,28 @@ class TestTaskAPI(unittest.TestCase):
     # NOTE: only the instantiated predicate can be used with operators like below
     mock_gs = MockGameState()
 
-    # get the individual predicate's source code
+    # get the individual predicate"s source code
     self.assertEqual(SUCCESS.get_source_code(),
-                     'def Success(gs, subject: Group):\n  return True')
+                     "def Success(gs, subject: Group):\n  return True")
     self.assertEqual(FAILURE.get_source_code(),
-                     'def Failure(gs, subject: Group):\n  return False')
+                     "def Failure(gs, subject: Group):\n  return False")
 
     # AND (&), OR (|), NOT (~)
     pred1 = SUCCESS & FAILURE
     self.assertFalse(pred1(mock_gs))
     # NOTE: get_source_code() of the combined predicates returns the joined str
-    #   of each predicate's source code, which may NOT represent what the actual
+    #   of each predicate"s source code, which may NOT represent what the actual
     #   predicate is doing
     self.assertEqual(pred1.get_source_code(),
-                     'def Success(gs, subject: Group):\n  return True\n\n'+
-                     'def Failure(gs, subject: Group):\n  return False')
+                     "def Success(gs, subject: Group):\n  return True\n\n"+
+                     "def Failure(gs, subject: Group):\n  return False")
 
     pred2 = SUCCESS | FAILURE | SUCCESS
     self.assertTrue(pred2(mock_gs))
     self.assertEqual(pred2.get_source_code(),
-                     'def Success(gs, subject: Group):\n  return True\n\n'+
-                     'def Failure(gs, subject: Group):\n  return False\n\n'+
-                     'def Success(gs, subject: Group):\n  return True')
+                     "def Success(gs, subject: Group):\n  return True\n\n"+
+                     "def Failure(gs, subject: Group):\n  return False\n\n"+
+                     "def Success(gs, subject: Group):\n  return True")
 
     pred3 = SUCCESS & ~ FAILURE & SUCCESS
     self.assertTrue(pred3(mock_gs))
@@ -98,7 +100,7 @@ class TestTaskAPI(unittest.TestCase):
     # NOTE: demonstrating the above point again, -- it just returns the functions
     #   NOT what this predicate actually evaluates.
     self.assertEqual(pred4.get_source_code(),
-                     'def Success(gs, subject: Group):\n  return True')
+                     "def Success(gs, subject: Group):\n  return True")
 
     pred5 = 0.3 * SUCCESS - 1
     self.assertEqual(pred5(mock_gs), 0.0) # cannot go below 0
@@ -109,11 +111,11 @@ class TestTaskAPI(unittest.TestCase):
   def test_team_assignment(self):
     team =  Group([1, 2, 8, 9], "TeamFoo")
 
-    self.assertEqual(team.name, 'TeamFoo')
+    self.assertEqual(team.name, "TeamFoo")
     self.assertEqual(team[2].name, "TeamFoo.2")
     self.assertEqual(team[2], (8,))
 
-    # don't allow member of one-member team
+    # don"t allow member of one-member team
     self.assertEqual(team[2][0].name, team[2].name)
 
   def test_predicate_name(self):
@@ -174,10 +176,10 @@ class TestTaskAPI(unittest.TestCase):
     action = Action.Melee
     predicate = fake_pred_cls(group, a=1, b=item, c=action)
     self.assertEqual(predicate.get_source_code(),
-                     'def Fake(gs, subject, a,b,c):\n  return False')
-    self.assertEqual(predicate.get_signature(), ['gs', 'subject', 'a', 'b', 'c'])
+                     "def Fake(gs, subject, a,b,c):\n  return False")
+    self.assertEqual(predicate.get_signature(), ["gs", "subject", "a", "b", "c"])
     self.assertEqual(predicate.args, [group])
-    self.assertDictEqual(predicate.kwargs, {'a': 1, 'b': item, 'c': action})
+    self.assertDictEqual(predicate.kwargs, {"a": 1, "b": item, "c": action})
 
     assignee = [1,2,3] # list of agent ids
     task = predicate.create_task(assignee=assignee)
@@ -186,13 +188,13 @@ class TestTaskAPI(unittest.TestCase):
     self.assertEqual(task.name, # contains predicate name and assignee list
                      "(Task_eval_fn:(Fake_(2,)_a:1_b:Hat_c:Melee)_assignee:(1,2,3))")
     self.assertEqual(task.get_source_code(),
-                     'def Fake(gs, subject, a,b,c):\n  return False')
-    self.assertEqual(task.get_signature(), ['gs', 'subject', 'a', 'b', 'c'])
+                     "def Fake(gs, subject, a,b,c):\n  return False")
+    self.assertEqual(task.get_signature(), ["gs", "subject", "a", "b", "c"])
     self.assertEqual(task.args, [group])
-    self.assertDictEqual(task.kwargs, {'a': 1, 'b': item, 'c': action})
+    self.assertDictEqual(task.kwargs, {"a": 1, "b": item, "c": action})
     for agent_id in assignee:
       self.assertEqual(rewards[agent_id], 0)
-      self.assertEqual(infos[agent_id]['progress'], 0) # progress (False -> 0)
+      self.assertEqual(infos[agent_id]["progress"], 0) # progress (False -> 0)
       self.assertFalse(task.completed)
 
   def test_task_api_with_function(self):
@@ -209,16 +211,16 @@ class TestTaskAPI(unittest.TestCase):
     self.assertEqual(task.name, # contains predicate name and assignee list
                      "(Task_eval_fn:is_agent_1_assignee:(1,2,3))")
     self.assertEqual(task.get_source_code(),
-                     'def is_agent_1(gs):\n        ' +
-                     'return any(agent_id == 1 for agent_id in subject.agents)')
-    self.assertEqual(task.get_signature(), ['gs'])
+                     "def is_agent_1(gs):\n        " +
+                     "return any(agent_id == 1 for agent_id in subject.agents)")
+    self.assertEqual(task.get_signature(), ["gs"])
     self.assertEqual(task.args, [])
     self.assertDictEqual(task.kwargs, {})
     self.assertEqual(task.subject, tuple(assignee))
     self.assertEqual(task.assignee, tuple(assignee))
     for agent_id in assignee:
       self.assertEqual(rewards[agent_id], 1)
-      self.assertEqual(infos[agent_id]['progress'], 1) # progress (True -> 1)
+      self.assertEqual(infos[agent_id]["progress"], 1) # progress (True -> 1)
       self.assertTrue(task.completed)
 
   def test_predicate_fn_using_other_predicate_fn(self):
@@ -229,8 +231,8 @@ class TestTaskAPI(unittest.TestCase):
     # team should stay together within 1 tile for 10 ticks
     goal_tick = 10
     task_spec = TaskSpec(eval_fn=PracticeFormation,
-                         eval_fn_kwargs={'dist': 1, 'num_tick': goal_tick},
-                         reward_to='team')
+                         eval_fn_kwargs={"dist": 1, "num_tick": goal_tick},
+                         reward_to="team")
 
     # create the test task from the task spec
     teams = {1:[1,2,3], 3:[4,5], 6:[6,7], 9:[8,9], 14:[10,11]}
@@ -246,13 +248,13 @@ class TestTaskAPI(unittest.TestCase):
     # check the task information
     task = env.tasks[0]
     self.assertEqual(task.name,
-                     '(Task_eval_fn:(PracticeFormation_(1,2,3)_dist:1_num_tick:10)'+
-                     '_assignee:(1,2,3))')
+                     "(Task_eval_fn:(PracticeFormation_(1,2,3)_dist:1_num_tick:10)"+
+                     "_assignee:(1,2,3))")
     self.assertEqual(task.get_source_code(),
-                     'def PracticeFormation(gs, subject, dist, num_tick):\n      '+
-                     'return AllMembersWithinRange(gs, subject, dist) * '+
-                     'TickGE(gs, subject, num_tick)')
-    self.assertEqual(task.get_signature(), ['gs', 'subject', 'dist', 'num_tick'])
+                     "def PracticeFormation(gs, subject, dist, num_tick):\n      "+
+                     "return AllMembersWithinRange(gs, subject, dist) * "+
+                     "TickGE(gs, subject, num_tick)")
+    self.assertEqual(task.get_signature(), ["gs", "subject", "dist", "num_tick"])
     self.assertEqual(task.subject, tuple(teams[team_ids[0]]))
     self.assertEqual(task.kwargs, task_spec.eval_fn_kwargs)
     self.assertEqual(task.assignee, tuple(teams[team_ids[0]]))
@@ -262,7 +264,7 @@ class TestTaskAPI(unittest.TestCase):
       for task in agent_tasks:
         self.assertTrue(agent_id in task.assignee)
 
-    # move agent 2, 3 to agent 1's pos
+    # move agent 2, 3 to agent 1"s pos
     for agent_id in [2,3]:
       change_spawn_pos(env.realm, agent_id,
                        env.realm.players[1].pos)
@@ -273,37 +275,39 @@ class TestTaskAPI(unittest.TestCase):
       if tick < 10:
         self.assertAlmostEqual(rewards[1], 1/goal_tick)
         self.assertAlmostEqual((1+tick)/goal_tick,
-                               infos[1]['task'][env.tasks[0].name]['progress'])
+                               infos[1]["task"][env.tasks[0].name]["progress"])
       else:
         # tick 11, task should be completed
         self.assertEqual(rewards[1], 0)
-        self.assertEqual(infos[1]['task'][env.tasks[0].name]['progress'], 1)
-        self.assertEqual(infos[1]['task'][env.tasks[0].name]['completed'], True)
+        self.assertEqual(infos[1]["task"][env.tasks[0].name]["progress"], 1)
+        self.assertEqual(infos[1]["task"][env.tasks[0].name]["completed"], True)
 
     # test the task_spec_with_embedding
     task_embedding = np.ones(config.TASK_EMBED_DIM, dtype=np.float32)
     task_spec_with_embedding = TaskSpec(eval_fn=PracticeFormation,
-                                        eval_fn_kwargs={'dist': 1, 'num_tick': goal_tick},
-                                        reward_to='team',
+                                        eval_fn_kwargs={"dist": 1, "num_tick": goal_tick},
+                                        reward_to="team",
                                         embedding=task_embedding)
     env.reset(make_task_fn=lambda: make_task_from_spec(teams, [task_spec_with_embedding]))
 
     task = env.tasks[0]
+    self.assertEqual(task.spec_name, # without the subject and assignee agent ids
+                     "Task_PracticeFormation_(dist=1_num_tick=10)_reward_to=team")
     self.assertEqual(task.name,
-                     '(Task_eval_fn:(PracticeFormation_(1,2,3)_dist:1_num_tick:10)'+
-                     '_assignee:(1,2,3))')
+                     "(Task_eval_fn:(PracticeFormation_(1,2,3)_dist:1_num_tick:10)"+
+                     "_assignee:(1,2,3))")
     self.assertEqual(task.get_source_code(),
-                     'def PracticeFormation(gs, subject, dist, num_tick):\n      '+
-                     'return AllMembersWithinRange(gs, subject, dist) * '+
-                     'TickGE(gs, subject, num_tick)')
-    self.assertEqual(task.get_signature(), ['gs', 'subject', 'dist', 'num_tick'])
+                     "def PracticeFormation(gs, subject, dist, num_tick):\n      "+
+                     "return AllMembersWithinRange(gs, subject, dist) * "+
+                     "TickGE(gs, subject, num_tick)")
+    self.assertEqual(task.get_signature(), ["gs", "subject", "dist", "num_tick"])
     self.assertEqual(task.subject, tuple(teams[team_ids[0]]))
     self.assertEqual(task.kwargs, task_spec.eval_fn_kwargs)
     self.assertEqual(task.assignee, tuple(teams[team_ids[0]]))
     self.assertTrue(np.array_equal(task.embedding, task_embedding))
 
     obs_spec = env.observation_space(1)
-    self.assertTrue(obs_spec['Task'].contains(task.embedding))
+    self.assertTrue(obs_spec["Task"].contains(task.embedding))
 
   def test_completed_tasks_in_info(self):
     # pylint: disable=no-value-for-parameter,no-member
@@ -332,24 +336,24 @@ class TestTaskAPI(unittest.TestCase):
     _, _, _, infos = env.step({})
 
     # agent 1: assigned only task 1, which is always True
-    self.assertEqual(infos[1]['task'][env.tasks[0].name]['reward'], 1.0)
+    self.assertEqual(infos[1]["task"][env.tasks[0].name]["reward"], 1.0)
     for i in [1, 2]: # task 2 and 3
-      self.assertTrue(env.tasks[i].name not in infos[1]['task'])
+      self.assertTrue(env.tasks[i].name not in infos[1]["task"])
 
     # agent 2: assigned task 2 (Failure) and task 4 (Success)
-    self.assertEqual(infos[2]['task'][env.tasks[1].name]['reward'], 0.0) # task 2
-    self.assertEqual(infos[2]['task'][env.tasks[3].name]['reward'], 1.0) # task 4
+    self.assertEqual(infos[2]["task"][env.tasks[1].name]["reward"], 0.0) # task 2
+    self.assertEqual(infos[2]["task"][env.tasks[3].name]["reward"], 1.0) # task 4
 
     # agent 3 assigned task 3, Fake(), which is always False (0)
-    self.assertEqual(infos[3]['task'][env.tasks[2].name]['reward'], 0.0) # task 3
+    self.assertEqual(infos[3]["task"][env.tasks[2].name]["reward"], 0.0) # task 3
 
     # all agents in the same team with agent 2 have SUCCESS
-    # other agents don't have any tasks assigned
+    # other agents don"t have any tasks assigned
     for ent_id in env.possible_agents:
       if ent_id in same_team:
-        self.assertEqual(infos[ent_id]['task'][env.tasks[3].name]['reward'], 1.0)
+        self.assertEqual(infos[ent_id]["task"][env.tasks[3].name]["reward"], 1.0)
       else:
-        self.assertTrue(env.tasks[3].name not in infos[ent_id]['task'])
+        self.assertTrue(env.tasks[3].name not in infos[ent_id]["task"])
 
     # DONE
 
@@ -357,13 +361,13 @@ class TestTaskAPI(unittest.TestCase):
     teams = {0:[1,2,3], 1:[4,5,6]}
     test_embedding = np.array([1,2,3])
     task_spec = [
-      TaskSpec(eval_fn=TickGE, eval_fn_kwargs={'num_tick': 20}),
+      TaskSpec(eval_fn=TickGE, eval_fn_kwargs={"num_tick": 20}),
       TaskSpec(eval_fn=StayAlive, eval_fn_kwargs={}, task_cls=OngoingTask),
-      TaskSpec(eval_fn=StayAlive, eval_fn_kwargs={'target': 'my_team_leader'},
-               task_cls=OngoingTask, reward_to='team'),
-      TaskSpec(eval_fn=StayAlive, eval_fn_kwargs={'target': 'left_team'},
-               task_cls=OngoingTask, task_kwargs={'reward_multiplier': 2},
-               reward_to='team', embedding=test_embedding),
+      TaskSpec(eval_fn=StayAlive, eval_fn_kwargs={"target": "my_team_leader"},
+               task_cls=OngoingTask, reward_to="team"),
+      TaskSpec(eval_fn=StayAlive, eval_fn_kwargs={"target": "left_team"},
+               task_cls=OngoingTask, task_kwargs={"reward_multiplier": 2},
+               reward_to="team", embedding=test_embedding),
     ]
 
     task_list = []
@@ -371,17 +375,75 @@ class TestTaskAPI(unittest.TestCase):
     for single_spec in task_spec:
       task_list.append(make_task_from_spec(teams, [single_spec]))
 
+    # check the task spec names
+    self.assertEqual(task_list[0][0].spec_name,
+                     "Task_TickGE_(num_tick=20)_reward_to=agent")
+    self.assertEqual(task_list[1][0].spec_name,
+                     "OngoingTask_StayAlive_()_reward_to=agent")
+    self.assertEqual(task_list[2][0].spec_name,
+                     "OngoingTask_StayAlive_(target=my_team_leader)_reward_to=team")
+    self.assertEqual(task_list[3][0].spec_name,
+                     "OngoingTask_StayAlive_(target=left_team)_reward_to=team")
+
     # check the task names
     self.assertEqual(task_list[0][0].name,
-                     '(Task_eval_fn:(TickGE_(1,)_num_tick:20)_assignee:(1,))')
+                     "(Task_eval_fn:(TickGE_(1,)_num_tick:20)_assignee:(1,))")
     self.assertEqual(task_list[1][0].name,
-                     '(OngoingTask_eval_fn:(StayAlive_(1,))_assignee:(1,))')
+                     "(OngoingTask_eval_fn:(StayAlive_(1,))_assignee:(1,))")
     self.assertEqual(task_list[2][0].name,
-                     '(OngoingTask_eval_fn:(StayAlive_(1,))_assignee:(1,2,3))')
+                     "(OngoingTask_eval_fn:(StayAlive_(1,))_assignee:(1,2,3))")
     self.assertEqual(task_list[3][0].name,
-                     '(OngoingTask_eval_fn:(StayAlive_(4,5,6))_assignee:(1,2,3))')
+                     "(OngoingTask_eval_fn:(StayAlive_(4,5,6))_assignee:(1,2,3))")
     self.assertEqual(task_list[3][0].reward_multiplier, 2)
     self.assertTrue(np.array_equal(task_list[3][0].embedding, np.array([1,2,3])))
 
-if __name__ == '__main__':
+  def test_hold_duration_task(self):
+    # pylint: disable=protected-access
+    # each agent should hoard gold for 10 ticks
+    goal_tick = goal_gold = 10
+    task_spec = [TaskSpec(eval_fn=HoardGold,
+                          eval_fn_kwargs={"amount": goal_gold},
+                          task_cls=HoldDurationTask,
+                          task_kwargs={"hold_duration": goal_tick})] * 3
+
+    config = ScriptedAgentTestConfig()
+    config.PLAYERS =[Sleeper]
+    config.IMMORTAL = True
+
+    teams = {id: [id] for id in range(1,4)}
+    env = Env(config)
+    env.reset(make_task_fn=lambda: make_task_from_spec(teams, task_spec))
+
+    # give agent 1, 2 enough gold
+    for agent_id in [1,2]:
+      env.realm.players[agent_id].gold.update(goal_gold+1)
+
+    for _ in range(5):
+      env.step({})
+
+    # check the task information
+    self.assertEqual(env.tasks[0].spec_name,
+                     "HoldDurationTask_HoardGold_(amount=10)_reward_to=agent")
+    self.assertTrue(env.tasks[0]._progress == 0.5) # agent 1 has enough gold
+    self.assertTrue(env.tasks[1]._progress == 0.5) # agent 2 has enough gold
+    self.assertTrue(env.tasks[2]._progress == 0.0) # agent 3 has no gold
+    for task in env.tasks:
+      self.assertTrue(task.completed is False) # not completed yet
+
+    # take away gold from agent 2
+    env.realm.players[2].gold.update(goal_gold-1)
+
+    env.step({})
+    self.assertTrue(env.tasks[0]._progress == 0.6) # agent 1 has enough gold
+    self.assertTrue(env.tasks[1]._progress == 0) # agent 2 has not enough gold
+
+    for _ in range(4):
+      env.step({})
+
+    # only agent 1 successfully held 10 gold for 10 ticks
+    self.assertTrue(env.tasks[0].completed is True)
+    self.assertTrue(env.tasks[1].completed is False)
+    self.assertTrue(env.tasks[2].completed is False)
+
+if __name__ == "__main__":
   unittest.main()
