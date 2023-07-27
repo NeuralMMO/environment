@@ -5,6 +5,7 @@ from abc import ABC
 import inspect
 
 from nmmo.task.group import Group
+from nmmo.task.game_state import GameState
 from nmmo.task.predicate_api import Predicate, make_predicate, arg_to_string
 from nmmo.task import base_predicates as bp
 
@@ -16,7 +17,8 @@ class Task(ABC):
                eval_fn: Callable,
                assignee: Union[Iterable[int], int],
                reward_multiplier = 1.0,
-               embedding = None):
+               embedding = None,
+               spec_name: str = None):
     if isinstance(assignee, int):
       self._assignee = (assignee,)
     else:
@@ -27,6 +29,7 @@ class Task(ABC):
     self._completed = False
     self._reward_multiplier = reward_multiplier
     self._embedding = embedding
+    self.spec_name = spec_name # None if not created using TaskSpec
     self.name = self._make_name(self.__class__.__name__,
                                 eval_fn=eval_fn, assignee=self._assignee)
 
@@ -53,7 +56,7 @@ class Task(ABC):
   def set_embedding(self, embedding):
     self._embedding = embedding
 
-  def _map_progress_to_reward(self, gs) -> float:
+  def _map_progress_to_reward(self, gs: GameState) -> float:
     """ The default reward is the diff between the old and new progress.
         Once the task is completed, no more reward is provided.
 
@@ -70,16 +73,17 @@ class Task(ABC):
 
     return diff
 
-  def compute_rewards(self, gs) -> Tuple[Dict[int, float], Dict[int, Dict]]:
+  def compute_rewards(self, gs: GameState) -> Tuple[Dict[int, float], Dict[int, Dict]]:
     """ Environment facing API
 
     Returns rewards and infos for all agents in subject
     """
     reward = self._map_progress_to_reward(gs) * self._reward_multiplier
     rewards = {int(ent_id): reward for ent_id in self._assignee}
-    infos = {int(ent_id): {'reward': reward,
-                           'progress': self._progress,
-                           'completed': self._completed}
+    infos = {int(ent_id): {"task_spec": self.spec_name,
+                           "reward": reward,
+                           "progress": self._progress,
+                           "completed": self._completed}
              for ent_id in self._assignee}
 
     # NOTE: tasks do not know whether assignee agents are alive or dead
@@ -89,7 +93,7 @@ class Task(ABC):
   def _make_name(self, class_name, **kwargs) -> str:
     name = [class_name] + \
       [f"{arg_to_string(key)}:{arg_to_string(arg)}" for key, arg in kwargs.items()]
-    name = "("+'_'.join(name).replace(' ', '')+")"
+    name = "("+"_".join(name).replace(" ", "")+")"
     return name
 
   def __str__(self):
@@ -127,7 +131,7 @@ class Task(ABC):
     return {}
 
 class OngoingTask(Task):
-  def _map_progress_to_reward(self, gs) -> float:
+  def _map_progress_to_reward(self, gs: GameState) -> float:
     """Keep returning the progress reward after the task is completed.
        However, this task tracks the completion status in the same manner.
     """
@@ -136,6 +140,43 @@ class OngoingTask(Task):
       self._completed = True
     return self._progress
 
+class HoldDurationTask(Task):
+  def __init__(self,
+               eval_fn: Callable,
+               assignee: Union[Iterable[int], int],
+               hold_duration: int,
+               **kwargs):
+    super().__init__(eval_fn, assignee, **kwargs)
+    self._hold_duration = hold_duration
+    self._reset_timer()
+
+  def _reset_timer(self):
+    self._timer = 0
+    self._last_success_tick = 0
+
+  def reset(self):
+    super().reset()
+    self._reset_timer()
+
+  def _map_progress_to_reward(self, gs: GameState) -> float:
+    # pylint: disable=attribute-defined-outside-init
+    if self._completed:
+      return 0.0
+
+    curr_eval = max(min(self._eval_fn(gs)*1.0,1.0),0.0)
+    if curr_eval < 1:
+      self._reset_timer()
+    else:
+      self._timer += 1
+      self._last_success_tick = gs.current_tick
+
+    new_progress = self._timer / self._hold_duration
+    diff = new_progress - self._progress
+    self._progress = new_progress
+    if self._progress >= 1:
+      self._completed = True
+
+    return diff
 
 ######################################################################
 
@@ -162,11 +203,11 @@ def make_same_task(pred_cls: Union[Type[Predicate], Callable],
 
 def nmmo_default_task(agent_list: Iterable[int], test_mode=None) -> List[Task]:
   # (almost) no overhead in env._compute_rewards()
-  if test_mode == 'no_task':
+  if test_mode == "no_task":
     return []
 
   # eval function on Predicate class, but does not use Group during eval
-  if test_mode == 'dummy_eval_fn':
+  if test_mode == "dummy_eval_fn":
     # pylint: disable=unused-argument
     return make_same_task(lambda gs, subject: True, agent_list, task_cls=OngoingTask)
 

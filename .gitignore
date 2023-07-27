@@ -4,9 +4,10 @@ maps/
 runs/*
 wandb/*
 
-# local replay file from tests/test_deterministic_replay.py, test_render_save.py
+# local replay file from test_render_save.py
 tests/replay_local*.pickle
 replay*
+eval*
 
 .vscode
 
