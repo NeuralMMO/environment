@@ -445,5 +445,25 @@ class TestTaskAPI(unittest.TestCase):
     self.assertTrue(env.tasks[1].completed is False)
     self.assertTrue(env.tasks[2].completed is False)
 
+  def test_task_spec_with_predicate(self):
+    teams = {0:[1,2,3], 1:[4,5,6]}
+    SUCCESS = make_predicate(Success)(Group(1))
+    FAILURE = make_predicate(Failure)(Group([2,3]))
+    predicate = SUCCESS & FAILURE
+    predicate.name = "SuccessAndFailure"
+
+    # make task spec
+    task_spec = [TaskSpec(predicate=predicate,
+                          eval_fn=None, eval_fn_kwargs={"success_target": 1})]
+    tasks = make_task_from_spec(teams, task_spec)
+
+    env = Env(ScriptedAgentTestConfig())
+    env.reset(make_task_fn=lambda: tasks)
+    env.step({})
+
+    # check the task information
+    self.assertEqual(env.tasks[0].spec_name,
+                     "Task_SuccessAndFailure_(success_target=1)_reward_to=agent")
+
 if __name__ == "__main__":
   unittest.main()

@@ -6,7 +6,7 @@ from types import FunctionType
 import numpy as np
 
 from nmmo.task.task_api import Task, make_same_task
-from nmmo.task.predicate_api import make_predicate
+from nmmo.task.predicate_api import Predicate, make_predicate
 from nmmo.task.group import Group
 from nmmo.task import base_predicates as bp
 from nmmo.lib.team_helper import TeamHelper
@@ -42,10 +42,14 @@ class TaskSpec:
   reward_to: str = "agent"
   sampling_weight: float = 1.0
   embedding: np.ndarray = None
+  predicate: Predicate = None
 
   def __post_init__(self):
-    assert isinstance(self.eval_fn, FunctionType), \
-      "eval_fn must be a function"
+    if self.predicate is None:
+      assert isinstance(self.eval_fn, FunctionType), \
+        "eval_fn must be a function"
+    else:
+      assert self.eval_fn is None, "Cannot specify both eval_fn and predicate"
     assert self.reward_to in REWARD_TO, \
       f"reward_to must be in {REWARD_TO}"
     if "target" in self.eval_fn_kwargs:
@@ -54,11 +58,11 @@ class TaskSpec:
 
   @functools.cached_property
   def name(self):
-    """ Generate a name for the task spec
-    """
+    # pylint: disable=no-member
     kwargs_str = "".join([f"{key}={str(val)}_" for key, val in self.eval_fn_kwargs.items()])
     kwargs_str = "(" + kwargs_str[:-1] + ")" # remove the last _
-    return "_".join([self.task_cls.__name__, self.eval_fn.__name__, # pylint: disable=no-member
+    pred_name = self.eval_fn.__name__ if self.predicate is None else self.predicate.name
+    return "_".join([self.task_cls.__name__, pred_name,
                      kwargs_str, "reward_to=" + self.reward_to])
 
 def make_task_from_spec(assign_to: Union[Iterable[int], Dict],
@@ -89,6 +93,7 @@ def make_task_from_spec(assign_to: Union[Iterable[int], Dict],
     task_kwargs = task_spec[idx].task_kwargs
     task_kwargs["embedding"] = task_spec[idx].embedding # to pass to task_cls
     task_kwargs["spec_name"] = task_spec[idx].name
+    predicate = task_spec[idx].predicate
 
     # reserve "target" for relative agent mapping
     if "target" in pred_fn_kwargs:
@@ -99,8 +104,7 @@ def make_task_from_spec(assign_to: Union[Iterable[int], Dict],
       pred_fn_kwargs["target"] = target
 
     # handle some special cases and instantiate the predicate first
-    predicate = None
-    if isinstance(pred_fn, FunctionType):
+    if pred_fn is not None and isinstance(pred_fn, FunctionType):
       # if a function is provided as a predicate
       pred_cls = make_predicate(pred_fn)
 
