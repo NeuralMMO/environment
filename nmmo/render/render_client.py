@@ -19,6 +19,10 @@ class WebsocketRenderer:
 
     self.packet = None
 
+  def set_realm(self, realm) -> None:
+    self._realm = realm
+    self.registry = OverlayRegistry(realm, renderer=self) if realm else None
+
   def render_packet(self, packet) -> None:
     packet = {
       'pos': self.overlay_pos,

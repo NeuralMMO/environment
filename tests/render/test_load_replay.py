@@ -11,8 +11,8 @@ if __name__ == '__main__':
   renderer = WebsocketRenderer()
   time.sleep(3)
 
-  # load a replay
-  replay = FileReplayHelper.load('replay_dev.json', decompress=False)
+  # load a replay: replace 'replay_dev.json' with your replay file
+  replay = FileReplayHelper.load('replay_dev.json')
 
   # run the replay
   for packet in replay:
