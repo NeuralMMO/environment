@@ -18,7 +18,6 @@ from nmmo.systems.item import Item
 from nmmo.task import task_api, task_spec
 from nmmo.task.game_state import GameStateGenerator
 from nmmo.lib import seeding
-from scripted.baselines import Scripted
 
 class Env(ParallelEnv):
   # Environment wrapper for Neural MMO using the Parallel PettingZoo API
@@ -169,7 +168,7 @@ class Env(ParallelEnv):
 
     # check if there are scripted agents
     for eid, ent in self.realm.players.items():
-      if isinstance(ent.agent, Scripted):
+      if isinstance(ent.agent, nmmo.Scripted):
         self.scripted_agents.add(eid)
         ent.agent.set_rng(self._np_random)
 

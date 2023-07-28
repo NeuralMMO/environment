@@ -1,9 +1,6 @@
-# TODO: try to remove the below line
-# pylint: disable=all
-
+# pylint: disable=invalid-name, attribute-defined-outside-init, no-member
 from typing import Dict
 from collections import defaultdict
-import numpy as np
 
 import nmmo
 from nmmo import material
@@ -14,6 +11,7 @@ from nmmo.core import action
 from nmmo.core.observation import Observation
 
 from scripted import attack, move
+
 
 class Scripted(nmmo.Scripted):
   '''Template class for baseline scripted models.
@@ -27,18 +25,14 @@ class Scripted(nmmo.Scripted):
         config : A forge.blade.core.Config object or subclass object
     '''
     super().__init__(config, idx)
-    self._np_random = None
     self.health_max = config.PLAYER_BASE_HEALTH
 
     if config.RESOURCE_SYSTEM_ENABLED:
-        self.food_max   = config.RESOURCE_BASE
-        self.water_max  = config.RESOURCE_BASE
+      self.food_max   = config.RESOURCE_BASE
+      self.water_max  = config.RESOURCE_BASE
 
     self.spawnR    = None
     self.spawnC    = None
-
-  def set_rng(self, np_random):
-    self._np_random = np_random
 
   @property
   def policy(self):
@@ -83,7 +77,7 @@ class Scripted(nmmo.Scripted):
       style = self._np_random.choice(self.style)
       attack.target(self.config, self.actions, style, self.targetID)
 
-  def target_weak(self):
+  def target_weak(self): # pylint: disable=inconsistent-return-statements
     '''Target the nearest agent if it is weak'''
     if self.closest is None:
       return False
@@ -232,14 +226,16 @@ class Scripted(nmmo.Scripted):
 
       # InventoryItem needs where the item is (index) in the inventory
       self.actions[action.Use] = {
-        action.InventoryItem: self.ob.inventory.index(itm.id)} # list(self.ob.inventory.ids).index(itm.id)
+        action.InventoryItem: self.ob.inventory.index(itm.id)}
 
     return True
 
   def consume(self):
-    if self.me.health <= self.health_max // 2 and item_system.Potion.ITEM_TYPE_ID in self.best_items:
+    if self.me.health <= self.health_max // 2 \
+        and item_system.Potion.ITEM_TYPE_ID in self.best_items:
       itm = self.best_items[item_system.Potion.ITEM_TYPE_ID]
-    elif (self.me.food == 0 or self.me.water == 0) and item_system.Ration.ITEM_TYPE_ID in self.best_items:
+    elif (self.me.food == 0 or self.me.water == 0) \
+        and item_system.Ration.ITEM_TYPE_ID in self.best_items:
       itm = self.best_items[item_system.Ration.ITEM_TYPE_ID]
     else:
       return
@@ -249,7 +245,7 @@ class Scripted(nmmo.Scripted):
 
     # InventoryItem needs where the item is (index) in the inventory
     self.actions[action.Use] = {
-      action.InventoryItem: self.ob.inventory.index(itm.id)} # list(self.ob.inventory.ids).index(itm.id)
+      action.InventoryItem: self.ob.inventory.index(itm.id)}
 
   def sell(self, keep_k: dict, keep_best: set):
     for itm in self.inventory.values():
@@ -272,8 +268,8 @@ class Scripted(nmmo.Scripted):
         continue
 
       self.actions[action.Sell] = {
-        action.InventoryItem: self.ob.inventory.index(itm.id), # list(self.ob.inventory.ids).index(itm.id)
-        action.Price: action.Price.edges[price-1] } # Price starts from 1
+        action.InventoryItem: self.ob.inventory.index(itm.id),
+        action.Price: action.Price.index(price) }
 
       return itm
 
@@ -299,7 +295,7 @@ class Scripted(nmmo.Scripted):
       # Buy best heuristic upgrade
       if purchase:
         self.actions[action.Buy] = {
-          action.MarketItem: self.ob.market.index(purchase.id)} #list(self.ob.market.ids).index(purchase.id)}
+          action.MarketItem: self.ob.market.index(purchase.id)}
         return
 
   def exchange(self):
@@ -391,9 +387,9 @@ class Forage(Scripted):
     super().__call__(obs)
 
     if self.forage_criterion:
-        self.forage()
+      self.forage()
     else:
-        self.explore()
+      self.explore()
 
     return self.actions
 
