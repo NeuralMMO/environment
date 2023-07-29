@@ -292,7 +292,7 @@ class TestTaskAPI(unittest.TestCase):
 
     task = env.tasks[0]
     self.assertEqual(task.spec_name, # without the subject and assignee agent ids
-                     "Task_PracticeFormation_(dist=1_num_tick=10)_reward_to=team")
+                     "Task_PracticeFormation_(dist:1_num_tick:10)_reward_to:team")
     self.assertEqual(task.name,
                      "(Task_eval_fn:(PracticeFormation_(1,2,3)_dist:1_num_tick:10)"+
                      "_assignee:(1,2,3))")
@@ -377,13 +377,13 @@ class TestTaskAPI(unittest.TestCase):
 
     # check the task spec names
     self.assertEqual(task_list[0][0].spec_name,
-                     "Task_TickGE_(num_tick=20)_reward_to=agent")
+                     "Task_TickGE_(num_tick:20)_reward_to:agent")
     self.assertEqual(task_list[1][0].spec_name,
-                     "OngoingTask_StayAlive_()_reward_to=agent")
+                     "OngoingTask_StayAlive_()_reward_to:agent")
     self.assertEqual(task_list[2][0].spec_name,
-                     "OngoingTask_StayAlive_(target=my_team_leader)_reward_to=team")
+                     "OngoingTask_StayAlive_(target:my_team_leader)_reward_to:team")
     self.assertEqual(task_list[3][0].spec_name,
-                     "OngoingTask_StayAlive_(target=left_team)_reward_to=team")
+                     "OngoingTask_StayAlive_(target:left_team)_reward_to:team")
 
     # check the task names
     self.assertEqual(task_list[0][0].name,
@@ -423,7 +423,7 @@ class TestTaskAPI(unittest.TestCase):
 
     # check the task information
     self.assertEqual(env.tasks[0].spec_name,
-                     "HoldDurationTask_HoardGold_(amount=10)_reward_to=agent")
+                     "HoldDurationTask_HoardGold_(amount:10)_reward_to:agent")
     self.assertTrue(env.tasks[0]._progress == 0.5) # agent 1 has enough gold
     self.assertTrue(env.tasks[1]._progress == 0.5) # agent 2 has enough gold
     self.assertTrue(env.tasks[2]._progress == 0.0) # agent 3 has no gold
@@ -454,7 +454,9 @@ class TestTaskAPI(unittest.TestCase):
 
     # make task spec
     task_spec = [TaskSpec(predicate=predicate,
-                          eval_fn=None, eval_fn_kwargs={"success_target": 1})]
+                          eval_fn=None,
+                          eval_fn_kwargs={"success_target": 1,
+                                          "test_item": Item.Hat})]
     tasks = make_task_from_spec(teams, task_spec)
 
     env = Env(ScriptedAgentTestConfig())
@@ -463,7 +465,7 @@ class TestTaskAPI(unittest.TestCase):
 
     # check the task information
     self.assertEqual(env.tasks[0].spec_name,
-                     "Task_SuccessAndFailure_(success_target=1)_reward_to=agent")
+                     "Task_SuccessAndFailure_(success_target:1_test_item:Hat)_reward_to:agent")
 
 if __name__ == "__main__":
   unittest.main()
