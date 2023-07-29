@@ -424,8 +424,10 @@ class TestTaskAPI(unittest.TestCase):
     # check the task information
     self.assertEqual(env.tasks[0].spec_name,
                      "HoldDurationTask_HoardGold_(amount:10)_reward_to:agent")
-    self.assertTrue(env.tasks[0]._progress == 0.5) # agent 1 has enough gold
-    self.assertTrue(env.tasks[1]._progress == 0.5) # agent 2 has enough gold
+    for idx in [0, 1]:
+      self.assertEqual(env.tasks[idx]._progress, 0.5) # agent 1 & 2 has enough gold
+      self.assertEqual(env.tasks[idx]._max_progress, 0.5)
+      self.assertEqual(env.tasks[idx]._reward_count, 5)
     self.assertTrue(env.tasks[2]._progress == 0.0) # agent 3 has no gold
     for task in env.tasks:
       self.assertTrue(task.completed is False) # not completed yet
@@ -434,8 +436,12 @@ class TestTaskAPI(unittest.TestCase):
     env.realm.players[2].gold.update(goal_gold-1)
 
     env.step({})
-    self.assertTrue(env.tasks[0]._progress == 0.6) # agent 1 has enough gold
-    self.assertTrue(env.tasks[1]._progress == 0) # agent 2 has not enough gold
+    self.assertEqual(env.tasks[0]._progress, 0.6) # agent 1 has enough gold
+    self.assertEqual(env.tasks[0]._max_progress, 0.6)
+    self.assertEqual(env.tasks[0]._reward_count, 6)
+    self.assertEqual(env.tasks[1]._progress, 0) # agent 2 has not enough gold
+    self.assertEqual(env.tasks[1]._max_progress, 0.5) # max values are preserved
+    self.assertEqual(env.tasks[1]._reward_count, 5)
 
     for _ in range(4):
       env.step({})
