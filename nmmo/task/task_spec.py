@@ -2,6 +2,7 @@ import functools
 from dataclasses import dataclass, field
 from typing import Iterable, Dict, List, Union, Type
 from types import FunctionType
+from copy import deepcopy
 
 import numpy as np
 
@@ -93,9 +94,9 @@ def make_task_from_spec(assign_to: Union[Iterable[int], Dict],
     # map local vars to spec attributes
     reward_to = task_spec[idx].reward_to
     pred_fn = task_spec[idx].eval_fn
-    pred_fn_kwargs = task_spec[idx].eval_fn_kwargs
+    pred_fn_kwargs = deepcopy(task_spec[idx].eval_fn_kwargs)
     task_cls = task_spec[idx].task_cls
-    task_kwargs = task_spec[idx].task_kwargs
+    task_kwargs = deepcopy(task_spec[idx].task_kwargs)
     task_kwargs["embedding"] = task_spec[idx].embedding # to pass to task_cls
     task_kwargs["spec_name"] = task_spec[idx].name
     predicate = task_spec[idx].predicate
