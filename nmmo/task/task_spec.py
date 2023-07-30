@@ -2,6 +2,7 @@ import functools
 from dataclasses import dataclass, field
 from typing import Iterable, Dict, List, Union, Type
 from types import FunctionType
+from copy import deepcopy
 
 import numpy as np
 
@@ -59,11 +60,16 @@ class TaskSpec:
   @functools.cached_property
   def name(self):
     # pylint: disable=no-member
-    kwargs_str = "".join([f"{key}={str(val)}_" for key, val in self.eval_fn_kwargs.items()])
-    kwargs_str = "(" + kwargs_str[:-1] + ")" # remove the last _
+    kwargs_str = []
+    for key, val in self.eval_fn_kwargs.items():
+      val_str = str(val)
+      if isinstance(val, type):
+        val_str = val.__name__
+      kwargs_str.append(f"{key}:{val_str}_")
+    kwargs_str = "(" + "".join(kwargs_str)[:-1] + ")" # remove the last _
     pred_name = self.eval_fn.__name__ if self.predicate is None else self.predicate.name
     return "_".join([self.task_cls.__name__, pred_name,
-                     kwargs_str, "reward_to=" + self.reward_to])
+                     kwargs_str, "reward_to:" + self.reward_to])
 
 def make_task_from_spec(assign_to: Union[Iterable[int], Dict],
                         task_spec: List[TaskSpec]) -> List[Task]:
@@ -88,9 +94,9 @@ def make_task_from_spec(assign_to: Union[Iterable[int], Dict],
     # map local vars to spec attributes
     reward_to = task_spec[idx].reward_to
     pred_fn = task_spec[idx].eval_fn
-    pred_fn_kwargs = task_spec[idx].eval_fn_kwargs
+    pred_fn_kwargs = deepcopy(task_spec[idx].eval_fn_kwargs)
     task_cls = task_spec[idx].task_cls
-    task_kwargs = task_spec[idx].task_kwargs
+    task_kwargs = deepcopy(task_spec[idx].task_kwargs)
     task_kwargs["embedding"] = task_spec[idx].embedding # to pass to task_cls
     task_kwargs["spec_name"] = task_spec[idx].name
     predicate = task_spec[idx].predicate

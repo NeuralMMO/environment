@@ -27,6 +27,9 @@ class Task(ABC):
     self._eval_fn = eval_fn
     self._progress = 0.0
     self._completed = False
+    self._max_progress = 0.0
+    self._reward_count = 0
+
     self._reward_multiplier = reward_multiplier
     self._embedding = embedding
     self.spec_name = spec_name # None if not created using TaskSpec
@@ -36,6 +39,8 @@ class Task(ABC):
   def reset(self):
     self._progress = 0.0
     self._completed = False
+    self._max_progress = 0.0
+    self._reward_count = 0
 
   @property
   def assignee(self) -> Tuple[int]:
@@ -79,6 +84,8 @@ class Task(ABC):
     Returns rewards and infos for all agents in subject
     """
     reward = self._map_progress_to_reward(gs) * self._reward_multiplier
+    self._max_progress = max(self._max_progress, self._progress)
+    self._reward_count += int(reward > 0)
     rewards = {int(ent_id): reward for ent_id in self._assignee}
     infos = {int(ent_id): {"task_spec": self.spec_name,
                            "reward": reward,
