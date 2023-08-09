@@ -1,8 +1,9 @@
-# pylint: disable=unused-import
+# pylint: disable=unused-import,attribute-defined-outside-init
 from typing import Callable, Iterable, Dict, List, Union, Tuple, Type
 from types import FunctionType
 from abc import ABC
 import inspect
+import numpy as np
 
 from nmmo.task.group import Group
 from nmmo.task.game_state import GameState
@@ -25,22 +26,19 @@ class Task(ABC):
       assert len(assignee) > 0, "Assignee cannot be empty"
       self._assignee = tuple(set(assignee)) # dedup
     self._eval_fn = eval_fn
-    self._progress = 0.0
-    self._completed = False
-    self._max_progress = 0.0
-    self._reward_count = 0
-
     self._reward_multiplier = reward_multiplier
-    self._embedding = embedding
+    self._embedding = None if embedding is None else np.array(embedding, dtype=np.float16)
     self.spec_name = spec_name # None if not created using TaskSpec
     self.name = self._make_name(self.__class__.__name__,
                                 eval_fn=eval_fn, assignee=self._assignee)
+    self.reset()
 
   def reset(self):
     self._progress = 0.0
-    self._completed = False
+    self._completed_tick = None
     self._max_progress = 0.0
-    self._reward_count = 0
+    self._positive_reward_count = 0
+    self._negative_reward_count = 0
 
   @property
   def assignee(self) -> Tuple[int]:
@@ -48,11 +46,15 @@ class Task(ABC):
 
   @property
   def completed(self) -> bool:
-    return self._completed
+    return self._completed_tick is not None
 
   @property
   def reward_multiplier(self) -> float:
     return self._reward_multiplier
+
+  @property
+  def reward_signal_count(self) -> int:
+    return self._positive_reward_count + self._negative_reward_count
 
   @property
   def embedding(self):
@@ -67,14 +69,14 @@ class Task(ABC):
 
         Override this function to create a custom reward function
     """
-    if self._completed:
+    if self.completed:
       return 0.0
 
     new_progress = max(min(self._eval_fn(gs)*1.0,1.0),0.0)
     diff = new_progress - self._progress
     self._progress = new_progress
     if self._progress >= 1:
-      self._completed = True
+      self._completed_tick = gs.current_tick
 
     return diff
 
@@ -85,12 +87,13 @@ class Task(ABC):
     """
     reward = self._map_progress_to_reward(gs) * self._reward_multiplier
     self._max_progress = max(self._max_progress, self._progress)
-    self._reward_count += int(reward > 0)
+    self._positive_reward_count += int(reward > 0)
+    self._negative_reward_count += int(reward < 0)
     rewards = {int(ent_id): reward for ent_id in self._assignee}
     infos = {int(ent_id): {"task_spec": self.spec_name,
                            "reward": reward,
                            "progress": self._progress,
-                           "completed": self._completed}
+                           "completed": self.completed}
              for ent_id in self._assignee}
 
     # NOTE: tasks do not know whether assignee agents are alive or dead
@@ -143,8 +146,8 @@ class OngoingTask(Task):
        However, this task tracks the completion status in the same manner.
     """
     self._progress = max(min(self._eval_fn(gs)*1.0,1.0),0.0)
-    if self._progress >= 1:
-      self._completed = True
+    if self._progress >= 1 and self._completed_tick is None:
+      self._completed_tick = gs.current_tick
     return self._progress
 
 class HoldDurationTask(Task):
@@ -167,7 +170,7 @@ class HoldDurationTask(Task):
 
   def _map_progress_to_reward(self, gs: GameState) -> float:
     # pylint: disable=attribute-defined-outside-init
-    if self._completed:
+    if self.completed:
       return 0.0
 
     curr_eval = max(min(self._eval_fn(gs)*1.0,1.0),0.0)
@@ -180,8 +183,8 @@ class HoldDurationTask(Task):
     new_progress = self._timer / self._hold_duration
     diff = new_progress - self._progress
     self._progress = new_progress
-    if self._progress >= 1:
-      self._completed = True
+    if self._progress >= 1 and self._completed_tick is None:
+      self._completed_tick = gs.current_tick
 
     return diff
 
