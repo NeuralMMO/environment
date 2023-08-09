@@ -381,7 +381,7 @@ class Observation:
     if self.inventory.len >= self.config.ITEM_INVENTORY_CAPACITY:
       exist_ammo_listings = self._existing_ammo_listings()
       if not np.any(exist_ammo_listings):
-        return np.zeros(self.config.MARKET_N_OBS, dtype=np.int8)
+        return buy_mask
       not_mine &= exist_ammo_listings
 
     enough_gold = market_items[:,ItemState.State.attr_name_to_col["listed_price"]] <= agent.gold
