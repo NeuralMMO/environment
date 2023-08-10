@@ -34,6 +34,7 @@ class Task(ABC):
     self.reset()
 
   def reset(self):
+    self._last_eval_tick = None
     self._progress = 0.0
     self._completed_tick = None
     self._max_progress = 0.0
@@ -86,6 +87,7 @@ class Task(ABC):
     Returns rewards and infos for all agents in subject
     """
     reward = self._map_progress_to_reward(gs) * self._reward_multiplier
+    self._last_eval_tick = gs.current_tick
     self._max_progress = max(self._max_progress, self._progress)
     self._positive_reward_count += int(reward > 0)
     self._negative_reward_count += int(reward < 0)
@@ -139,6 +141,19 @@ class Task(ABC):
       return self._eval_fn.kwargs
     # the function _eval_fn must only take gs
     return {}
+
+  @property
+  def progress_info(self):
+    return {
+      "task_spec_name": self.spec_name,
+      "last_eval_tick": self._last_eval_tick,
+      "completed": self.completed,
+      "completed_tick": self._completed_tick,
+      "max_progress": self._max_progress,
+      "positive_reward_count": self._positive_reward_count,
+      "negative_reward_count": self._negative_reward_count,
+      "reward_signal_count": self.reward_signal_count,
+    }
 
 class OngoingTask(Task):
   def _map_progress_to_reward(self, gs: GameState) -> float:

@@ -21,7 +21,6 @@ TEST_HORIZON = 30
 RANDOM_SEED = random.randint(0, 10000)
 
 class Config(nmmo.config.Small, nmmo.config.AllGameSystems):
-  SPECIALIZE = True
   PLAYERS = [
     baselines.Fisher, baselines.Herbalist, baselines.Prospector,
     baselines.Carver, baselines.Alchemist,

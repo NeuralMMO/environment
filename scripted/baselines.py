@@ -464,42 +464,42 @@ class Gather(Scripted):
 class Fisher(Gather):
   def __init__(self, config, idx):
     super().__init__(config, idx)
-    if config.SPECIALIZE:
+    if config.PROFESSION_SYSTEM_ENABLED:
       self.resource = [material.Fish]
     self.tool     = item_system.Rod
 
 class Herbalist(Gather):
   def __init__(self, config, idx):
     super().__init__(config, idx)
-    if config.SPECIALIZE:
+    if config.PROFESSION_SYSTEM_ENABLED:
       self.resource = [material.Herb]
     self.tool     = item_system.Gloves
 
 class Prospector(Gather):
   def __init__(self, config, idx):
     super().__init__(config, idx)
-    if config.SPECIALIZE:
+    if config.PROFESSION_SYSTEM_ENABLED:
       self.resource = [material.Ore]
     self.tool     = item_system.Pickaxe
 
 class Carver(Gather):
   def __init__(self, config, idx):
     super().__init__(config, idx)
-    if config.SPECIALIZE:
+    if config.PROFESSION_SYSTEM_ENABLED:
       self.resource = [material.Tree]
     self.tool     = item_system.Axe
 
 class Alchemist(Gather):
   def __init__(self, config, idx):
     super().__init__(config, idx)
-    if config.SPECIALIZE:
+    if config.PROFESSION_SYSTEM_ENABLED:
       self.resource = [material.Crystal]
     self.tool     = item_system.Chisel
 
 class Melee(Combat):
   def __init__(self, config, idx):
     super().__init__(config, idx)
-    if config.SPECIALIZE:
+    if config.COMBAT_SYSTEM_ENABLED:
       self.style  = [action.Melee]
     self.weapon = item_system.Spear
     self.ammo   = item_system.Whetstone
@@ -507,7 +507,7 @@ class Melee(Combat):
 class Range(Combat):
   def __init__(self, config, idx):
     super().__init__(config, idx)
-    if config.SPECIALIZE:
+    if config.COMBAT_SYSTEM_ENABLED:
       self.style  = [action.Range]
     self.weapon = item_system.Bow
     self.ammo   = item_system.Arrow
@@ -515,7 +515,7 @@ class Range(Combat):
 class Mage(Combat):
   def __init__(self, config, idx):
     super().__init__(config, idx)
-    if config.SPECIALIZE:
+    if config.COMBAT_SYSTEM_ENABLED:
       self.style  = [action.Mage]
     self.weapon = item_system.Wand
     self.ammo   = item_system.Runes
