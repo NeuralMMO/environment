@@ -119,7 +119,6 @@ class ScriptedAgentTestConfig(nmmo.config.Small, nmmo.config.AllGameSystems):
 
   PLAYER_DEATH_FOG = 5
 
-  SPECIALIZE = True
   PLAYERS = [
     baselines.Fisher, baselines.Herbalist,
     baselines.Prospector,baselines.Carver, baselines.Alchemist,
