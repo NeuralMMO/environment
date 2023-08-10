@@ -475,11 +475,12 @@ class Env(ParallelEnv):
     # Compute Rewards and infos
     self.game_state = self._gamestate_generator.generate(self.realm, self.obs)
     for task in self.tasks:
-      task_rewards, task_infos = task.compute_rewards(self.game_state)
-      for agent_id, reward in task_rewards.items():
-        if agent_id in agents:
-          rewards[agent_id] = rewards.get(agent_id,0) + reward
-          infos[agent_id]['task'][task.name] = task_infos[agent_id] # progress
+      if agents.intersection(task.assignee): # evaluate only if the agents are current
+        task_rewards, task_infos = task.compute_rewards(self.game_state)
+        for agent_id, reward in task_rewards.items():
+          if agent_id in agents:
+            rewards[agent_id] = rewards.get(agent_id,0) + reward
+            infos[agent_id]['task'][task.name] = task_infos[agent_id] # include progress, etc
 
     # Make sure the dead agents return the rewards of -1
     for agent_id in self._dead_this_tick:
