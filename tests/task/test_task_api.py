@@ -273,7 +273,8 @@ class TestTaskAPI(unittest.TestCase):
       _, rewards, _, infos = env.step({})
 
       if tick < 10:
-        self.assertAlmostEqual(rewards[1], 1/goal_tick)
+        target_reward = 1.0 if env.realm.tick == goal_tick else 1/goal_tick
+        self.assertAlmostEqual(rewards[1], target_reward)
         self.assertAlmostEqual((1+tick)/goal_tick,
                                infos[1]["task"][env.tasks[0].name]["progress"])
       else:
@@ -283,7 +284,7 @@ class TestTaskAPI(unittest.TestCase):
         self.assertEqual(infos[1]["task"][env.tasks[0].name]["completed"], True)
 
     # test the task_spec_with_embedding
-    task_embedding = np.ones(config.TASK_EMBED_DIM, dtype=np.float32)
+    task_embedding = np.ones(config.TASK_EMBED_DIM, dtype=np.float16)
     task_spec_with_embedding = TaskSpec(eval_fn=PracticeFormation,
                                         eval_fn_kwargs={"dist": 1, "num_tick": goal_tick},
                                         reward_to="team",

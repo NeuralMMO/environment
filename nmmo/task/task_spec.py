@@ -6,6 +6,7 @@ from copy import deepcopy
 
 import numpy as np
 
+import nmmo
 from nmmo.task.task_api import Task, make_same_task
 from nmmo.task.predicate_api import Predicate, make_predicate
 from nmmo.task.group import Group
@@ -143,3 +144,22 @@ def make_task_from_spec(assign_to: Union[Iterable[int], Dict],
                   for agent_id in agent_list]
 
   return tasks
+
+# pylint: disable=bare-except,cell-var-from-loop
+def check_task_spec(spec_list: List[TaskSpec]) -> List[Dict]:
+  teams = {0: [1, 2, 3], 3: [4, 5], 7: [6, 7], 11: [8, 9], 14: [10, 11]}
+  config = nmmo.config.Default()
+  env = nmmo.Env(config)
+  results = []
+  for single_spec in spec_list:
+    result = {"spec_name": single_spec.name}
+    try:
+      env.reset(make_task_fn=lambda: make_task_from_spec(teams, [single_spec]))
+      for _ in range(3):
+        env.step({})
+      result["runnable"] = True
+    except:
+      result["runnable"] = False
+
+    results.append(result)
+  return results

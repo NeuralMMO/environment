@@ -3,12 +3,11 @@
 # pylint: disable=wildcard-import,unused-wildcard-import
 from typing import List
 
-import nmmo
 import nmmo.lib.material as m
 from nmmo.task.base_predicates import *
 from nmmo.task.task_api import OngoingTask
 from nmmo.task import constraint as c
-from nmmo.task.task_spec import TaskSpec, make_task_from_spec
+from nmmo.task.task_spec import TaskSpec, check_task_spec
 
 EVENT_NUMBER_GOAL = [3, 4, 5, 7, 9, 12, 15, 20, 30, 50]
 INFREQUENT_GOAL = list(range(1, 10))
@@ -295,7 +294,6 @@ for style in COMBAT_STYLE:
 
 
 if __name__ == '__main__':
-  # pylint: disable=bare-except
   import psutil
   from contextlib import contextmanager
   import multiprocessing as mp
@@ -309,36 +307,20 @@ if __name__ == '__main__':
     pool.close()
     pool.join()
 
-  def check_task_spec(spec_list):
-    teams = {0:[1,2,3], 1:[4,5], 2:[6,7], 3:[8,9], 4:[10,11]}
-    config = nmmo.config.Default()
-    env = nmmo.Env(config)
-    for idx, single_spec in enumerate(spec_list):
-      # pylint: disable=cell-var-from-loop
-      test_task = make_task_from_spec(teams, [single_spec])
-      try:
-        env.reset(make_task_fn=lambda: test_task)
-        for _ in range(3):
-          env.step({})
-      except:
-        print('invalid task spec:', single_spec)
-
-      if idx > 0 and idx % 50 == 0:
-        print(idx, 'task specs checked.')
-
   # 3495 task specs: divide the specs into chunks
-  num_cores = psutil.cpu_count(logical=False)
-  spec_chunks = np.array_split(task_spec, num_cores)
-  with create_pool(num_cores) as pool:
-    pool.map(check_task_spec, spec_chunks)
+  num_workers = round(psutil.cpu_count(logical=False)*0.7)
+  spec_chunks = np.array_split(task_spec, num_workers)
+  with create_pool(num_workers) as pool:
+    chunk_results = pool.map(check_task_spec, spec_chunks)
 
-  # print(sample_task[0].name)
-  # if len(sample_task) > 1:
-  #   print(sample_task[-1].name)
-
-  # for now, we only use the 1535 tasks with reward_to=agent
-  flt_spec = [spec for spec in task_spec if spec.reward_to == 'agent']
+  num_error = 0
+  for results in chunk_results:
+    for result in results:
+      if result["runnable"] is False:
+        print("ERROR: ", result["spec_name"])
+        num_error += 1
+  print("Total number of errors: ", num_error)
 
   # test if the task spec is pickalable
   with open('sample_curriculum.pkl', 'wb') as f:
-    dill.dump(flt_spec, f)
+    dill.dump(task_spec, f)

@@ -78,6 +78,7 @@ class Task(ABC):
     self._progress = new_progress
     if self._progress >= 1:
       self._completed_tick = gs.current_tick
+      diff = 1.0  # give out the max reward when task is completed
 
     return diff
 
@@ -200,6 +201,7 @@ class HoldDurationTask(Task):
     self._progress = new_progress
     if self._progress >= 1 and self._completed_tick is None:
       self._completed_tick = gs.current_tick
+      diff = 1.0  # give out the max reward when task is completed
 
     return diff
 
