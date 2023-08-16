@@ -21,7 +21,7 @@ def make_random_actions(config, ent_obs):
   for atn in sorted(nmmo.Action.edges(config)):
     actions[atn] = {}
     for arg in sorted(atn.edges, reverse=True): # intentionally doing wrong
-      mask = ent_obs['ActionTargets'][atn][arg]
+      mask = ent_obs["ActionTargets"][atn.__name__][arg.__name__]
       actions[atn][arg] = 0
       if np.any(mask):
         actions[atn][arg] += int(np.random.choice(np.where(mask)[0]))

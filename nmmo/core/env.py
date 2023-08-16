@@ -1,7 +1,7 @@
 import functools
 from typing import Any, Dict, List, Callable
 from collections import defaultdict
-from copy import copy, deepcopy
+from copy import copy
 import dill
 
 import gym
@@ -85,11 +85,13 @@ class Env(ParallelEnv):
       obs_space["Market"] = box(self.config.MARKET_N_OBS, Item.State.num_attributes)
 
     if self.config.PROVIDE_ACTION_TARGETS:
-      mask_spec = deepcopy(self._atn_space)
-      for atn in mask_spec:
+      mask_spec = {} # deepcopy(self._atn_space)
+      for atn in self._atn_space:
+        tmp_mask = {}
         for arg in atn.edges:
-          mask_spec[atn][arg] = mask_box(mask_spec[atn][arg].n)
-      obs_space['ActionTargets'] = mask_spec
+          tmp_mask[arg.__name__] = mask_box(self._atn_space[atn][arg].n)
+        mask_spec[atn.__name__] = gym.spaces.Dict(tmp_mask)
+      obs_space['ActionTargets'] = gym.spaces.Dict(mask_spec)
 
     return gym.spaces.Dict(obs_space)
 

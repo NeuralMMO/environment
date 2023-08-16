@@ -18,8 +18,11 @@ class TestGymObsSpaces(unittest.TestCase):
         for atn in nmmo.Action.edges(env.config):
           if atn.enabled(env.config):
             for arg in atn.edges: # pylint: disable=not-an-iterable
-              self.assertTrue(obs_spec['ActionTargets'][atn][arg].contains(val[atn][arg]),
-                              f"Invalid obs format -- key: {atn}/{arg}, val: {val[atn][arg]}")
+              mask_spec = obs_spec['ActionTargets'][atn.__name__][arg.__name__]
+              mask_val = val[atn.__name__][arg.__name__]
+              self.assertTrue(mask_spec.contains(mask_val),
+                              "Invalid obs format -- " + \
+                              f"key: {atn.__name__}/{arg.__name__}, val: {mask_val}")
 
   def test_env_without_noop(self):
     config = nmmo.config.Default()

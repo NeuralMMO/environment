@@ -10,7 +10,6 @@ from nmmo.core.realm import Realm
 from nmmo.core.tile import TileState
 from nmmo.entity.entity import Entity, EntityState
 from nmmo.systems.item import ItemState
-from nmmo.core import action
 from scripted import baselines
 
 # Allow private access for testing
@@ -60,12 +59,12 @@ class TestEnv(unittest.TestCase):
           self._validate_market(player_obs, self.env.realm)
         else:
           # the obs of dead agents are dummy, all zeros
-          self.assertEqual(np.sum(player_obs['Tile']), 0)
-          self.assertEqual(np.sum(player_obs['Entity']), 0)
-          self.assertEqual(np.sum(player_obs['Inventory']), 0)
-          self.assertEqual(np.sum(player_obs['Market']), 0)
-          self.assertEqual(np.sum(player_obs['ActionTargets'][action.Move][action.Direction]), 0)
-          self.assertEqual(np.sum(player_obs['ActionTargets'][action.Attack][action.Style]), 0)
+          self.assertEqual(np.sum(player_obs["Tile"]), 0)
+          self.assertEqual(np.sum(player_obs["Entity"]), 0)
+          self.assertEqual(np.sum(player_obs["Inventory"]), 0)
+          self.assertEqual(np.sum(player_obs["Market"]), 0)
+          self.assertEqual(np.sum(player_obs["ActionTargets"]["Move"]["Direction"]), 0)
+          self.assertEqual(np.sum(player_obs["ActionTargets"]["Attack"]["Style"]), 0)
 
       obs, rewards, dones, infos = self.env.step({})
 
