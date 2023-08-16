@@ -266,21 +266,21 @@ class ScriptedTestTemplate(unittest.TestCase):
   def _check_ent_mask(self, ent_obs, atn, target_id):
     assert atn in [action.Give, action.GiveGold], "Invalid action"
     gym_obs = ent_obs.to_gym()
-    mask = gym_obs['ActionTargets'][atn][action.Target][:ent_obs.entities.len] > 0
+    mask = gym_obs["ActionTargets"][atn.__name__]["Target"][:ent_obs.entities.len] > 0
 
     return target_id in ent_obs.entities.ids[mask]
 
   def _check_inv_mask(self, ent_obs, atn, item_sig):
     assert atn in [action.Destroy, action.Give, action.Sell, action.Use], "Invalid action"
     gym_obs = ent_obs.to_gym()
-    mask = gym_obs['ActionTargets'][atn][action.InventoryItem][:ent_obs.inventory.len] > 0
+    mask = gym_obs["ActionTargets"][atn.__name__]["InventoryItem"][:ent_obs.inventory.len] > 0
     inv_idx = ent_obs.inventory.sig(*item_sig)
 
     return ent_obs.inventory.id(inv_idx) in ent_obs.inventory.ids[mask]
 
   def _check_mkt_mask(self, ent_obs, item_id):
     gym_obs = ent_obs.to_gym()
-    mask = gym_obs['ActionTargets'][action.Buy][action.MarketItem][:ent_obs.market.len] > 0
+    mask = gym_obs["ActionTargets"]["Buy"]["MarketItem"][:ent_obs.market.len] > 0
 
     return item_id in ent_obs.market.ids[mask]
 

@@ -160,48 +160,48 @@ class Observation:
 
   def _make_action_targets(self):
     masks = {}
-    masks[action.Move] = {
-      action.Direction: self._make_move_mask()
+    masks["Move"] = {
+      "Direction": self._make_move_mask()
     }
 
     if self.config.COMBAT_SYSTEM_ENABLED:
       # Test below. see tests/core/test_observation_tile.py, test_action_target_consts()
       # assert len(action.Style.edges) == 3
-      masks[action.Attack] = {
-        action.Style: np.zeros(3, dtype=np.int8) if self.dummy_obs\
-                        else np.ones(3, dtype=np.int8),
-        action.Target: self._make_attack_mask()
+      masks["Attack"] = {
+        "Style": np.zeros(3, dtype=np.int8) if self.dummy_obs\
+                  else np.ones(3, dtype=np.int8),
+        "Target": self._make_attack_mask()
       }
 
     if self.config.ITEM_SYSTEM_ENABLED:
-      masks[action.Use] = {
-        action.InventoryItem: self._make_use_mask()
+      masks["Use"] = {
+        "InventoryItem": self._make_use_mask()
       }
-      masks[action.Give] = {
-        action.InventoryItem: self._make_sell_mask(),
-        action.Target: self._make_give_target_mask()
+      masks["Give"] = {
+        "InventoryItem": self._make_sell_mask(),
+        "Target": self._make_give_target_mask()
       }
-      masks[action.Destroy] = {
-        action.InventoryItem: self._make_destroy_item_mask()
+      masks["Destroy"] = {
+        "InventoryItem": self._make_destroy_item_mask()
       }
 
     if self.config.EXCHANGE_SYSTEM_ENABLED:
-      masks[action.Sell] = {
-        action.InventoryItem: self._make_sell_mask(),
-        action.Price: np.zeros(self.config.PRICE_N_OBS, dtype=np.int8) if self.dummy_obs\
-                        else np.ones(self.config.PRICE_N_OBS, dtype=np.int8)
+      masks["Sell"] = {
+        "InventoryItem": self._make_sell_mask(),
+        "Price": np.zeros(self.config.PRICE_N_OBS, dtype=np.int8) if self.dummy_obs\
+                  else np.ones(self.config.PRICE_N_OBS, dtype=np.int8)
       }
-      masks[action.Buy] = {
-        action.MarketItem: self._make_buy_mask()
+      masks["Buy"] = {
+        "MarketItem": self._make_buy_mask()
       }
-      masks[action.GiveGold] = {
-        action.Target: self._make_give_target_mask(),
-        action.Price: self._make_give_gold_mask() # reusing Price
+      masks["GiveGold"] = {
+        "Target": self._make_give_target_mask(),
+        "Price": self._make_give_gold_mask() # reusing Price
       }
 
     if self.config.COMMUNICATION_SYSTEM_ENABLED:
-      masks[action.Comm] = {
-        action.Token:\
+      masks["Comm"] = {
+        "Token":\
           np.zeros(self.config.COMMUNICATION_NUM_TOKENS, dtype=np.int8) if self.dummy_obs\
             else np.ones(self.config.COMMUNICATION_NUM_TOKENS, dtype=np.int8)
       }
