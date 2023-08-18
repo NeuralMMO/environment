@@ -33,9 +33,10 @@ class TestEnv(unittest.TestCase):
 
   def test_action_space(self):
     action_space = self.env.action_space(0)
+    atn_str_keys = set(atn.__name__ for atn in nmmo.Action.edges(self.config))
     self.assertSetEqual(
         set(action_space.keys()),
-        set(nmmo.Action.edges(self.config)))
+        atn_str_keys)
 
   def test_observations(self):
     obs = self.env.reset()
