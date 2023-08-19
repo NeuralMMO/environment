@@ -29,7 +29,7 @@ def make_random_actions(config, ent_obs):
   return actions
 
 # CHECK ME: this would be nice to include in the env._validate_actions()
-def filter_item_actions(actions):
+def filter_item_actions(actions, use_str_key=False):
   # when there are multiple actions on the same item, select one
   flt_atns = {}
   inventory_atn = {} # key: inventory idx, val: action
@@ -52,6 +52,15 @@ def filter_item_actions(actions):
       else:
         flt_atns[atns[0][0]] = atns[0][1]
 
+    # convert action keys to str
+    if use_str_key:
+      str_atns = {}
+      for atn, args in flt_atns.items():
+        str_atns[atn.__name__] = {}
+        for arg, val in args.items():
+          str_atns[atn.__name__][arg.__name__] = val
+      flt_atns = str_atns
+
     return flt_atns
 
 
@@ -63,7 +72,7 @@ class TestMonkeyAction(unittest.TestCase):
 
   @staticmethod
   # NOTE: this can also be used for sweeping random seeds
-  def rollout_with_seed(config, seed):
+  def rollout_with_seed(config, seed, use_str_key=False):
     env = ScriptedAgentTestEnv(config)
     obs = env.reset(seed=seed)
 
@@ -72,7 +81,7 @@ class TestMonkeyAction(unittest.TestCase):
       actions = {}
       for ent_id in env.realm.players:
         ent_atns = make_random_actions(config, obs[ent_id])
-        actions[ent_id] = filter_item_actions(ent_atns)
+        actions[ent_id] = filter_item_actions(ent_atns, use_str_key)
       obs, _, _, _ = env.step(actions)
 
   def test_monkey_action(self):
@@ -81,6 +90,8 @@ class TestMonkeyAction(unittest.TestCase):
     except: # pylint: disable=bare-except
       assert False, f"Monkey action failed. seed: {RANDOM_SEED}"
 
+  def test_monkey_action_with_str_key(self):
+    self.rollout_with_seed(self.config, RANDOM_SEED, use_str_key=True)
 
 if __name__ == '__main__':
   unittest.main()

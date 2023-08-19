@@ -1,7 +1,7 @@
 import functools
 from typing import Any, Dict, List, Callable
 from collections import defaultdict
-from copy import copy
+from copy import copy, deepcopy
 import dill
 
 import gym
@@ -85,13 +85,11 @@ class Env(ParallelEnv):
       obs_space["Market"] = box(self.config.MARKET_N_OBS, Item.State.num_attributes)
 
     if self.config.PROVIDE_ACTION_TARGETS:
-      mask_spec = {} # deepcopy(self._atn_space)
-      for atn in self._atn_space:
-        tmp_mask = {}
-        for arg in atn.edges:
-          tmp_mask[arg.__name__] = mask_box(self._atn_space[atn][arg].n)
-        mask_spec[atn.__name__] = gym.spaces.Dict(tmp_mask)
-      obs_space['ActionTargets'] = gym.spaces.Dict(mask_spec)
+      mask_spec = deepcopy(self._atn_space)
+      for atn_str in mask_spec:
+        for arg_str in mask_spec[atn_str]:
+          mask_spec[atn_str][arg_str] = mask_box(self._atn_space[atn_str][arg_str].n)
+      obs_space["ActionTargets"] = mask_spec
 
     return gym.spaces.Dict(obs_space)
 
@@ -113,12 +111,22 @@ class Env(ParallelEnv):
     actions = {}
     for atn in sorted(nmmo.Action.edges(self.config)):
       if atn.enabled(self.config):
-        actions[atn] = {}
+        actions[atn.__name__] = {}  # use the string key
         for arg in sorted(atn.edges):
           n = arg.N(self.config)
-          actions[atn][arg] = gym.spaces.Discrete(n)
-        actions[atn] = gym.spaces.Dict(actions[atn])
+          actions[atn.__name__][arg.__name__] = gym.spaces.Discrete(n)
+        actions[atn.__name__] = gym.spaces.Dict(actions[atn.__name__])
     return gym.spaces.Dict(actions)
+
+  @functools.cached_property
+  def _str_atn_map(self):
+    '''Map action and argument names to their corresponding objects'''
+    str_map = {}
+    for atn in nmmo.Action.edges(self.config):
+      str_map[atn.__name__] = atn
+      for arg in atn.edges:
+        str_map[arg.__name__] = arg
+    return str_map
 
   # pylint: disable=method-cache-max-size-none
   @functools.lru_cache(maxsize=None)
@@ -368,15 +376,16 @@ class Env(ParallelEnv):
 
       validated_actions[ent_id] = {}
 
-      for atn, args in sorted(atns.items()):
+      for atn_key, args in sorted(atns.items()):
         action_valid = True
         deserialized_action = {}
-
+        atn = self._str_atn_map[atn_key] if isinstance(atn_key, str) else atn_key
         if not atn.enabled(self.config):
           action_valid = False
           break
 
-        for arg, val in sorted(args.items()):
+        for arg_key, val in sorted(args.items()):
+          arg = self._str_atn_map[arg_key] if isinstance(arg_key, str) else arg_key
           obj = arg.deserialize(self.realm, entity, val, self.obs[ent_id])
           if obj is None:
             action_valid = False
