@@ -117,7 +117,7 @@ class Observation:
   def agent(self):
     return self.entity(self.agent_id)
 
-  def __del__(self):
+  def clear_cache(self):
     # clear the cache, so that this object can be garbage collected
     self.agent.cache_clear()
     self.entity.cache_clear()

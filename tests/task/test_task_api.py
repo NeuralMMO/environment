@@ -39,6 +39,9 @@ class MockGameState():
     self.cache_result = {}
     self.get_subject_view = lambda _: None
 
+  def clear_cache(self):
+    pass
+
 class TestTaskAPI(unittest.TestCase):
   def test_predicate_operators(self):
     # pylint: disable=unsupported-binary-operation,invalid-unary-operand-type

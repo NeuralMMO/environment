@@ -1,8 +1,9 @@
 from __future__ import annotations
-from typing import Dict, Iterable, Tuple, MutableMapping, Set
-from dataclasses import dataclass
+from typing import Dict, Iterable, Tuple, MutableMapping, Set, List
+from dataclasses import dataclass, field
 from copy import deepcopy
 from collections import defaultdict
+import weakref
 
 from abc import ABC, abstractmethod
 import functools
@@ -44,6 +45,7 @@ class GameState:
   event_index: Dict[int, Iterable]
 
   cache_result: MutableMapping # cache for general memoization
+  _group_view: List[GroupView] = field(default_factory=list) # cache for GroupView
 
   # add helper functions below
   @functools.lru_cache
@@ -73,9 +75,33 @@ class GameState:
     raise ValueError("data_type must be in entity, item, event")
 
   def get_subject_view(self, subject: Group):
-    return GroupView(self, subject)
+    new_group_view = GroupView(self, subject)
+    self._group_view.append(new_group_view)
+    return new_group_view
+
+  def clear_cache(self):
+    # clear the cache, so that this object can be garbage collected
+    self.entity_or_none.cache_clear()  # pylint: disable=no-member
+    self.cache_result.clear()
+    self.alive_agents.clear()
+    while self._group_view:
+      weakref.ref(self._group_view.pop())  # clear the cache
 
 # Wrapper around an iterable datastore
+class CachedProperty:
+  def __init__(self, func):
+    self.func = func
+    # Allows the instance keys to be garbage collected
+    #   when they are no longer referenced elsewhere
+    self.cache = weakref.WeakKeyDictionary()
+
+  def __get__(self, instance, owner):
+    if instance is None:
+      return self
+    if instance not in self.cache:
+      self.cache[instance] = self.func(instance)
+    return self.cache[instance]
+
 class ArrayView(ABC):
   def __init__(self,
                mapping,
@@ -157,7 +183,10 @@ class GroupObsView:
     valid_agents = filter(lambda eid: eid in gs.env_obs,subject.agents)
     self._obs = [gs.env_obs[ent_id] for ent_id in valid_agents]
     self._subject = subject
-    self.tile = TileView(gs, subject, [o.tiles for o in self._obs])
+
+  @CachedProperty
+  def tile(self):
+    return TileView(self._gs, self._subject, [o.tiles for o in self._obs])
 
   def __getattr__(self, attr):
     return [getattr(o, attr) for o in self._obs]
@@ -167,29 +196,32 @@ class GroupView:
     self._gs = gs
     self._subject = subject
     self._subject_hash = hash(subject)
-    self.obs = GroupObsView(gs, subject)
 
-  @functools.cached_property
+  @CachedProperty
+  def obs(self):
+    return GroupObsView(self._gs, self._subject)
+
+  @CachedProperty
   def _sbj_ent(self):
     return self._gs.where_in_id('entity', self._subject.agents)
 
-  @functools.cached_property
+  @CachedProperty
   def entity(self):
     return EntityView(self._gs, self._subject, self._sbj_ent)
 
-  @functools.cached_property
+  @CachedProperty
   def _sbj_item(self):
     return self._gs.where_in_id('item', self._subject.agents)
 
-  @functools.cached_property
+  @CachedProperty
   def item(self):
     return ItemView(self._gs, self._subject, self._sbj_item)
 
-  @functools.cached_property
+  @CachedProperty
   def _sbj_event(self):
     return self._gs.where_in_id('event', self._subject.agents)
 
-  @functools.cached_property
+  @CachedProperty
   def event(self):
     return EventView(self._gs, self._subject, self._sbj_event)
 
