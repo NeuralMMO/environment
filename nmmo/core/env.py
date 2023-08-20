@@ -349,11 +349,6 @@ class Env(ParallelEnv):
       else:
         dones[agent_id] = False
 
-    # Clean up unnecessary observations, which cause memory leaks
-    for agent_id in self.obs:
-      # pylint: disable=unnecessary-dunder-call
-      self.obs[agent_id].__del__()  # clear the lru_cache
-
     # Store the observations, since actions reference them
     self.obs = self._compute_observations()
     gym_obs = {a: o.to_gym() for a,o in self.obs.items()}
@@ -426,6 +421,12 @@ class Env(ParallelEnv):
                        dummy_tiles, dummy_entities, dummy_inventory, dummy_market)
 
   def _compute_observations(self):
+    # Clean up unnecessary observations, which cause memory leaks
+    if self.obs is not None:
+      for agent_obs in self.obs.values():
+        # pylint: disable=unnecessary-dunder-call
+        agent_obs.__del__()  # clear the lru_cache
+
     obs = {}
     market = Item.Query.for_sale(self.realm.datastore)
 
