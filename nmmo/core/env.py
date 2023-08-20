@@ -349,6 +349,11 @@ class Env(ParallelEnv):
       else:
         dones[agent_id] = False
 
+    # Clean up unnecessary observations, which cause memory leaks
+    for agent_id in self.obs:
+      # pylint: disable=unnecessary-dunder-call
+      self.obs[agent_id].__del__()  # clear the lru_cache
+
     # Store the observations, since actions reference them
     self.obs = self._compute_observations()
     gym_obs = {a: o.to_gym() for a,o in self.obs.items()}
