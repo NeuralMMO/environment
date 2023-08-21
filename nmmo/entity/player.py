@@ -1,5 +1,6 @@
 from nmmo.systems.skill import Skills
 from nmmo.entity import entity
+from nmmo.lib.log import EventCode
 
 # pylint: disable=no-member
 class Player(entity.Entity):
@@ -65,8 +66,10 @@ class Player(entity.Entity):
 
     # starting from here, source receive gold & inventory items
     if self.config.EXCHANGE_SYSTEM_ENABLED and source is not None:
-      source.gold.increment(self.gold.val)
-      self.gold.update(0)
+      if self.gold.val > 0:
+        source.gold.increment(self.gold.val)
+        self.realm.event_log.record(EventCode.EARN_GOLD, source, amount=self.gold.val)
+        self.gold.update(0)
 
     # TODO: make source receive the highest-level items first
     #   because source cannot take it if the inventory is full
@@ -77,8 +80,10 @@ class Player(entity.Entity):
 
       # if source is None or NPC, destroy the item
       if source.is_player:
+        # inventory.receive() returns True if the item is received
         # if source doesn't have space, inventory.receive() destroys the item
-        source.inventory.receive(item)
+        if source.inventory.receive(item):
+          self.realm.event_log.record(EventCode.LOOT_ITEM, source, item=item)
       else:
         item.destroy()
 

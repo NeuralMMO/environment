@@ -51,6 +51,7 @@ class EventCode:
   DESTROY_ITEM = 23
   HARVEST_ITEM = 24
   EQUIP_ITEM = 25
+  LOOT_ITEM = 26
 
   # Exchange
   GIVE_GOLD = 31

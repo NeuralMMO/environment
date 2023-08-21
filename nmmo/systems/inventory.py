@@ -125,7 +125,8 @@ class Inventory:
     for item in self.items:
       yield item
 
-  def receive(self, item: Item.Item):
+  def receive(self, item: Item.Item) -> bool:
+    # Return True if the item is received
     assert isinstance(item, Item.Item), f'{item} received is not an Item instance'
     assert item not in self.items, f'{item} object received already in inventory'
     assert not item.equipped.val, f'Received equipped item {item}'
@@ -140,19 +141,19 @@ class Inventory:
         stack.quantity.increment(item.quantity.val)
         # destroy the original item instance after the transfer is complete
         item.destroy()
-        return
+        return False
 
       if not self.space:
         # if no space thus cannot receive, just destroy the item
         item.destroy()
-        return
+        return False
 
       self._item_stacks[signature] = item
 
     if not self.space:
       # if no space thus cannot receive, just destroy the item
       item.destroy()
-      return
+      return False
 
     self.realm.log_milestone(f'Receive_{item.__class__.__name__}', item.level.val,
       f'INVENTORY: Received level {item.level.val} {item.__class__.__name__}',
@@ -160,6 +161,7 @@ class Inventory:
 
     item.owner_id.update(self.entity.id.val)
     self.items.add(item)
+    return True
 
   # pylint: disable=protected-access
   def remove(self, item, quantity=None):
