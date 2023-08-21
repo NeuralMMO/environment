@@ -390,7 +390,8 @@ def profile_env_step(action_target=True, tasks=None, condition=None):
   for _ in range(3):
     env.step({})
 
-  obs = env._compute_observations()
+  env.obs = env._compute_observations()
+  obs = deepcopy(env.obs)
 
   test_func = [
     ('env.step({}):', lambda: env.step({})),

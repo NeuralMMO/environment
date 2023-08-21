@@ -117,6 +117,12 @@ class Observation:
   def agent(self):
     return self.entity(self.agent_id)
 
+  def clear_cache(self):
+    # clear the cache, so that this object can be garbage collected
+    self.agent.cache_clear()
+    self.entity.cache_clear()
+    self.tile.cache_clear()
+
   def get_empty_obs(self):
     gym_obs = {
       "CurrentTick": self.current_tick,

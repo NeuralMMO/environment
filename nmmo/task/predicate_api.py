@@ -66,6 +66,11 @@ class Predicate(ABC):
     if not self.check(self._config):
       raise InvalidConstraint()
 
+  def close(self):
+    # To prevent memory leak, clear all refs to old game state
+    for group in self._groups:
+      group.clear_prev_state()
+
   def check(self, config: Config):
     """ Checks whether the predicate is valid
 

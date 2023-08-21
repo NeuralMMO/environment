@@ -34,12 +34,19 @@ class Task(ABC):
     self.reset()
 
   def reset(self):
+    self._stop_eval = False
     self._last_eval_tick = None
     self._progress = 0.0
     self._completed_tick = None
     self._max_progress = 0.0
     self._positive_reward_count = 0
     self._negative_reward_count = 0
+
+  def close(self):
+    if self._stop_eval is False:
+      if isinstance(self._eval_fn, Predicate):
+        self._eval_fn.close()
+      self._stop_eval = True
 
   @property
   def assignee(self) -> Tuple[int]:

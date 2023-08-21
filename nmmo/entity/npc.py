@@ -5,7 +5,7 @@ from nmmo.systems.ai import policy
 from nmmo.systems import item as Item
 from nmmo.systems import skill
 from nmmo.systems.inventory import EquipmentSlot
-
+from nmmo.lib.log import EventCode
 
 class Equipment:
   def __init__(self, total,
@@ -71,12 +71,17 @@ class NPC(entity.Entity):
     # run the next lines if the npc is killed
     # source receive gold & items in the droptable
     # pylint: disable=no-member
-    source.gold.increment(self.gold.val)
-    self.gold.update(0)
+    if self.gold.val > 0:
+      source.gold.increment(self.gold.val)
+      self.realm.event_log.record(EventCode.EARN_GOLD, source, amount=self.gold.val)
+      self.gold.update(0)
 
     for item in self.droptable.roll(self.realm, self.attack_level):
       if source.is_player and source.inventory.space:
-        source.inventory.receive(item)
+        # inventory.receive() returns True if the item is received
+        # if source doesn't have space, inventory.receive() destroys the item
+        if source.inventory.receive(item):
+          self.realm.event_log.record(EventCode.LOOT_ITEM, source, item=item)
       else:
         item.destroy()
 
