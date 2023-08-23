@@ -239,7 +239,7 @@ class Attack(Node):
     # Testing a spawn immunity against old agents to avoid spawn camping
     immunity = config.COMBAT_SPAWN_IMMUNITY
     if entity.is_player and target.is_player and \
-      target.history.time_alive < immunity < entity.history.time_alive.val:
+      target.history.time_alive < immunity:
       return None
 
     #Check if self targeted
