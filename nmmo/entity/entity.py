@@ -122,18 +122,19 @@ class Resources:
     food_thresh = self.food > thresh * self.config.RESOURCE_BASE
     water_thresh = self.water > thresh * self.config.RESOURCE_BASE
 
-    self.health_restore = 0  # for "healing" bonus
+    org_health = self.health.val
     if food_thresh and water_thresh:
-      self.health_restore = -self.health.val  # before incrementing
       restore = np.floor(self.health.max * regen)
       self.health.increment(restore)
-      self.health_restore += self.health.val  # after incrementing
 
     if self.food.empty:
       self.health.decrement(self.config.RESOURCE_STARVATION_RATE)
 
     if self.water.empty:
       self.health.decrement(self.config.RESOURCE_DEHYDRATION_RATE)
+
+    # records both increase and decrease in health due to food and water
+    self.health_restore = self.health.val - org_health
 
   def packet(self):
     data = {}
