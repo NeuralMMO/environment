@@ -437,19 +437,19 @@ class Progression:
   PROGRESSION_LEVEL_MAX             = 10
   '''Max skill level'''
 
-  PROGRESSION_MELEE_BASE_DAMAGE     = 0
+  PROGRESSION_MELEE_BASE_DAMAGE     = 15
   '''Base Melee attack damage'''
 
   PROGRESSION_MELEE_LEVEL_DAMAGE    = 5
   '''Bonus Melee attack damage per level'''
 
-  PROGRESSION_RANGE_BASE_DAMAGE     = 0
+  PROGRESSION_RANGE_BASE_DAMAGE     = 15
   '''Base Range attack damage'''
 
   PROGRESSION_RANGE_LEVEL_DAMAGE    = 5
   '''Bonus Range attack damage per level'''
 
-  PROGRESSION_MAGE_BASE_DAMAGE      = 0
+  PROGRESSION_MAGE_BASE_DAMAGE      = 15
   '''Base Mage attack damage '''
 
   PROGRESSION_MAGE_LEVEL_DAMAGE     = 5
