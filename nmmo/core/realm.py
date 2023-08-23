@@ -188,6 +188,7 @@ class Realm:
     self.map.step()
     self.exchange.step(self.tick)
     self.log_helper.update(dead)
+    self.event_log.update()
     if self._replay_helper is not None:
       self._replay_helper.update()
 

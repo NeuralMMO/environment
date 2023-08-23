@@ -48,6 +48,7 @@ class TestEventLog(unittest.TestCase):
                      combat_style=Skill.Melee, damage=50)
     event_log.record(EventCode.PLAYER_KILL, MockEntity(3),
                      target=MockEntity(5, attack_level=5))
+    event_log.update()
 
     mock_realm.tick = 1
     event_log.record(EventCode.CONSUME_ITEM, MockEntity(4),
@@ -56,6 +57,7 @@ class TestEventLog(unittest.TestCase):
     event_log.record(EventCode.DESTROY_ITEM, MockEntity(5))
     event_log.record(EventCode.HARVEST_ITEM, MockEntity(6),
                      item=Whetstone(mock_realm, 3))
+    event_log.update()
 
     mock_realm.tick = 2
     event_log.record(EventCode.GIVE_GOLD, MockEntity(7))
@@ -65,18 +67,20 @@ class TestEventLog(unittest.TestCase):
     event_log.record(EventCode.BUY_ITEM, MockEntity(10),
                      item=Whetstone(mock_realm, 7), price=21)
     #event_log.record(EventCode.SPEND_GOLD, env.realm.players[11], amount=25)
+    event_log.update()
 
     mock_realm.tick = 3
     event_log.record(EventCode.LEVEL_UP, MockEntity(12),
                      skill=Skill.Fishing, level=3)
+    event_log.update()
 
     mock_realm.tick = 4
     event_log.record(EventCode.GO_FARTHEST, MockEntity(12), distance=6)
     event_log.record(EventCode.EQUIP_ITEM, MockEntity(12),
                      item=Hat(mock_realm, 4))
+    event_log.update()
 
     log_data = [list(row) for row in event_log.get_data()]
-
     self.assertListEqual(log_data, [
       [1,  1, 1, EventCode.EAT_FOOD, 0, 0, 0, 0, 0],
       [1,  2, 1, EventCode.DRINK_WATER, 0, 0, 0, 0, 0],
@@ -93,6 +97,24 @@ class TestEventLog(unittest.TestCase):
       [1, 12, 4, EventCode.LEVEL_UP, 4, 3, 0, 0, 0],
       [1, 12, 5, EventCode.GO_FARTHEST, 0, 0, 6, 0, 0],
       [1, 12, 5, EventCode.EQUIP_ITEM, 2, 4, 1, 0, 0]])
+
+    log_by_tick = [list(row) for row in event_log.get_data(tick = 4)]
+    self.assertListEqual(log_by_tick, [
+      [1, 12, 4, EventCode.LEVEL_UP, 4, 3, 0, 0, 0]])
+
+    log_by_event = [list(row) for row in event_log.get_data(event_code = EventCode.CONSUME_ITEM)]
+    self.assertListEqual(log_by_event, [
+      [1,  4, 2, EventCode.CONSUME_ITEM, 16, 8, 1, 0, 0]])
+
+    log_by_tick_agent = [list(row) for row in \
+                         event_log.get_data(tick = 5,
+                                            agents = [12],
+                                            event_code = EventCode.EQUIP_ITEM)]
+    self.assertListEqual(log_by_tick_agent, [
+      [1, 12, 5, EventCode.EQUIP_ITEM, 2, 4, 1, 0, 0]])
+
+    empty_log = event_log.get_data(tick = 10)
+    self.assertTrue(empty_log.shape[0] == 0)
 
 if __name__ == '__main__':
   unittest.main()
