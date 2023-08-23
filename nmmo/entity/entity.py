@@ -124,8 +124,10 @@ class Resources:
 
     self.health_restore = 0  # for "healing" bonus
     if food_thresh and water_thresh:
-      self.health_restore = np.floor(self.health.max * regen)
-      self.health.increment(self.health_restore)
+      self.health_restore = -self.health.val  # before incrementing
+      restore = np.floor(self.health.max * regen)
+      self.health.increment(restore)
+      self.health_restore += self.health.val  # after incrementing
 
     if self.food.empty:
       self.health.decrement(self.config.RESOURCE_STARVATION_RATE)
