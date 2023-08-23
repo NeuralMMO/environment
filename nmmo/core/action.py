@@ -134,12 +134,13 @@ class Move(Node):
     realm.map.tiles[r_new, c_new].add_entity(entity)
 
     # exploration record keeping. moved from entity.py, History.update()
-    dist_from_spawn = utils.linf_single(entity.spawn_pos, (r_new, c_new))
-    if dist_from_spawn > entity.history.exploration:
-      entity.history.exploration = dist_from_spawn
+    progress_to_center = realm.map.dist_border_center -\
+      utils.linf_single(realm.map.center_coord, (r_new, c_new))
+    if progress_to_center > entity.history.exploration:
+      entity.history.exploration = progress_to_center
       if entity.is_player:
         realm.event_log.record(EventCode.GO_FARTHEST, entity,
-                               distance=dist_from_spawn)
+                               distance=progress_to_center)
 
     # CHECK ME: material.Impassible includes void, so this line is not reachable
     #   Does this belong to Entity/Player.update()?
