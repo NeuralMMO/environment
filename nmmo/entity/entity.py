@@ -105,6 +105,7 @@ class Resources:
     self.health = ent.health
     self.water = ent.water
     self.food = ent.food
+    self.health_restore = 0
 
     self.health.update(config.PLAYER_BASE_HEALTH)
     if config.RESOURCE_SYSTEM_ENABLED:
@@ -121,6 +122,7 @@ class Resources:
     food_thresh = self.food > thresh * self.config.RESOURCE_BASE
     water_thresh = self.water > thresh * self.config.RESOURCE_BASE
 
+    org_health = self.health.val
     if food_thresh and water_thresh:
       restore = np.floor(self.health.max * regen)
       self.health.increment(restore)
@@ -130,6 +132,9 @@ class Resources:
 
     if self.water.empty:
       self.health.decrement(self.config.RESOURCE_DEHYDRATION_RATE)
+
+    # records both increase and decrease in health due to food and water
+    self.health_restore = self.health.val - org_health
 
   def packet(self):
     data = {}

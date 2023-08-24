@@ -32,8 +32,28 @@ class TestAmmoUse(ScriptedTestTemplate):
     # If MarketItem and InventoryTarget have no-action flags, these sum up to 5
     self.assertEqual(mask, 5*int(self.config.PROVIDE_NOOP_ACTION_TARGET))
 
-  def test_ammo_fire_all(self):
+  def test_spawn_immunity(self):
     env = self._setup_env(random_seed=RANDOM_SEED)
+
+    # Check spawn immunity in the action targets
+    for ent_obs in env.obs.values():
+      gym_obs = ent_obs.to_gym()
+      target_mask = gym_obs["ActionTargets"]["Attack"]["Target"][:len(ent_obs.entities.ids)]
+      # cannot target other agents
+      self.assertTrue(np.sum(target_mask[ent_obs.entities.ids > 0]) == 0)
+
+    # Test attack during spawn immunity, which should be ignored
+    env.step({ ent_id: { action.Attack:
+        { action.Style: env.realm.players[ent_id].agent.style[0],
+          action.Target: env.obs[ent_id].entities.index((ent_id+1)%3+1) } }
+        for ent_id in self.ammo })
+
+    for ent_id in [1, 2, 3]:
+      # in_combat status is set when attack is executed
+      self.assertFalse(env.realm.players[ent_id].in_combat)
+
+  def test_ammo_fire_all(self):
+    env = self._setup_env(random_seed=RANDOM_SEED, remove_immunity=True)
 
     # First tick actions: USE (equip) level-0 ammo
     env.step({ ent_id: { action.Use:

@@ -30,6 +30,8 @@ EventState.Query = SimpleNamespace(
   table=lambda ds: ds.table("Event").where_eq(EventAttr["recorded"], 1),
   by_event=lambda ds, event_code: ds.table("Event").where_eq(
     EventAttr["event"], event_code),
+  by_tick=lambda ds, tick: ds.table("Event").where_eq(
+    EventAttr["tick"], tick),
 )
 
 # defining col synoyms for different event types
@@ -55,6 +57,8 @@ class EventLogger(EventCode):
 
     self.valid_events = { val: evt for evt, val in EventCode.__dict__.items()
                            if isinstance(val, int) }
+    self._data_by_tick = {}
+    self._last_tick = 0
 
     # add synonyms to the attributes
     self.attr_to_col = deepcopy(EventAttr)
@@ -155,16 +159,27 @@ class EventLogger(EventCode):
     # CHECK ME: The below should be commented out after debugging
     raise ValueError(f"Event code: {event_code}", kwargs)
 
-  def get_data(self, event_code=None, agents: List[int]=None):
-    if event_code is None:
-      event_data = EventState.Query.table(self.datastore)
-    elif event_code in self.valid_events:
-      event_data = EventState.Query.by_event(self.datastore, event_code)
-    else:
-      return None
+  def update(self):
+    curr_tick = self.realm.tick + 1  # update happens before the tick update
+    if curr_tick > self._last_tick:
+      self._data_by_tick[curr_tick] = EventState.Query.by_tick(self.datastore, curr_tick)
+      self._last_tick = curr_tick
 
-    if agents:
-      flt_idx = np.in1d(event_data[:, EventAttr['ent_id']], agents)
+  def get_data(self, event_code=None, agents: List[int]=None, tick: int=None) -> np.ndarray:
+    if tick is not None:
+      if tick not in self._data_by_tick:
+        return np.array([])
+      event_data = self._data_by_tick[tick]
+    else:
+      event_data = EventState.Query.table(self.datastore)
+
+    if event_data.shape[0] > 0:
+      if event_code is None:
+        flt_idx = event_data[:, EventAttr["event"]] > 0
+      else:
+        flt_idx = event_data[:, EventAttr["event"]] == event_code
+      if agents:
+        flt_idx &= np.in1d(event_data[:, EventAttr["ent_id"]], agents)
       return event_data[flt_idx]
 
-    return event_data
+    return np.array([])
