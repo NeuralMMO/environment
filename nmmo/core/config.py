@@ -437,19 +437,19 @@ class Progression:
   PROGRESSION_LEVEL_MAX             = 10
   '''Max skill level'''
 
-  PROGRESSION_MELEE_BASE_DAMAGE     = 10
+  PROGRESSION_MELEE_BASE_DAMAGE     = 20
   '''Base Melee attack damage'''
 
   PROGRESSION_MELEE_LEVEL_DAMAGE    = 5
   '''Bonus Melee attack damage per level'''
 
-  PROGRESSION_RANGE_BASE_DAMAGE     = 10
+  PROGRESSION_RANGE_BASE_DAMAGE     = 20
   '''Base Range attack damage'''
 
   PROGRESSION_RANGE_LEVEL_DAMAGE    = 5
   '''Bonus Range attack damage per level'''
 
-  PROGRESSION_MAGE_BASE_DAMAGE      = 10
+  PROGRESSION_MAGE_BASE_DAMAGE      = 20
   '''Base Mage attack damage '''
 
   PROGRESSION_MAGE_LEVEL_DAMAGE     = 5
@@ -492,13 +492,13 @@ class NPC:
   NPC_BASE_DEFENSE                    = 0
   '''Base NPC defense'''
 
-  NPC_LEVEL_DEFENSE                   = 30
+  NPC_LEVEL_DEFENSE                   = 15
   '''Bonus NPC defense per level'''
 
   NPC_BASE_DAMAGE                     = 15
   '''Base NPC damage'''
 
-  NPC_LEVEL_DAMAGE                    = 30
+  NPC_LEVEL_DAMAGE                    = 15
   '''Bonus NPC damage per level'''
 
 
