@@ -168,7 +168,7 @@ class EventLogger(EventCode):
   def get_data(self, event_code=None, agents: List[int]=None, tick: int=None) -> np.ndarray:
     if tick is not None:
       if tick not in self._data_by_tick:
-        return np.array([])
+        return np.empty((2, 0))
       event_data = self._data_by_tick[tick]
     else:
       event_data = EventState.Query.table(self.datastore)
@@ -182,4 +182,4 @@ class EventLogger(EventCode):
         flt_idx &= np.in1d(event_data[:, EventAttr["ent_id"]], agents)
       return event_data[flt_idx]
 
-    return np.array([])
+    return np.empty((2, 0))
