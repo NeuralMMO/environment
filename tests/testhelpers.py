@@ -225,9 +225,14 @@ class ScriptedTestTemplate(unittest.TestCase):
 
     return item_sig
 
-  def _setup_env(self, random_seed, check_assert=True):
+  def _setup_env(self, random_seed, check_assert=True, remove_immunity=False):
     """ set up a new env and perform initial checks """
-    env = ScriptedAgentTestEnv(self.config, seed=random_seed)
+    config = deepcopy(self.config)
+
+    if remove_immunity:
+      config.COMBAT_SPAWN_IMMUNITY = 0
+
+    env = ScriptedAgentTestEnv(config, seed=random_seed)
     env.reset()
 
     # provide money for all

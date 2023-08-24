@@ -27,6 +27,10 @@ class Map:
       for c in range(sz):
         self.tiles[r, c] = Tile(realm, r, c, np_random)
 
+    self.dist_border_center = config.MAP_CENTER // 2
+    self.center_coord = (config.MAP_BORDER + self.dist_border_center,
+                         config.MAP_BORDER + self.dist_border_center)
+
   @property
   def packet(self):
     '''Packet of degenerate resource states'''

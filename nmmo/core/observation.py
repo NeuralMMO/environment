@@ -243,17 +243,16 @@ class Observation:
       ) <= self.config.COMBAT_MELEE_REACH
 
     immunity = self.config.COMBAT_SPAWN_IMMUNITY
-    if 0 < immunity < agent.time_alive:
-      # ids > 0 equals entity.is_player
-      spawn_immunity = (self.entities.ids > 0) & \
-        (self.entities.values[:,EntityState.State.attr_name_to_col["time_alive"]] < immunity)
+    if agent.time_alive < immunity:
+      # NOTE: CANNOT attack players during immunity, thus mask should set to 0
+      no_spawn_immunity = ~(self.entities.ids > 0)  # ids > 0 equals entity.is_player
     else:
-      spawn_immunity = np.ones(self.entities.len, dtype=bool)
+      no_spawn_immunity = np.ones(self.entities.len, dtype=bool)
 
     # allow friendly fire but no self shooting
     not_me = self.entities.ids != agent.id
 
-    attack_mask[:self.entities.len] = within_range & not_me & spawn_immunity
+    attack_mask[:self.entities.len] = within_range & not_me & no_spawn_immunity
     return attack_mask
 
   def _make_use_mask(self):
