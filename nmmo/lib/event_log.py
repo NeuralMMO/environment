@@ -59,6 +59,7 @@ class EventLogger(EventCode):
                            if isinstance(val, int) }
     self._data_by_tick = {}
     self._last_tick = 0
+    self._empty_data = np.empty((0, len(EventAttr)))
 
     # add synonyms to the attributes
     self.attr_to_col = deepcopy(EventAttr)
@@ -168,7 +169,7 @@ class EventLogger(EventCode):
   def get_data(self, event_code=None, agents: List[int]=None, tick: int=None) -> np.ndarray:
     if tick is not None:
       if tick not in self._data_by_tick:
-        return np.empty((2, 0))
+        return self._empty_data
       event_data = self._data_by_tick[tick]
     else:
       event_data = EventState.Query.table(self.datastore)
@@ -182,4 +183,4 @@ class EventLogger(EventCode):
         flt_idx &= np.in1d(event_data[:, EventAttr["ent_id"]], agents)
       return event_data[flt_idx]
 
-    return np.empty((2, 0))
+    return self._empty_data
