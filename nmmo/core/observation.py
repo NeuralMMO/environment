@@ -207,8 +207,8 @@ class Observation:
         "MarketItem": self._make_buy_mask()
       }
       masks["GiveGold"] = {
-        "Target": self._make_give_target_mask(),
-        "Price": self._make_give_gold_mask() # reusing Price
+        "Price": self._make_give_gold_mask(), # reusing Price
+        "Target": self._make_give_target_mask()
       }
 
     if self.config.COMMUNICATION_SYSTEM_ENABLED:
