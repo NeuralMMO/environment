@@ -1,5 +1,4 @@
 from functools import lru_cache, cached_property
-from collections import OrderedDict
 
 import numpy as np
 
@@ -10,9 +9,6 @@ import nmmo.systems.item as item_system
 from nmmo.core import action
 from nmmo.lib import material, utils
 
-
-def sort_dict_by_key(d):
-  return OrderedDict(sorted(d.items(), key=lambda t: t[0]))
 
 class BasicObs:
   def __init__(self, values, id_col):
@@ -144,16 +140,14 @@ class Observation:
     return gym_obs
 
   def to_gym(self):
-    '''Convert the observation to a format that can be used by OpenAI Gym
-       The dictionary keys must be sorted alphabetically to work with gym.spaces.Dict.
-    '''
+    '''Convert the observation to a format that can be used by OpenAI Gym'''
     gym_obs = self.get_empty_obs()
     if self.dummy_obs:
       # return empty obs for the dead agents
       gym_obs['Tile'] = np.zeros((self.config.MAP_N_OBS, self.tiles.shape[1]), dtype=np.int16)
       if self.config.PROVIDE_ACTION_TARGETS:
         gym_obs["ActionTargets"] = self._make_action_targets()
-      return sort_dict_by_key(gym_obs)
+      return gym_obs
 
     # NOTE: assume that all len(self.tiles) == self.config.MAP_N_OBS
     gym_obs['Tile'] = self.tiles
@@ -168,7 +162,7 @@ class Observation:
     if self.config.PROVIDE_ACTION_TARGETS:
       gym_obs["ActionTargets"] = self._make_action_targets()
 
-    return sort_dict_by_key(gym_obs)
+    return gym_obs
 
   def _make_action_targets(self):
     masks = {}
@@ -218,8 +212,7 @@ class Observation:
             else np.ones(self.config.COMMUNICATION_NUM_TOKENS, dtype=np.int8)
       }
 
-    # NOTE: the order of the keys are important to work with gym.spaces.Dict
-    return sort_dict_by_key(masks)
+    return masks
 
   def _make_move_mask(self):
     if self.dummy_obs:
