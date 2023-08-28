@@ -64,8 +64,8 @@ class TestEnv(unittest.TestCase):
           self.assertEqual(np.sum(player_obs["Entity"]), 0)
           self.assertEqual(np.sum(player_obs["Inventory"]), 0)
           self.assertEqual(np.sum(player_obs["Market"]), 0)
-          self.assertEqual(np.sum(player_obs["ActionTargets"]["Move"]["Direction"]), 0)
-          self.assertEqual(np.sum(player_obs["ActionTargets"]["Attack"]["Style"]), 0)
+          self.assertEqual(np.sum(player_obs["ActionTargets"]["Move"]["Direction"]), 1)
+          self.assertEqual(np.sum(player_obs["ActionTargets"]["Attack"]["Style"]), 3)
 
       obs, rewards, dones, infos = self.env.step({})
 

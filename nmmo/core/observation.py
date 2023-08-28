@@ -212,7 +212,9 @@ class Observation:
 
   def _make_move_mask(self):
     if self.dummy_obs:
-      return np.zeros(len(action.Direction.edges), dtype=np.int8)
+      mask = np.zeros(len(action.Direction.edges), dtype=np.int8)
+      mask[-1] = 1  # make sure the noop action is available
+      return mask
     # pylint: disable=not-an-iterable
     return np.array([self.tile(*d.delta).material_id in material.Habitable.indices
                      for d in action.Direction.edges], dtype=np.int8)
