@@ -174,8 +174,7 @@ class Observation:
       # Test below. see tests/core/test_observation_tile.py, test_action_target_consts()
       # assert len(action.Style.edges) == 3
       masks["Attack"] = {
-        "Style": np.zeros(3, dtype=np.int8) if self.dummy_obs\
-                  else np.ones(3, dtype=np.int8),
+        "Style": np.ones(3, dtype=np.int8),
         "Target": self._make_attack_mask()
       }
 
@@ -194,8 +193,7 @@ class Observation:
     if self.config.EXCHANGE_SYSTEM_ENABLED:
       masks["Sell"] = {
         "InventoryItem": self._make_sell_mask(),
-        "Price": np.zeros(self.config.PRICE_N_OBS, dtype=np.int8) if self.dummy_obs\
-                  else np.ones(self.config.PRICE_N_OBS, dtype=np.int8)
+        "Price": np.ones(self.config.PRICE_N_OBS, dtype=np.int8)
       }
       masks["Buy"] = {
         "MarketItem": self._make_buy_mask()
@@ -207,16 +205,16 @@ class Observation:
 
     if self.config.COMMUNICATION_SYSTEM_ENABLED:
       masks["Comm"] = {
-        "Token":\
-          np.zeros(self.config.COMMUNICATION_NUM_TOKENS, dtype=np.int8) if self.dummy_obs\
-            else np.ones(self.config.COMMUNICATION_NUM_TOKENS, dtype=np.int8)
+        "Token":np.ones(self.config.COMMUNICATION_NUM_TOKENS, dtype=np.int8)
       }
 
     return masks
 
   def _make_move_mask(self):
     if self.dummy_obs:
-      return np.zeros(len(action.Direction.edges), dtype=np.int8)
+      mask = np.zeros(len(action.Direction.edges), dtype=np.int8)
+      mask[-1] = 1  # make sure the noop action is available
+      return mask
     # pylint: disable=not-an-iterable
     return np.array([self.tile(*d.delta).material_id in material.Habitable.indices
                      for d in action.Direction.edges], dtype=np.int8)
@@ -344,6 +342,7 @@ class Observation:
 
   def _make_give_gold_mask(self):
     mask = np.zeros(self.config.PRICE_N_OBS, dtype=np.int8)
+    mask[0] = 1  # To avoid all-0 masks. If the agent has no gold, this action will be ignored.
     if self.dummy_obs:
       return mask
 
