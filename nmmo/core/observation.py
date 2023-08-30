@@ -349,8 +349,10 @@ class Observation:
     if self.config.PROVIDE_NOOP_ACTION_TARGET:
       give_mask[-1] = 1
 
+    # To prevent entropy collapse, allow agents to issue random give actions during early training
     if not self.config.EXCHANGE_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat\
        or int(self.agent().gold) == 0:
+      give_mask[self.config.PLAYER_N_OBS//2:] = 1
       return give_mask
 
     agent = self.agent()
@@ -371,12 +373,13 @@ class Observation:
   def _make_give_gold_mask(self):
     mask = np.zeros(self.config.PRICE_N_OBS, dtype=np.int8)
     mask[0] = 1  # To avoid all-0 masks. If the agent has no gold, this action will be ignored.
-    if self.dummy_obs:
+    if self.dummy_obs or self.agent_in_combat:
+      # To prevent entropy collapse, allow agents to issue random give actions during early training
+      mask[:] = 1
       return mask
 
     gold = int(self.agent().gold)
-    if gold and not self.agent_in_combat:
-      mask[:gold] = 1 # NOTE that action.Price starts from Discrete_1
+    mask[:gold] = 1 # NOTE that action.Price starts from Discrete_1
 
     return mask
 
@@ -401,12 +404,10 @@ class Observation:
     if self.config.PROVIDE_NOOP_ACTION_TARGET:
       buy_mask[-1] = 1
 
-    if not self.config.EXCHANGE_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat:
-      return buy_mask
-
     # To prevent entropy collapse, allow agents to issue random buy actions during early training
-    if self.market.len == 0:  # nothing in the market
-      buy_mask[self.config.MARKET_N_OBS//10:] = 1
+    if not self.config.EXCHANGE_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat \
+       or self.market.len == 0:
+      buy_mask[self.config.MARKET_N_OBS//2:] = 1
       return buy_mask
 
     agent = self.agent()
