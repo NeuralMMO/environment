@@ -326,11 +326,9 @@ class Observation:
     if self.config.PROVIDE_NOOP_ACTION_TARGET:
       give_mask[-1] = 1
 
-    if not self.config.ITEM_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat:
-      return give_mask
-
     # To prevent entropy collapse, allow agents to issue random give actions during early training
-    if self.inventory.len == 0:
+    if not self.config.ITEM_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat\
+       or self.inventory.len == 0:
       give_mask[self.config.PLAYER_N_OBS//2:] = 1
       return give_mask
 
@@ -342,6 +340,11 @@ class Observation:
     player = (self.entities.values[:,EntityState.State.attr_name_to_col["npc_type"]] == 0)
 
     give_mask[:self.entities.len] = same_tile & player & not_me
+
+    # To prevent entropy collapse, allow agents to issue random give actions during early training
+    if sum(give_mask[:self.entities.len]) == 0:
+      give_mask[self.config.PLAYER_N_OBS//2:] = 1
+
     return give_mask
 
   def _make_give_gold_target_mask(self):
