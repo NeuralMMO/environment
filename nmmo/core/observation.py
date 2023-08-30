@@ -361,6 +361,11 @@ class Observation:
     player = (self.entities.values[:,EntityState.State.attr_name_to_col["npc_type"]] == 0)
 
     give_mask[:self.entities.len] = same_tile & player & not_me
+
+    # To prevent entropy collapse, allow agents to issue random give actions during early training
+    if sum(give_mask[:self.entities.len]) == 0:
+      give_mask[self.config.PLAYER_N_OBS//2:] = 1
+
     return give_mask
 
   def _make_give_gold_mask(self):
