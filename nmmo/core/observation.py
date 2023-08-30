@@ -199,8 +199,8 @@ class Observation:
         "MarketItem": self._make_buy_mask()
       }
       masks["GiveGold"] = {
-        "Price": self._make_give_gold_mask(), # reusing Price
-        "Target": self._make_give_target_mask()
+        "Price": self._make_give_gold_mask(),  # reusing Price
+        "Target": self._make_give_gold_target_mask()
       }
 
     if self.config.COMMUNICATION_SYSTEM_ENABLED:
@@ -325,9 +325,32 @@ class Observation:
     give_mask = np.zeros(self.config.PLAYER_N_OBS + self._noop_action, dtype=np.int8)
     if self.config.PROVIDE_NOOP_ACTION_TARGET:
       give_mask[-1] = 1
-    # empty inventory -- nothing to give
-    if not (self.config.ITEM_SYSTEM_ENABLED and self.inventory.len > 0)\
-        or self.dummy_obs or self.agent_in_combat:
+
+    if not self.config.ITEM_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat:
+      return give_mask
+
+    # To prevent entropy collapse, allow agents to issue random give actions during early training
+    if self.inventory.len == 0:
+      give_mask[self.config.PLAYER_N_OBS//2:] = 1
+      return give_mask
+
+    agent = self.agent()
+    entities_pos = self.entities.values[:,[EntityState.State.attr_name_to_col["row"],
+                                           EntityState.State.attr_name_to_col["col"]]]
+    same_tile = utils.linf(entities_pos, (agent.row, agent.col)) == 0
+    not_me = self.entities.ids != self.agent_id
+    player = (self.entities.values[:,EntityState.State.attr_name_to_col["npc_type"]] == 0)
+
+    give_mask[:self.entities.len] = same_tile & player & not_me
+    return give_mask
+
+  def _make_give_gold_target_mask(self):
+    give_mask = np.zeros(self.config.PLAYER_N_OBS + self._noop_action, dtype=np.int8)
+    if self.config.PROVIDE_NOOP_ACTION_TARGET:
+      give_mask[-1] = 1
+
+    if not self.config.EXCHANGE_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat\
+       or int(self.agent().gold) == 0:
       return give_mask
 
     agent = self.agent()
@@ -374,6 +397,11 @@ class Observation:
       buy_mask[-1] = 1
 
     if not self.config.EXCHANGE_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat:
+      return buy_mask
+
+    # To prevent entropy collapse, allow agents to issue random buy actions during early training
+    if self.market.len == 0:  # nothing in the market
+      buy_mask[self.config.MARKET_N_OBS//10:] = 1
       return buy_mask
 
     agent = self.agent()
