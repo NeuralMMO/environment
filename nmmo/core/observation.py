@@ -434,6 +434,12 @@ class Observation:
 
     enough_gold = market_items[:,ItemState.State.attr_name_to_col["listed_price"]] <= agent.gold
     buy_mask[:self.market.len] = not_mine & enough_gold
+
+    # To prevent entropy collapse, allow agents to issue random give actions during early training
+    if sum(buy_mask[:self.market.len]) == 0:
+      buy_mask[self.config.MARKET_N_OBS//2:] = 1
+      buy_mask[-1] = 0  # do not allow noop action in this case
+
     return buy_mask
 
   def _existing_ammo_listings(self):
