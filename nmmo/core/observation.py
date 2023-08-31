@@ -219,9 +219,9 @@ class Observation:
     # pylint: disable=not-an-iterable
     mask = np.array([self.tile(*d.delta).material_id in material.Habitable.indices
                      for d in action.Direction.edges], dtype=np.int8)
-    if sum(mask) == 1:  # only the stay is available
+    if sum(mask) == 1:  # only the stay (no-op) is available
       mask[:] = 1
-      mask[-1] = 0  # do not allow noop action
+      mask[-1] = 0  # do not allow no-op action
 
     return mask
 
@@ -261,7 +261,7 @@ class Observation:
     # To prevent entropy collapse, allow agents to issue random give actions during early training
     if sum(attack_mask[:self.entities.len]) == 0:
       attack_mask[self.config.PLAYER_N_OBS//2:] = 1
-      attack_mask[-1] = 0  # do not allow noop action in this case
+      attack_mask[-1] = 0  # do not allow no-op action in this case
 
     return attack_mask
 
@@ -338,10 +338,8 @@ class Observation:
     if self.config.PROVIDE_NOOP_ACTION_TARGET:
       give_mask[-1] = 1
 
-    # To prevent entropy collapse, allow agents to issue random give actions during early training
     if not self.config.ITEM_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat\
        or self.inventory.len == 0:
-      give_mask[self.config.PLAYER_N_OBS//2:] = 1
       return give_mask
 
     agent = self.agent()
@@ -352,11 +350,6 @@ class Observation:
     player = (self.entities.values[:,EntityState.State.attr_name_to_col["npc_type"]] == 0)
 
     give_mask[:self.entities.len] = same_tile & player & not_me
-
-    # To prevent entropy collapse, allow agents to issue random give actions during early training
-    if sum(give_mask[:self.entities.len]) == 0:
-      give_mask[self.config.PLAYER_N_OBS//2:] = 1
-
     return give_mask
 
   def _make_give_gold_target_mask(self):
@@ -364,10 +357,8 @@ class Observation:
     if self.config.PROVIDE_NOOP_ACTION_TARGET:
       give_mask[-1] = 1
 
-    # To prevent entropy collapse, allow agents to issue random give actions during early training
     if not self.config.EXCHANGE_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat\
        or int(self.agent().gold) == 0:
-      give_mask[self.config.PLAYER_N_OBS//2:] = 1
       return give_mask
 
     agent = self.agent()
@@ -378,24 +369,16 @@ class Observation:
     player = (self.entities.values[:,EntityState.State.attr_name_to_col["npc_type"]] == 0)
 
     give_mask[:self.entities.len] = same_tile & player & not_me
-
-    # To prevent entropy collapse, allow agents to issue random give actions during early training
-    if sum(give_mask[:self.entities.len]) == 0:
-      give_mask[self.config.PLAYER_N_OBS//2:] = 1
-
     return give_mask
 
   def _make_give_gold_mask(self):
     mask = np.zeros(self.config.PRICE_N_OBS, dtype=np.int8)
     mask[0] = 1  # To avoid all-0 masks. If the agent has no gold, this action will be ignored.
     if self.dummy_obs or self.agent_in_combat:
-      # To prevent entropy collapse, allow agents to issue random give actions during early training
-      mask[:] = 1
       return mask
 
     gold = int(self.agent().gold)
     mask[:gold] = 1 # NOTE that action.Price starts from Discrete_1
-
     return mask
 
   def _make_sell_mask(self):
@@ -419,11 +402,8 @@ class Observation:
     if self.config.PROVIDE_NOOP_ACTION_TARGET:
       buy_mask[-1] = 1
 
-    # To prevent entropy collapse, allow agents to issue random buy actions during early training
     if not self.config.EXCHANGE_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat \
        or self.market.len == 0:
-      buy_mask[self.config.MARKET_N_OBS//2:] = 1
-      buy_mask[-1] = 0  # do not allow noop action in this case
       return buy_mask
 
     agent = self.agent()
@@ -440,12 +420,6 @@ class Observation:
 
     enough_gold = market_items[:,ItemState.State.attr_name_to_col["listed_price"]] <= agent.gold
     buy_mask[:self.market.len] = not_mine & enough_gold
-
-    # To prevent entropy collapse, allow agents to issue random give actions during early training
-    if sum(buy_mask[:self.market.len]) == 0:
-      buy_mask[self.config.MARKET_N_OBS//2:] = 1
-      buy_mask[-1] = 0  # do not allow noop action in this case
-
     return buy_mask
 
   def _existing_ammo_listings(self):

@@ -31,7 +31,7 @@ class TestAmmoUse(ScriptedTestTemplate):
       mask += np.sum(gym_obs["ActionTargets"][atn.__name__]["InventoryItem"])
     # If MarketItem and InventoryTarget have no-action flags, these sum up to 5
     # To prevent entropy collapse, GiveGold/Price and Buy/MarketItem masks are tweaked
-    self.assertEqual(mask, 99 + 511 + 5*int(self.config.PROVIDE_NOOP_ACTION_TARGET))
+    self.assertEqual(mask, 1 + 5*int(self.config.PROVIDE_NOOP_ACTION_TARGET))
 
   def test_spawn_immunity(self):
     env = self._setup_env(random_seed=RANDOM_SEED)
