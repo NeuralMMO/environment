@@ -213,15 +213,19 @@ class Observation:
   def _make_move_mask(self):
     if self.dummy_obs:
       mask = np.zeros(len(action.Direction.edges), dtype=np.int8)
-      mask[-1] = 1  # make sure the noop action is available
+      mask[-1] = 1  # for no-op
       return mask
 
     # pylint: disable=not-an-iterable
     mask = np.array([self.tile(*d.delta).material_id in material.Habitable.indices
                      for d in action.Direction.edges], dtype=np.int8)
-    if sum(mask) == 1:  # only the stay (no-op) is available
+
+    # To prevent entropy collapse, do NOT allow no-op action
+    if sum(mask) <= 1:
+      # if only the stay (no-op) is possible, then allow all actions
       mask[:] = 1
-      mask[-1] = 0  # do not allow no-op action
+    # Mask the no-op option, since there should be at least one allowed move
+    mask[-1] = 0
 
     return mask
 
@@ -261,7 +265,10 @@ class Observation:
     # To prevent entropy collapse, allow agents to issue random give actions during early training
     if sum(attack_mask[:self.entities.len]) == 0:
       attack_mask[self.config.PLAYER_N_OBS//2:] = 1
-      attack_mask[-1] = 0  # do not allow no-op action in this case
+
+    # Mask the no-op option, since there should be at least one allowed move
+    # NOTE: this will make agents always attack if there is a valid target
+    attack_mask[-1] = 0
 
     return attack_mask
 
