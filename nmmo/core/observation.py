@@ -215,9 +215,15 @@ class Observation:
       mask = np.zeros(len(action.Direction.edges), dtype=np.int8)
       mask[-1] = 1  # make sure the noop action is available
       return mask
+
     # pylint: disable=not-an-iterable
-    return np.array([self.tile(*d.delta).material_id in material.Habitable.indices
+    mask = np.array([self.tile(*d.delta).material_id in material.Habitable.indices
                      for d in action.Direction.edges], dtype=np.int8)
+    if sum(mask) == 1:  # only the stay is available
+      mask[:] = 1
+      mask[-1] = 0  # do not allow noop action
+
+    return mask
 
   def _make_attack_mask(self):
     # NOTE: Currently, all attacks have the same range
