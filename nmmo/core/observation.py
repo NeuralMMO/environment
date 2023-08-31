@@ -251,6 +251,12 @@ class Observation:
     not_me = self.entities.ids != agent.id
 
     attack_mask[:self.entities.len] = within_range & not_me & no_spawn_immunity
+
+    # To prevent entropy collapse, allow agents to issue random give actions during early training
+    if sum(attack_mask[:self.entities.len]) == 0:
+      attack_mask[self.config.PLAYER_N_OBS//2:] = 1
+      attack_mask[-1] = 0  # do not allow noop action in this case
+
     return attack_mask
 
   def _make_use_mask(self):
@@ -411,6 +417,7 @@ class Observation:
     if not self.config.EXCHANGE_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat \
        or self.market.len == 0:
       buy_mask[self.config.MARKET_N_OBS//2:] = 1
+      buy_mask[-1] = 0  # do not allow noop action in this case
       return buy_mask
 
     agent = self.agent()
