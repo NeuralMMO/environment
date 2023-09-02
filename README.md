@@ -1,4 +1,4 @@
-![figure](https://neuralmmo.github.io/_static/banner.png)
+![figure](https://neuralmmo.github.io/_static/banner.jpg)
 
 # ![icon](https://neuralmmo.github.io/_build/html/_images/icon.png) Welcome to the Platform!
 
