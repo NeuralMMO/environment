@@ -217,16 +217,8 @@ class Observation:
       return mask
 
     # pylint: disable=not-an-iterable
-    mask = np.array([self.tile(*d.delta).material_id in material.Habitable.indices
+    return np.array([self.tile(*d.delta).material_id in material.Habitable.indices
                      for d in action.Direction.edges], dtype=np.int8)
-
-    if sum(mask) <= 1:
-      # if only the stay (no-op) is possible, then allow all actions
-      mask[:] = 1
-    # Mask the no-op option, since there should be at least one allowed move
-    mask[-1] = 0
-
-    return mask
 
   def _make_attack_mask(self):
     # NOTE: Currently, all attacks have the same range
