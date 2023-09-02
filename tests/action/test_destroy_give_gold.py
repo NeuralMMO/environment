@@ -153,7 +153,7 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
       self._check_inv_mask(env.obs[ent_id], action.Sell, item_sig))
     actions[ent_id] = { action.Sell: {
         action.InventoryItem: env.obs[ent_id].inventory.sig(*item_sig),
-        action.Price: price } }
+        action.Price: action.Price.index(price) } }
 
     env.step(actions)
 
@@ -257,7 +257,7 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
     test_cond[1] = { 'tgt_id': 3, 'gold': 1, 'ent_mask': True,
                      'ent_gold': self.init_gold-1, 'tgt_gold': self.init_gold+1 }
     # agent 2: give gold to agent 4 (valid: same tile)
-    test_cond[2] = { 'tgt_id': 4, 'gold': 100, 'ent_mask': True,
+    test_cond[2] = { 'tgt_id': 4, 'gold': self.init_gold, 'ent_mask': True,
                      'ent_gold': 0, 'tgt_gold': 2*self.init_gold }
     # agent 3: give gold to npc -1 (invalid: cannot give to npc)
     #  ent_gold is self.init_gold+1 because (3) got 1 gold from (1)

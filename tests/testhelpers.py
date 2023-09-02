@@ -6,12 +6,12 @@ from timeit import timeit
 import numpy as np
 
 import nmmo
-
-from scripted import baselines
-from nmmo.entity.entity import EntityState
 from nmmo.core import action
 from nmmo.systems import item as Item
 from nmmo.core.realm import Realm
+from nmmo.lib import material as Material
+
+from scripted import baselines
 
 # this function can be replaced by assertDictEqual
 # but might be still useful for debugging
@@ -51,6 +51,7 @@ def observations_are_equal(source_obs, target_obs, debug=True):
   keys_obs = list(target_obs.keys())
   if keys_src != keys_obs:
     if debug:
+      #print("entities don't match")
       logging.error("entities don't match")
     return False
 
@@ -59,6 +60,7 @@ def observations_are_equal(source_obs, target_obs, debug=True):
     ent_tgt = target_obs[k]
     if list(ent_src.keys()) != list(ent_tgt.keys()):
       if debug:
+        #print(f"entries don't match. key: {k}")
         logging.error("entries don't match. key: %s", str(k))
       return False
 
@@ -73,6 +75,7 @@ def observations_are_equal(source_obs, target_obs, debug=True):
       obj_tgt = ent_tgt[o]
       if np.sum(obj_src != obj_tgt) > 0:
         if debug:
+          #print(f"objects don't match. key: {k}, obj: {o}")
           logging.error("objects don't match. key: %s, obj: %s", str(k), str(o))
         return False
 
@@ -116,7 +119,6 @@ class ScriptedAgentTestConfig(nmmo.config.Small, nmmo.config.AllGameSystems):
 
   PLAYER_DEATH_FOG = 5
 
-  SPECIALIZE = True
   PLAYERS = [
     baselines.Fisher, baselines.Herbalist,
     baselines.Prospector,baselines.Carver, baselines.Alchemist,
@@ -143,9 +145,6 @@ class ScriptedAgentTestEnv(nmmo.Env):
 
   def reset(self, map_id=None, seed=None, options=None):
     self.actions = {}
-    # manually resetting the EntityState, ItemState datastore tables
-    EntityState.State.table(self.realm.datastore).reset()
-    Item.ItemState.State.table(self.realm.datastore).reset()
     return super().reset(map_id=map_id, seed=seed, options=options)
 
   def _compute_scripted_agent_actions(self, actions):
@@ -226,9 +225,14 @@ class ScriptedTestTemplate(unittest.TestCase):
 
     return item_sig
 
-  def _setup_env(self, random_seed, check_assert=True):
+  def _setup_env(self, random_seed, check_assert=True, remove_immunity=False):
     """ set up a new env and perform initial checks """
-    env = ScriptedAgentTestEnv(self.config, seed=random_seed)
+    config = deepcopy(self.config)
+
+    if remove_immunity:
+      config.COMBAT_SPAWN_IMMUNITY = 0
+
+    env = ScriptedAgentTestEnv(config, seed=random_seed)
     env.reset()
 
     # provide money for all
@@ -248,6 +252,15 @@ class ScriptedTestTemplate(unittest.TestCase):
     for ent_id, pos in self.spawn_locs.items():
       change_spawn_pos(env.realm, ent_id, pos)
 
+    # Change entire map to grass to become habitable and non-harvestable
+    MS = env.config.MAP_SIZE
+    for i in range(MS):
+      for j in range(MS):
+        tile = env.realm.map.tiles[i,j]
+        tile.material = Material.Grass
+        tile.material_id.update(Material.Grass.index)
+        tile.state = Material.Grass(env.config)
+
     env.obs = env._compute_observations()
 
     if check_assert:
@@ -258,21 +271,21 @@ class ScriptedTestTemplate(unittest.TestCase):
   def _check_ent_mask(self, ent_obs, atn, target_id):
     assert atn in [action.Give, action.GiveGold], "Invalid action"
     gym_obs = ent_obs.to_gym()
-    mask = gym_obs['ActionTargets'][atn][action.Target][:ent_obs.entities.len] > 0
+    mask = gym_obs["ActionTargets"][atn.__name__]["Target"][:ent_obs.entities.len] > 0
 
     return target_id in ent_obs.entities.ids[mask]
 
   def _check_inv_mask(self, ent_obs, atn, item_sig):
     assert atn in [action.Destroy, action.Give, action.Sell, action.Use], "Invalid action"
     gym_obs = ent_obs.to_gym()
-    mask = gym_obs['ActionTargets'][atn][action.InventoryItem][:ent_obs.inventory.len] > 0
+    mask = gym_obs["ActionTargets"][atn.__name__]["InventoryItem"][:ent_obs.inventory.len] > 0
     inv_idx = ent_obs.inventory.sig(*item_sig)
 
     return ent_obs.inventory.id(inv_idx) in ent_obs.inventory.ids[mask]
 
   def _check_mkt_mask(self, ent_obs, item_id):
     gym_obs = ent_obs.to_gym()
-    mask = gym_obs['ActionTargets'][action.Buy][action.MarketItem][:ent_obs.market.len] > 0
+    mask = gym_obs["ActionTargets"]["Buy"]["MarketItem"][:ent_obs.market.len] > 0
 
     return item_id in ent_obs.market.ids[mask]
 
@@ -356,11 +369,12 @@ class ScriptedTestTemplate(unittest.TestCase):
       if atn == action.Give:
         actions[ent_id] = { action.Give: {
           action.InventoryItem: env.obs[ent_id].inventory.sig(*cond['item_sig']),
-          action.Target: cond['tgt_id'] } }
+          action.Target: env.obs[ent_id].entities.index(cond['tgt_id']) } }
 
       elif atn == action.GiveGold:
         actions[ent_id] = { action.GiveGold:
-          { action.Target: cond['tgt_id'], action.Price: cond['gold'] } }
+          { action.Target: env.obs[ent_id].entities.index(cond['tgt_id']),
+           action.Price: action.Price.index(cond['gold']) } }
 
       elif atn == action.Buy:
         mkt_idx = ent_obs.market.index(cond['item_id'])
@@ -374,21 +388,22 @@ def profile_env_step(action_target=True, tasks=None, condition=None):
   config.PLAYERS = [baselines.Sleeper] # the scripted agents doing nothing
   config.IMMORTAL = True # otherwise the agents will die
   config.PROVIDE_ACTION_TARGETS = action_target
-  env = nmmo.Env(config)
+  env = nmmo.Env(config, seed=0)
   if tasks is None:
     tasks = []
   env.reset(seed=0, make_task_fn=lambda: tasks)
   for _ in range(3):
     env.step({})
 
-  obs = env._compute_observations()
+  env.obs = env._compute_observations()
+  obs = deepcopy(env.obs)
 
   test_func = [
     ('env.step({}):', lambda: env.step({})),
     ('env.realm.step():', lambda: env.realm.step({})),
     ('env._compute_observations():', lambda: env._compute_observations()),
     ('obs.to_gym(), ActionTarget:', lambda: {a: o.to_gym() for a,o in obs.items()}),
-    ('env._compute_rewards():', lambda: env._compute_rewards(obs.keys(), {}))
+    ('env._compute_rewards():', lambda: env._compute_rewards())
   ]
 
   if condition:

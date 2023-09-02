@@ -1,10 +1,9 @@
 from types import SimpleNamespace
-import numpy as np
 
 from nmmo.datastore.serialized import SerializedState
 from nmmo.lib import material
 
-# pylint: disable=no-member
+# pylint: disable=no-member,protected-access
 TileState = SerializedState.subclass(
   "Tile", [
     "row",
@@ -23,13 +22,17 @@ TileState.Query = SimpleNamespace(
     TileState.State.attr_name_to_col["row"],
     TileState.State.attr_name_to_col["col"],
     r, c, radius),
+  get_map=lambda ds, map_size:
+    ds.table("Tile")._data[1:(map_size*map_size+1)]
+                    .reshape((map_size,map_size,len(TileState.State.attr_name_to_col)))
 )
 
 class Tile(TileState):
-  def __init__(self, realm, r, c):
+  def __init__(self, realm, r, c, np_random):
     super().__init__(realm.datastore, TileState.Limits(realm.config))
     self.realm = realm
     self.config = realm.config
+    self._np_random = np_random
 
     self.row.update(r)
     self.col.update(c)
@@ -61,7 +64,8 @@ class Tile(TileState):
   def void(self):
     return self.material == material.Void
 
-  def reset(self, mat, config):
+  def reset(self, mat, config, np_random):
+    self._np_random = np_random # reset the RNG
     self.state = mat(config)
     self.material = mat(config)
     self.material_id.update(self.state.index)
@@ -80,7 +84,7 @@ class Tile(TileState):
     del self.entities[ent_id]
 
   def step(self):
-    if not self.depleted or np.random.rand() > self.material.respawn:
+    if not self.depleted or self._np_random.random() > self.material.respawn:
       return
 
     self.depleted = False

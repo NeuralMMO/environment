@@ -24,14 +24,26 @@ class TeamHelper():
     return agent_id in self.teams[team_id]
 
   def get_target_agent(self, team_id: int, target: str):
-    if target == 'left_team':
-      return self.teams[(team_id+1) % self.num_teams]
-    if target == 'left_team_leader':
-      return self.teams[(team_id+1) % self.num_teams][0]
-    if target == 'right_team':
-      return self.teams[(team_id-1) % self.num_teams]
-    if target == 'right_team_leader':
-      return self.teams[(team_id-1) % self.num_teams][0]
-    if target == 'my_team_leader':
+    team_ids = list(self.teams.keys())
+    idx = team_ids.index(team_id)
+    if target == "left_team":
+      target_id = team_ids[(idx+1) % self.num_teams]
+      return self.teams[target_id]
+    if target == "left_team_leader":
+      target_id = team_ids[(idx+1) % self.num_teams]
+      return self.teams[target_id][0]
+    if target == "right_team":
+      target_id = team_ids[(idx-1) % self.num_teams]
+      return self.teams[target_id]
+    if target == "right_team_leader":
+      target_id = team_ids[(idx-1) % self.num_teams]
+      return self.teams[target_id][0]
+    if target == "my_team_leader":
       return self.teams[team_id][0]
+    if target == "all_foes":
+      all_foes = []
+      for foe_team_id in team_ids:
+        if foe_team_id != team_id:
+          all_foes += self.teams[foe_team_id]
+      return all_foes
     return None

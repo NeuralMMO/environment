@@ -10,6 +10,7 @@ class TestMapGeneration(unittest.TestCase):
     config.PATH_MAPS = 'maps/test_map_gen'
     config.MAP_N = 20
 
+    # clear the directory
     path_maps = os.path.join(config.PATH_CWD, config.PATH_MAPS)
     shutil.rmtree(path_maps, ignore_errors=True)
 
@@ -22,6 +23,26 @@ class TestMapGeneration(unittest.TestCase):
 
     test_env = nmmo.Env(config)
     test_env.reset(map_id=config.MAP_N)
+
+    # this should finish without error
+
+  def test_map_preview(self):
+    class MapConfig(
+      nmmo.config.Small, # no fractal, grass only
+      nmmo.config.Terrain, # water, grass, foilage, stone
+      nmmo.config.Item, # no additional effect on the map
+      nmmo.config.Profession, # add ore, tree, crystal, herb, fish
+    ):
+      PATH_MAPS = 'maps/test_preview'
+      MAP_FORCE_GENERATION = True
+      MAP_GENERATE_PREVIEWS = True
+    config = MapConfig()
+
+    # clear the directory
+    path_maps = os.path.join(config.PATH_CWD, config.PATH_MAPS)
+    shutil.rmtree(path_maps, ignore_errors=True)
+
+    test_env = nmmo.Env(config) # pylint: disable=unused-variable
 
     # this should finish without error
 

@@ -7,6 +7,7 @@ from nmmo.lib.log import EventCode
 from nmmo.systems import skill
 from nmmo.task import predicate_api as p
 from nmmo.task import task_api as t
+from nmmo.task import task_spec as ts
 from nmmo.task import base_predicates as bp
 from nmmo.task.game_state import GameState
 from nmmo.task.group import Group
@@ -83,6 +84,7 @@ class TestDemoTask(unittest.TestCase):
 
     # Test rollout
     config = ScriptedAgentTestConfig()
+    config.ALLOW_MULTI_TASKS_PER_AGENT = True
     env = Env(config)
 
     # Creating and testing "team" tasks
@@ -210,34 +212,25 @@ class TestDemoTask(unittest.TestCase):
 
     # DONE
 
-  def test_make_team_tasks_using_task_spec(self):
+  def test_task_spec_based_curriculum(self):
+    task_spec = [
+      ts.TaskSpec(eval_fn=bp.CountEvent, eval_fn_kwargs={'event': 'PLAYER_KILL', 'N': 1},
+                  reward_to='team'),
+      ts.TaskSpec(eval_fn=bp.CountEvent, eval_fn_kwargs={'event': 'PLAYER_KILL', 'N': 2},
+                  reward_to='agent'),
+      ts.TaskSpec(eval_fn=bp.AllDead, eval_fn_kwargs={'target': 'left_team'},
+                  reward_to='agent'),
+      ts.TaskSpec(eval_fn=bp.CanSeeAgent, eval_fn_kwargs={'target': 'right_team_leader'},
+                  task_cls=t.OngoingTask, reward_to='team'),
+    ]
+
     # NOTE: len(teams) and len(task_spec) don't need to match
-    teams = {0:[1,2,3], 1:[4,5], 2:[6,7], 3:[8,9], 4:[10,11]}
-
-    """ task_spec is a list of tuple (reward_to, predicate class, kwargs)
-
-        each tuple in the task_spec will create tasks for a team in teams
-
-        reward_to: must be in ['team', 'agent']
-          * 'team' create a single team task, in which all team members get rewarded
-          * 'agent' create a task for each agent, in which only the agent gets rewarded
-
-        predicate class from the base predicates or custom predicates like above
-
-        kwargs are the additional args that go into predicate. There are also special keys
-          * 'target' must be ['left_team', 'right_team', 'left_team_leader', 'right_team_leader']
-             these str will be translated into the actual agent ids
-          * 'task_cls' is optional. If not provided, the standard Task is used. """
-    task_spec = [ # (reward_to, predicate function, kwargs)
-      ('team', bp.CountEvent, {'event': 'PLAYER_KILL', 'N': 1}), # one task
-      ('agent', bp.CountEvent, {'event': 'PLAYER_KILL', 'N': 2}),
-      ('agent', bp.AllDead, {'target': 'left_team'}),
-      ('team', bp.CanSeeAgent, {'target': 'right_team_leader', 'task_cls': t.OngoingTask})]
+    teams = {1:[1,2,3], 3:[4,5], 6:[6,7], 9:[8,9], 14:[10,11]}
 
     config = ScriptedAgentTestConfig()
     env = Env(config)
 
-    env.reset(make_task_fn=lambda: t.make_team_tasks(teams, task_spec))
+    env.reset(make_task_fn=lambda: ts.make_task_from_spec(teams, task_spec))
 
     self.assertEqual(len(env.tasks), 6) # 6 tasks were created
     self.assertEqual(env.tasks[0].name, # team 0 task assigned to agents 1,2,3

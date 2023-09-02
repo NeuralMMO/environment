@@ -1,9 +1,6 @@
-# pylint: disable=all
-
+# pylint: disable=invalid-name, attribute-defined-outside-init, no-member
 from typing import Dict
-
 from collections import defaultdict
-import random
 
 import nmmo
 from nmmo import material
@@ -15,8 +12,9 @@ from nmmo.core.observation import Observation
 
 from scripted import attack, move
 
-class Scripted(nmmo.Agent):
-  '''Template class for scripted models.
+
+class Scripted(nmmo.Scripted):
+  '''Template class for baseline scripted models.
 
   You may either subclass directly or mirror the __call__ function'''
   scripted = True
@@ -30,8 +28,8 @@ class Scripted(nmmo.Agent):
     self.health_max = config.PLAYER_BASE_HEALTH
 
     if config.RESOURCE_SYSTEM_ENABLED:
-        self.food_max   = config.RESOURCE_BASE
-        self.water_max  = config.RESOURCE_BASE
+      self.food_max   = config.RESOURCE_BASE
+      self.water_max  = config.RESOURCE_BASE
 
     self.spawnR    = None
     self.spawnC    = None
@@ -48,15 +46,17 @@ class Scripted(nmmo.Agent):
 
   def forage(self):
     '''Min/max food and water using Dijkstra's algorithm'''
-    move.forageDijkstra(self.config, self.ob, self.actions, self.food_max, self.water_max)
+    # TODO: do not access realm._np_random directly. ALSO see below for all other uses
+    move.forageDijkstra(self.config, self.ob, self.actions,
+                        self.food_max, self.water_max, self._np_random)
 
   def gather(self, resource):
     '''BFS search for a particular resource'''
-    return move.gatherBFS(self.config, self.ob, self.actions, resource)
+    return move.gatherBFS(self.config, self.ob, self.actions, resource, self._np_random)
 
   def explore(self):
     '''Route away from spawn'''
-    move.explore(self.config, self.ob, self.actions, self.me.row, self.me.col)
+    move.explore(self.config, self.ob, self.actions, self.me.row, self.me.col, self._np_random)
 
   @property
   def downtime(self):
@@ -65,7 +65,7 @@ class Scripted(nmmo.Agent):
 
   def evade(self):
     '''Target and path away from an attacker'''
-    move.evade(self.config, self.ob, self.actions, self.attacker)
+    move.evade(self.config, self.ob, self.actions, self.attacker, self._np_random)
     self.target     = self.attacker
     self.targetID   = self.attackerID
     self.targetDist = self.attackerDist
@@ -74,10 +74,10 @@ class Scripted(nmmo.Agent):
     '''Attack the current target'''
     if self.target is not None:
       assert self.targetID is not None
-      style = random.choice(self.style)
+      style = self._np_random.choice(self.style)
       attack.target(self.config, self.actions, style, self.targetID)
 
-  def target_weak(self):
+  def target_weak(self): # pylint: disable=inconsistent-return-statements
     '''Target the nearest agent if it is weak'''
     if self.closest is None:
       return False
@@ -99,11 +99,11 @@ class Scripted(nmmo.Agent):
 
     self.closestID = None
     if self.closest is not None:
-      self.closestID = self.closest.id
+      self.closestID = self.ob.entities.index(self.closest.id)
 
     self.attackerID = None
     if self.attacker is not None:
-      self.attackerID = self.attacker.id
+      self.attackerID = self.ob.entities.index(self.attacker.id)
 
     self.target     = None
     self.targetID   = None
@@ -226,14 +226,16 @@ class Scripted(nmmo.Agent):
 
       # InventoryItem needs where the item is (index) in the inventory
       self.actions[action.Use] = {
-        action.InventoryItem: self.ob.inventory.index(itm.id)} # list(self.ob.inventory.ids).index(itm.id)
+        action.InventoryItem: self.ob.inventory.index(itm.id)}
 
     return True
 
   def consume(self):
-    if self.me.health <= self.health_max // 2 and item_system.Potion.ITEM_TYPE_ID in self.best_items:
+    if self.me.health <= self.health_max // 2 \
+        and item_system.Potion.ITEM_TYPE_ID in self.best_items:
       itm = self.best_items[item_system.Potion.ITEM_TYPE_ID]
-    elif (self.me.food == 0 or self.me.water == 0) and item_system.Ration.ITEM_TYPE_ID in self.best_items:
+    elif (self.me.food == 0 or self.me.water == 0) \
+        and item_system.Ration.ITEM_TYPE_ID in self.best_items:
       itm = self.best_items[item_system.Ration.ITEM_TYPE_ID]
     else:
       return
@@ -243,7 +245,7 @@ class Scripted(nmmo.Agent):
 
     # InventoryItem needs where the item is (index) in the inventory
     self.actions[action.Use] = {
-      action.InventoryItem: self.ob.inventory.index(itm.id)} # list(self.ob.inventory.ids).index(itm.id)
+      action.InventoryItem: self.ob.inventory.index(itm.id)}
 
   def sell(self, keep_k: dict, keep_best: set):
     for itm in self.inventory.values():
@@ -266,8 +268,8 @@ class Scripted(nmmo.Agent):
         continue
 
       self.actions[action.Sell] = {
-        action.InventoryItem: self.ob.inventory.index(itm.id), # list(self.ob.inventory.ids).index(itm.id)
-        action.Price: action.Price.edges[price-1] } # Price starts from 1
+        action.InventoryItem: self.ob.inventory.index(itm.id),
+        action.Price: action.Price.index(price) }
 
       return itm
 
@@ -277,7 +279,7 @@ class Scripted(nmmo.Agent):
 
     purchase = None
     best = list(self.best_heuristic.items())
-    random.shuffle(best)
+    self._np_random.shuffle(best)
     for type_id, itm in best:
       # Buy top k
       if type_id in buy_k:
@@ -293,7 +295,7 @@ class Scripted(nmmo.Agent):
       # Buy best heuristic upgrade
       if purchase:
         self.actions[action.Buy] = {
-          action.MarketItem: self.ob.market.index(purchase.id)} #list(self.ob.market.ids).index(purchase.id)}
+          action.MarketItem: self.ob.market.index(purchase.id)}
         return
 
   def exchange(self):
@@ -311,6 +313,7 @@ class Scripted(nmmo.Agent):
 
   def __call__(self, observation: Observation):
     '''Process observations and return actions'''
+    assert self._np_random is not None, "Agent's RNG must be set."
     self.actions = {}
 
     self.ob = observation
@@ -358,7 +361,7 @@ class Random(Scripted):
   def __call__(self, obs):
     super().__call__(obs)
 
-    move.rand(self.config, self.ob, self.actions)
+    move.rand(self.config, self.ob, self.actions, self._np_random)
     return self.actions
 
 class Meander(Scripted):
@@ -366,7 +369,7 @@ class Meander(Scripted):
   def __call__(self, obs):
     super().__call__(obs)
 
-    move.meander(self.config, self.ob, self.actions)
+    move.meander(self.config, self.ob, self.actions, self._np_random)
     return self.actions
 
 class Explore(Scripted):
@@ -384,9 +387,9 @@ class Forage(Scripted):
     super().__call__(obs)
 
     if self.forage_criterion:
-        self.forage()
+      self.forage()
     else:
-        self.explore()
+      self.explore()
 
     return self.actions
 
@@ -461,42 +464,42 @@ class Gather(Scripted):
 class Fisher(Gather):
   def __init__(self, config, idx):
     super().__init__(config, idx)
-    if config.SPECIALIZE:
+    if config.PROFESSION_SYSTEM_ENABLED:
       self.resource = [material.Fish]
     self.tool     = item_system.Rod
 
 class Herbalist(Gather):
   def __init__(self, config, idx):
     super().__init__(config, idx)
-    if config.SPECIALIZE:
+    if config.PROFESSION_SYSTEM_ENABLED:
       self.resource = [material.Herb]
     self.tool     = item_system.Gloves
 
 class Prospector(Gather):
   def __init__(self, config, idx):
     super().__init__(config, idx)
-    if config.SPECIALIZE:
+    if config.PROFESSION_SYSTEM_ENABLED:
       self.resource = [material.Ore]
     self.tool     = item_system.Pickaxe
 
 class Carver(Gather):
   def __init__(self, config, idx):
     super().__init__(config, idx)
-    if config.SPECIALIZE:
+    if config.PROFESSION_SYSTEM_ENABLED:
       self.resource = [material.Tree]
     self.tool     = item_system.Axe
 
 class Alchemist(Gather):
   def __init__(self, config, idx):
     super().__init__(config, idx)
-    if config.SPECIALIZE:
+    if config.PROFESSION_SYSTEM_ENABLED:
       self.resource = [material.Crystal]
     self.tool     = item_system.Chisel
 
 class Melee(Combat):
   def __init__(self, config, idx):
     super().__init__(config, idx)
-    if config.SPECIALIZE:
+    if config.COMBAT_SYSTEM_ENABLED:
       self.style  = [action.Melee]
     self.weapon = item_system.Spear
     self.ammo   = item_system.Whetstone
@@ -504,7 +507,7 @@ class Melee(Combat):
 class Range(Combat):
   def __init__(self, config, idx):
     super().__init__(config, idx)
-    if config.SPECIALIZE:
+    if config.COMBAT_SYSTEM_ENABLED:
       self.style  = [action.Range]
     self.weapon = item_system.Bow
     self.ammo   = item_system.Arrow
@@ -512,7 +515,7 @@ class Range(Combat):
 class Mage(Combat):
   def __init__(self, config, idx):
     super().__init__(config, idx)
-    if config.SPECIALIZE:
+    if config.COMBAT_SYSTEM_ENABLED:
       self.style  = [action.Mage]
     self.weapon = item_system.Wand
     self.ammo   = item_system.Runes

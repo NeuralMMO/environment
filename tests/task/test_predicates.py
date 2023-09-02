@@ -36,6 +36,7 @@ class TestBasePredicate(unittest.TestCase):
     config.PLAYERS = [Sleeper]
     config.PLAYER_N = NUM_AGENT
     config.IMMORTAL = True
+    config.ALLOW_MULTI_TASKS_PER_AGENT = True
 
     # OngoingTask keeps evaluating and returns progress as the reward
     #   vs. Task stops evaluating once the task is completed, returns reward = delta(progress)
@@ -126,8 +127,6 @@ class TestBasePredicate(unittest.TestCase):
         # make sure that dead players not in the realm nor the datastore
         self.assertTrue(ent_id not in env.realm.players)
         self.assertTrue(ent_id not in entities)
-        # CHECK ME: dead agents are also not in infos
-        self.assertTrue(ent_id not in infos)
 
     # TickGE_5 is true. Agents 1-3 are dead, so
     # StayAlive(1,3) and StayAlive(3,4) are false, StayAlive(4) is true
@@ -253,8 +252,9 @@ class TestBasePredicate(unittest.TestCase):
     env = self._get_taskenv(test_preds, grass_map=True)
 
     # All agents to one corner
+    BORDER = env.config.MAP_BORDER
     for ent_id in env.realm.players:
-      change_agent_pos(env.realm,ent_id,(0,0))
+      change_agent_pos(env.realm,ent_id,(BORDER,BORDER))
     env.obs = env._compute_observations()
 
     _, _, _, infos = env.step({})

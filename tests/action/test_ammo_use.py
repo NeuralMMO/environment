@@ -25,14 +25,35 @@ class TestAmmoUse(ScriptedTestTemplate):
       logging.basicConfig(filename=LOGFILE, level=logging.INFO)
 
   def _assert_action_targets_zero(self, gym_obs):
-    mask = np.sum(gym_obs['ActionTargets'][action.GiveGold][action.Price]) \
-          + np.sum(gym_obs['ActionTargets'][action.Buy][action.MarketItem])
+    mask = np.sum(gym_obs["ActionTargets"]["GiveGold"]["Price"]) \
+          + np.sum(gym_obs["ActionTargets"]["Buy"]["MarketItem"])
     for atn in [action.Use, action.Give, action.Destroy, action.Sell]:
-      mask += np.sum(gym_obs['ActionTargets'][atn][action.InventoryItem])
-    self.assertEqual(mask, 0)
+      mask += np.sum(gym_obs["ActionTargets"][atn.__name__]["InventoryItem"])
+    # If MarketItem and InventoryTarget have no-action flags, these sum up to 5
+    self.assertEqual(mask, 1 + 5*int(self.config.PROVIDE_NOOP_ACTION_TARGET))
+
+  def test_spawn_immunity(self):
+    env = self._setup_env(random_seed=RANDOM_SEED)
+
+    # Check spawn immunity in the action targets
+    for ent_obs in env.obs.values():
+      gym_obs = ent_obs.to_gym()
+      target_mask = gym_obs["ActionTargets"]["Attack"]["Target"][:len(ent_obs.entities.ids)]
+      # cannot target other agents
+      self.assertTrue(np.sum(target_mask[ent_obs.entities.ids > 0]) == 0)
+
+    # Test attack during spawn immunity, which should be ignored
+    env.step({ ent_id: { action.Attack:
+        { action.Style: env.realm.players[ent_id].agent.style[0],
+          action.Target: env.obs[ent_id].entities.index((ent_id+1)%3+1) } }
+        for ent_id in self.ammo })
+
+    for ent_id in [1, 2, 3]:
+      # in_combat status is set when attack is executed
+      self.assertFalse(env.realm.players[ent_id].in_combat)
 
   def test_ammo_fire_all(self):
-    env = self._setup_env(random_seed=RANDOM_SEED)
+    env = self._setup_env(random_seed=RANDOM_SEED, remove_immunity=True)
 
     # First tick actions: USE (equip) level-0 ammo
     env.step({ ent_id: { action.Use:
@@ -48,7 +69,7 @@ class TestAmmoUse(ScriptedTestTemplate):
         ItemState.parse_array(inventory.values[inv_idx]).equipped)
 
       # check SELL InventoryItem mask -- one cannot sell equipped item
-      mask = gym_obs['ActionTargets'][action.Sell][action.InventoryItem][:inventory.len] > 0
+      mask = gym_obs["ActionTargets"]["Sell"]["InventoryItem"][:inventory.len] > 0
       self.assertTrue(inventory.id(inv_idx) not in inventory.ids[mask])
 
       # the agents must not be in combat status
@@ -58,7 +79,7 @@ class TestAmmoUse(ScriptedTestTemplate):
     #  NOTE that agents 1 & 3's attack are invalid due to out-of-range
     env.step({ ent_id: { action.Attack:
         { action.Style: env.realm.players[ent_id].agent.style[0],
-          action.Target: (ent_id+1)%3+1 } }
+          action.Target: env.obs[ent_id].entities.index((ent_id+1)%3+1) } }
         for ent_id in self.ammo })
 
     # check combat status: agents 2 (attacker) and 1 (target) are in combat
@@ -87,7 +108,7 @@ class TestAmmoUse(ScriptedTestTemplate):
     #  NOTE that agent 3's attack command is invalid due to out-of-range
     env.step({ ent_id: { action.Attack:
         { action.Style: env.realm.players[ent_id].agent.style[0],
-          action.Target: (ent_id+1)%3+1 } }
+          action.Target: env.obs[ent_id].entities.index((ent_id+1)%3+1) } }
         for ent_id in self.ammo })
 
     # agents 1 and 2's latest_combat_tick should be updated
@@ -140,7 +161,7 @@ class TestAmmoUse(ScriptedTestTemplate):
     # First tick actions: SELL level-0 ammo
     env.step({ ent_id: { action.Sell:
         { action.InventoryItem: env.obs[ent_id].inventory.sig(ent_ammo, 0),
-          action.Price: sell_price } }
+          action.Price: action.Price.index(sell_price) } }
         for ent_id, ent_ammo in self.ammo.items() })
 
     # check if the ammos were listed
@@ -156,15 +177,15 @@ class TestAmmoUse(ScriptedTestTemplate):
       self.assertTrue(item_info.id in env.obs[ent_id].market.ids)
 
       # check SELL InventoryItem mask -- one cannot sell listed item
-      mask = gym_obs['ActionTargets'][action.Sell][action.InventoryItem][:inventory.len] > 0
+      mask = gym_obs["ActionTargets"]["Sell"]["InventoryItem"][:inventory.len] > 0
       self.assertTrue(inventory.id(inv_idx) not in inventory.ids[mask])
 
       # check USE InventoryItem mask -- one cannot use listed item
-      mask = gym_obs['ActionTargets'][action.Use][action.InventoryItem][:inventory.len] > 0
+      mask = gym_obs["ActionTargets"]["Use"]["InventoryItem"][:inventory.len] > 0
       self.assertTrue(inventory.id(inv_idx) not in inventory.ids[mask])
 
       # check BUY MarketItem mask -- there should be two ammo items in the market
-      mask = gym_obs['ActionTargets'][action.Buy][action.MarketItem][:inventory.len] > 0
+      mask = gym_obs["ActionTargets"]["Buy"]["MarketItem"][:inventory.len] > 0
       # agent 1 has inventory space
       if ent_id == 1: self.assertTrue(sum(mask) == 2)
       # agent 2's inventory is full but can buy level-0 whetstone (existing ammo)
@@ -242,7 +263,7 @@ class TestAmmoUse(ScriptedTestTemplate):
       if ent_id == 1:
         gym_obs = env.obs[ent_id].to_gym()
         # check USE InventoryItem mask
-        mask = gym_obs['ActionTargets'][action.Use][action.InventoryItem][:inv_obs.len] > 0
+        mask = gym_obs["ActionTargets"]["Use"]["InventoryItem"][:inv_obs.len] > 0
         # level-2 melee should be able to use level-0, level-1 whetstone but not level-3
         self.assertTrue(inv_obs.id(inv_obs.sig(*wstone_lvl0)) in inv_obs.ids[mask])
         self.assertTrue(inv_obs.id(inv_obs.sig(*wstone_lvl1)) in inv_obs.ids[mask])

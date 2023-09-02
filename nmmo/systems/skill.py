@@ -17,7 +17,7 @@ class SkillGroup:
     self.entity = entity
 
     self.experience_calculator = experience.ExperienceCalculator()
-    self.skills  = OrderedSet()
+    self.skills  = OrderedSet() # critical for determinism
 
   def update(self):
     for skill in self.skills:
@@ -97,8 +97,8 @@ class HarvestSkill(NonCombatSkill):
     # for example, fishing level=5 without rod will only yield level-1 ration
     level = 1
     tool  = entity.equipment.held
-    if matl.tool is not None and isinstance(tool, matl.tool):
-      level = tool.level.val
+    if matl.tool is not None and isinstance(tool.item, matl.tool):
+      level = min(1+tool.item.level.val, self.config.PROGRESSION_LEVEL_MAX)
 
     #TODO: double-check drop table quantity
     for drop in drop_table.roll(self.realm, level):

@@ -35,9 +35,6 @@ class MilestoneLogger(Logger):
     return True
 
 
-# CHECK ME: Is this a good place to put here?
-#   EventCode is used in many places, and I(kywch)'m putting it here
-#   to avoid a circular import, which happened a few times with event_log.py
 class EventCode:
   # Move
   EAT_FOOD = 1
@@ -54,6 +51,7 @@ class EventCode:
   DESTROY_ITEM = 23
   HARVEST_ITEM = 24
   EQUIP_ITEM = 25
+  LOOT_ITEM = 26
 
   # Exchange
   GIVE_GOLD = 31

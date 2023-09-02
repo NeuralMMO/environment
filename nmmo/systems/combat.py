@@ -130,16 +130,16 @@ def danger(config, pos):
 
   return norm
 
-def spawn(config, dnger):
+def spawn(config, dnger, np_random):
   border = config.MAP_BORDER
   center = config.MAP_CENTER
   mid    = center // 2
 
   dist       = dnger * center / 2
   max_offset = mid - dist
-  offset     = mid + border + np.random.randint(-max_offset, max_offset)
+  offset     = mid + border + np_random.integers(-max_offset, max_offset)
 
-  rng = np.random.rand()
+  rng = np_random.random()
   if rng < 0.25:
     r = border + dist
     c = offset

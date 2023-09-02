@@ -1,4 +1,6 @@
 import unittest
+import numpy as np
+
 import nmmo
 from nmmo.entity.entity import Entity, EntityState
 from nmmo.datastore.numpy_datastore import NumpyDatastore
@@ -9,6 +11,7 @@ class MockRealm:
     self.config.PLAYERS = range(100)
     self.datastore = NumpyDatastore()
     self.datastore.register_object_type("Entity", EntityState.State.num_attributes)
+    self._np_random = np.random
 
 # pylint: disable=no-member
 class TestEntity(unittest.TestCase):

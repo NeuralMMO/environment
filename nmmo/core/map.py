@@ -1,10 +1,9 @@
 import os
 import logging
-
 import numpy as np
 from ordered_set import OrderedSet
-from nmmo.core.tile import Tile
 
+from nmmo.core.tile import Tile
 from nmmo.lib import material
 
 
@@ -13,18 +12,24 @@ class Map:
 
   Also tracks a sparse list of tile updates
   '''
-  def __init__(self, config, realm):
+  def __init__(self, config, realm, np_random):
     self.config = config
     self._repr  = None
     self.realm  = realm
     self.update_list = None
+    self.pathfinding_cache = {} # Avoid recalculating A*, paths don't move
 
     sz          = config.MAP_SIZE
     self.tiles  = np.zeros((sz, sz), dtype=object)
+    self.habitable_tiles = np.zeros((sz,sz))
 
     for r in range(sz):
       for c in range(sz):
-        self.tiles[r, c] = Tile(realm, r, c)
+        self.tiles[r, c] = Tile(realm, r, c, np_random)
+
+    self.dist_border_center = config.MAP_CENTER // 2
+    self.center_coord = (config.MAP_BORDER + self.dist_border_center,
+                         config.MAP_BORDER + self.dist_border_center)
 
   @property
   def packet(self):
@@ -42,10 +47,10 @@ class Map:
 
     return self._repr
 
-  def reset(self, map_id):
+  def reset(self, map_id, np_random):
     '''Reuse the current tile objects to load a new map'''
     config = self.config
-    self.update_list = OrderedSet()
+    self.update_list = OrderedSet() # critical for determinism
 
     path_map_suffix = config.PATH_MAP_SUFFIX.format(map_id)
     f_path = os.path.join(config.PATH_CWD, config.PATH_MAPS, path_map_suffix)
@@ -62,7 +67,8 @@ class Map:
       for c, idx in enumerate(row):
         mat  = materials[idx]
         tile = self.tiles[r, c]
-        tile.reset(mat, config)
+        tile.reset(mat, config, np_random)
+        self.habitable_tiles[r, c] = tile.habitable
 
     assert c == config.MAP_SIZE - 1
     assert r == config.MAP_SIZE - 1

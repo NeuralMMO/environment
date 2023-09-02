@@ -1,3 +1,4 @@
+import os
 import json
 import logging
 import lzma
@@ -77,11 +78,9 @@ class FileReplayHelper(ReplayHelper):
   def update(self):
     self.packets.append(self._packet())
 
-  def save(self, filename_prefix, compress=True):
+  def save(self, filename_prefix, compress=False):
     replay_file = f'{filename_prefix}.replay.json'
     metadata_file = f'{filename_prefix}.metadata.pkl'
-
-    logging.info('Saving replay to %s ...', replay_file)
 
     data = json.dumps({
       'map': self.map,
@@ -92,19 +91,21 @@ class FileReplayHelper(ReplayHelper):
       replay_file = f'{filename_prefix}.replay.lzma'
       data = lzma.compress(data, format=lzma.FORMAT_ALONE)
 
+    logging.info('Saving replay to %s ...', replay_file)
+
     with open(replay_file, 'wb') as out:
       out.write(data)
 
     with open(metadata_file, 'wb') as out:
       pickle.dump(self._metadata(), out)
 
-
   @classmethod
-  def load(cls, replay_file, decompress=True):
+  def load(cls, replay_file):
+    extension = os.path.splitext(replay_file)[1]
     with open(replay_file, 'rb') as fp:
       data = fp.read()
 
-    if decompress:
+    if extension != '.json':
       data = lzma.decompress(data, format=lzma.FORMAT_ALONE)
     data = json.loads(data.decode('utf-8'))
 

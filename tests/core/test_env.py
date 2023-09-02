@@ -2,6 +2,7 @@ import unittest
 from typing import List
 
 import random
+import numpy as np
 from tqdm import tqdm
 
 import nmmo
@@ -19,7 +20,6 @@ TEST_HORIZON = 30
 RANDOM_SEED = random.randint(0, 10000)
 
 class Config(nmmo.config.Small, nmmo.config.AllGameSystems):
-  SPECIALIZE = True
   PLAYERS = [
     baselines.Fisher, baselines.Herbalist, baselines.Prospector,
     baselines.Carver, baselines.Alchemist,
@@ -33,9 +33,10 @@ class TestEnv(unittest.TestCase):
 
   def test_action_space(self):
     action_space = self.env.action_space(0)
+    atn_str_keys = set(atn.__name__ for atn in nmmo.Action.edges(self.config))
     self.assertSetEqual(
         set(action_space.keys()),
-        set(nmmo.Action.edges(self.config)))
+        atn_str_keys)
 
   def test_observations(self):
     obs = self.env.reset()
@@ -51,21 +52,46 @@ class TestEnv(unittest.TestCase):
       ]
 
       for player_id, player_obs in obs.items():
-        self._validate_tiles(player_obs, self.env.realm)
-        self._validate_entitites(
-            player_id, player_obs, self.env.realm, entity_locations)
-        self._validate_inventory(player_id, player_obs, self.env.realm)
-        self._validate_market(player_obs, self.env.realm)
-      obs, _, dones, _ = self.env.step({})
+        if player_id in self.env.realm.players: # alive agents
+          self._validate_tiles(player_obs, self.env.realm)
+          self._validate_entitites(
+              player_id, player_obs, self.env.realm, entity_locations)
+          self._validate_inventory(player_id, player_obs, self.env.realm)
+          self._validate_market(player_obs, self.env.realm)
+        else:
+          # the obs of dead agents are dummy, all zeros
+          self.assertEqual(np.sum(player_obs["Tile"]), 0)
+          self.assertEqual(np.sum(player_obs["Entity"]), 0)
+          self.assertEqual(np.sum(player_obs["Inventory"]), 0)
+          self.assertEqual(np.sum(player_obs["Market"]), 0)
+          self.assertEqual(np.sum(player_obs["ActionTargets"]["Move"]["Direction"]), 1)
+          self.assertEqual(np.sum(player_obs["ActionTargets"]["Attack"]["Style"]), 3)
 
-      # make sure dead agents return proper dones=True
-      self.assertEqual(len(self.env.agents), len(self.env.realm.players))
+      obs, rewards, dones, infos = self.env.step({})
+
+      # make sure dead agents return proper dones=True, dummy obs, and -1 reward
+      self.assertEqual(len(self.env.agents),
+                       len(self.env.realm.players) + len(self.env._dead_this_tick))
       self.assertEqual(len(self.env.possible_agents),
                        len(self.env.realm.players) + len(self.env._dead_agents))
+      for agent_id in self.env.agents:
+        self.assertTrue(agent_id in obs)
+        self.assertTrue(agent_id in rewards)
+        self.assertTrue(agent_id in dones)
+        self.assertTrue(agent_id in infos)
       if len(self.env._dead_agents) > len(dead_agents):
         for dead_id in self.env._dead_agents - dead_agents:
+          self.assertEqual(rewards[dead_id], -1)
           self.assertTrue(dones[dead_id])
           dead_agents.add(dead_id)
+
+      # check dead and alive
+      entity_all = EntityState.Query.table(self.env.realm.datastore)
+      alive_agents = entity_all[:, Entity.State.attr_name_to_col["id"]]
+      alive_agents = set(alive_agents[alive_agents > 0])
+      for agent_id in alive_agents:
+        self.assertTrue(agent_id in self.env.realm.players)
+        self.assertTrue(agent_id not in self.env._dead_agents)
 
   def _validate_tiles(self, obs, realm: Realm):
     for tile_obs in obs["Tile"]:

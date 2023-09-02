@@ -1,8 +1,8 @@
 import functools
-import random
 from typing import Any, Dict, List, Callable
 from collections import defaultdict
-from ordered_set import OrderedSet
+from copy import copy, deepcopy
+import dill
 
 import gym
 import numpy as np
@@ -15,9 +15,9 @@ from nmmo.core.observation import Observation
 from nmmo.core.tile import Tile
 from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
-from nmmo.task import task_api
+from nmmo.task import task_api, task_spec
 from nmmo.task.game_state import GameStateGenerator
-from scripted.baselines import Scripted
+from nmmo.lib import seeding
 
 class Env(ParallelEnv):
   # Environment wrapper for Neural MMO using the Parallel PettingZoo API
@@ -26,50 +26,56 @@ class Env(ParallelEnv):
   def __init__(self,
                config: Default = nmmo.config.Default(),
                seed = None):
-    self._init_random(seed)
-
+    self._np_random = None
+    self._np_seed = None
+    self._reset_required = True
+    self.seed(seed)
     super().__init__()
 
     self.config = config
-    self.realm = realm.Realm(config)
+    self.realm = realm.Realm(config, self._np_random)
     self.obs = None
+    self._dummy_obs = None
 
     self.possible_agents = list(range(1, config.PLAYER_N + 1))
+    self._agents = None
     self._dead_agents = set()
-    self._episode_stats = defaultdict(lambda: defaultdict(float))
-    self.scripted_agents = OrderedSet()
+    self._dead_this_tick = None
+    self.scripted_agents = set()
 
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
     self.game_state = None
     # Default task: rewards 1 each turn agent is alive
     self.tasks = task_api.nmmo_default_task(self.possible_agents)
+    self.agent_task_map = None
+    self._dummy_task_embedding = np.zeros(self.config.TASK_EMBED_DIM, dtype=np.float16)
 
-  # pylint: disable=method-cache-max-size-none
-  @functools.lru_cache(maxsize=None)
-  def observation_space(self, agent: int):
-    '''Neural MMO Observation Space
+    # curriculum file path, if provided, should exist
+    self.curriculum_file_path = config.CURRICULUM_FILE_PATH
+    if self.curriculum_file_path is not None:
+      # try to open the file to check if it exists
+      with open(self.curriculum_file_path, 'rb') as f:
+        curriculum = dill.load(f) # pylint: disable=unused-variable
+      f.close()
 
-    Args:
-        agent: Agent ID
-
-    Returns:
-        observation: gym.spaces object contained the structured observation
-        for the specified agent. Each visible object is represented by
-        continuous and discrete vectors of attributes. A 2-layer attentional
-        encoder can be used to convert this structured observation into
-        a flat vector embedding.'''
-
+  @functools.cached_property
+  def _obs_space(self):
     def box(rows, cols):
       return gym.spaces.Box(
-          low=-2**20, high=2**20,
+          low=-2**15, high=2**15-1,
           shape=(rows, cols),
-          dtype=np.float32)
+          dtype=np.int16)
+    def mask_box(length):
+      return gym.spaces.Box(low=0, high=1, shape=(length,), dtype=np.int8)
 
     obs_space = {
-      "CurrentTick": gym.spaces.Discrete(1),
-      "AgentId": gym.spaces.Discrete(1),
+      "CurrentTick": gym.spaces.Discrete(self.config.HORIZON+1),
+      "AgentId": gym.spaces.Discrete(self.config.PLAYER_N+1),
       "Tile": box(self.config.MAP_N_OBS, Tile.State.num_attributes),
       "Entity": box(self.config.PLAYER_N_OBS, Entity.State.num_attributes),
+      "Task": gym.spaces.Box(low=-2**15, high=2**15-1,
+                             shape=(self.config.TASK_EMBED_DIM,),
+                             dtype=np.float16),
     }
 
     if self.config.ITEM_SYSTEM_ENABLED:
@@ -79,17 +85,52 @@ class Env(ParallelEnv):
       obs_space["Market"] = box(self.config.MARKET_N_OBS, Item.State.num_attributes)
 
     if self.config.PROVIDE_ACTION_TARGETS:
-      obs_space['ActionTargets'] = self.action_space(None)
+      mask_spec = deepcopy(self._atn_space)
+      for atn_str in mask_spec:
+        for arg_str in mask_spec[atn_str]:
+          mask_spec[atn_str][arg_str] = mask_box(self._atn_space[atn_str][arg_str].n)
+      obs_space["ActionTargets"] = mask_spec
 
     return gym.spaces.Dict(obs_space)
 
-  def _init_random(self, seed):
-    if seed is not None:
-      np.random.seed(seed)
-      random.seed(seed)
-
+  # pylint: disable=method-cache-max-size-none
   @functools.lru_cache(maxsize=None)
-  def action_space(self, agent):
+  def observation_space(self, agent: AgentID):
+    '''Neural MMO Observation Space
+
+    Args:
+        agent: Agent ID
+
+    Returns:
+        observation: gym.spaces object contained the structured observation
+        for the specified agent.'''
+    return self._obs_space
+
+  @functools.cached_property
+  def _atn_space(self):
+    actions = {}
+    for atn in sorted(nmmo.Action.edges(self.config)):
+      if atn.enabled(self.config):
+        actions[atn.__name__] = {}  # use the string key
+        for arg in sorted(atn.edges):
+          n = arg.N(self.config)
+          actions[atn.__name__][arg.__name__] = gym.spaces.Discrete(n)
+        actions[atn.__name__] = gym.spaces.Dict(actions[atn.__name__])
+    return gym.spaces.Dict(actions)
+
+  @functools.cached_property
+  def _str_atn_map(self):
+    '''Map action and argument names to their corresponding objects'''
+    str_map = {}
+    for atn in nmmo.Action.edges(self.config):
+      str_map[atn.__name__] = atn
+      for arg in atn.edges:
+        str_map[arg.__name__] = arg
+    return str_map
+
+  # pylint: disable=method-cache-max-size-none
+  @functools.lru_cache(maxsize=None)
+  def action_space(self, agent: AgentID):
     '''Neural MMO Action Space
 
     Args:
@@ -101,19 +142,7 @@ class Env(ParallelEnv):
         of discrete-valued arguments. These consist of both fixed, k-way
         choices (such as movement direction) and selections from the
         observation space (such as targeting)'''
-
-    actions = {}
-    for atn in sorted(nmmo.Action.edges(self.config)):
-      if atn.enabled(self.config):
-
-        actions[atn] = {}
-        for arg in sorted(atn.edges):
-          n = arg.N(self.config)
-          actions[atn][arg] = gym.spaces.Discrete(n)
-
-        actions[atn] = gym.spaces.Dict(actions[atn])
-
-    return gym.spaces.Dict(actions)
+    return self._atn_space
 
   ############################################################################
   # Core API
@@ -143,27 +172,70 @@ class Env(ParallelEnv):
         but finite horizon: ~1000 timesteps for small maps and
         5000+ timesteps for large maps
     '''
-
-    self._init_random(seed)
-    self.realm.reset(map_id)
+    self.seed(seed)
+    self.realm.reset(self._np_random, map_id)
+    self._agents = list(self.realm.players.keys())
     self._dead_agents = set()
-    self._episode_stats.clear()
+    self._dead_this_tick = {}
 
     # check if there are scripted agents
     for eid, ent in self.realm.players.items():
-      if isinstance(ent.agent, Scripted):
+      if isinstance(ent.agent, nmmo.Scripted):
         self.scripted_agents.add(eid)
+        ent.agent.set_rng(self._np_random)
 
-    self.obs = self._compute_observations()
-    self._gamestate_generator = GameStateGenerator(self.realm, self.config)
-
-    if make_task_fn is not None:
+    if self.curriculum_file_path is not None:
+      self.tasks = self._sample_training_tasks()
+    elif make_task_fn is not None:
       self.tasks = make_task_fn()
     else:
       for task in self.tasks:
         task.reset()
+    self.agent_task_map = self._map_task_to_agent()
+
+    self._dummy_obs = self._make_dummy_obs()
+    self.obs = self._compute_observations()
+    self._gamestate_generator = GameStateGenerator(self.realm, self.config)
+    if self.game_state is not None:
+      self.game_state.clear_cache()
+      self.game_state = None
+
+    self._reset_required = False
 
     return {a: o.to_gym() for a,o in self.obs.items()}
+
+  def _sample_training_tasks(self):
+    with open(self.curriculum_file_path, 'rb') as f:
+      # curriculum file may have been changed, so read the file when sampling
+      curriculum = dill.load(f) # a list of TaskSpec
+
+    sampling_weights = [spec.sampling_weight for spec in curriculum]
+    sampled_spec = self._np_random.choice(curriculum, size=len(self.possible_agents),
+                                          p=sampling_weights/np.sum(sampling_weights))
+
+    return task_spec.make_task_from_spec(self.possible_agents, sampled_spec)
+
+  def _map_task_to_agent(self):
+    agent_task_map: Dict[int, List[task_api.Task]] = {}
+    for task in self.tasks:
+      if task.embedding is None:
+        task.set_embedding(self._dummy_task_embedding)
+      # validate task embedding
+      assert self._obs_space['Task'].contains(task.embedding), "Task embedding is not valid"
+
+      # map task to agents
+      for agent_id in task.assignee:
+        if agent_id in agent_task_map:
+          agent_task_map[agent_id].append(task)
+        else:
+          agent_task_map[agent_id] = [task]
+
+    # for now we only support one task per agent
+    if self.config.ALLOW_MULTI_TASKS_PER_AGENT is False:
+      for agent_tasks in agent_task_map.values():
+        assert len(agent_tasks) == 1, "Only one task per agent is supported"
+
+    return agent_task_map
 
   def step(self, actions: Dict[int, Dict[str, Dict[str, Any]]]):
     '''Simulates one game tick or timestep
@@ -257,7 +329,7 @@ class Env(ParallelEnv):
 
           Provided for conformity with PettingZoo
     '''
-    assert self.obs is not None, 'step() called before reset'
+    assert not self._reset_required, 'step() called before reset'
     # Add in scripted agents' actions, if any
     if self.scripted_agents:
       actions = self._compute_scripted_agent_actions(actions)
@@ -266,31 +338,27 @@ class Env(ParallelEnv):
     #   we don't need _deserialize_scripted_actions() anymore
     actions = self._validate_actions(actions)
     # Execute actions
-    self.realm.step(actions)
+    self._dead_this_tick = self.realm.step(actions)
+    # the list of "current" agents, both alive and dead_this_tick
+    self._agents = list(set(list(self.realm.players.keys()) + list(self._dead_this_tick.keys())))
+
     dones = {}
-    for eid in self.possible_agents:
-      if eid not in self.realm.players or self.realm.tick >= self.config.HORIZON:
-        if eid not in self._dead_agents:
-          self._dead_agents.add(eid)
-          self._episode_stats[eid]["death_tick"] = self.realm.tick
-          dones[eid] = True
+    for agent_id in self.agents:
+      if agent_id in self._dead_this_tick or \
+        self.realm.tick >= self.config.HORIZON or \
+        (self.config.RESET_ON_DEATH and len(self._dead_agents) > 0):
+        self._dead_agents.add(agent_id)
+        dones[agent_id] = True
+      else:
+        dones[agent_id] = False
 
     # Store the observations, since actions reference them
     self.obs = self._compute_observations()
     gym_obs = {a: o.to_gym() for a,o in self.obs.items()}
 
-    rewards, infos = self._compute_rewards(self.obs.keys(), dones)
-    for k,r in rewards.items():
-      self._episode_stats[k]['reward'] += r
+    rewards, infos = self._compute_rewards()
 
-    # When the episode ends, add the episode stats to the info of one of
-    # the last dagents
-    if len(self._dead_agents) == len(self.possible_agents):
-      for agent_id, stats in self._episode_stats.items():
-        if agent_id not in infos:
-          infos[agent_id] = {}
-        infos[agent_id]["episode_stats"] = stats
-
+    # NOTE: all obs, rewards, dones, infos have data for each agent in self.agents
     return gym_obs, rewards, dones, infos
 
   def _validate_actions(self, actions: Dict[int, Dict[str, Dict[str, Any]]]):
@@ -311,16 +379,17 @@ class Env(ParallelEnv):
 
       validated_actions[ent_id] = {}
 
-      for atn, args in sorted(atns.items()):
+      for atn_key, args in sorted(atns.items()):
         action_valid = True
         deserialized_action = {}
-
+        atn = self._str_atn_map[atn_key] if isinstance(atn_key, str) else atn_key
         if not atn.enabled(self.config):
           action_valid = False
           break
 
-        for arg, val in sorted(args.items()):
-          obj = arg.deserialize(self.realm, entity, val)
+        for arg_key, val in sorted(args.items()):
+          arg = self._str_atn_map[arg_key] if isinstance(arg_key, str) else arg_key
+          obj = arg.deserialize(self.realm, entity, val, self.obs[ent_id])
           if obj is None:
             action_valid = False
             break
@@ -333,70 +402,79 @@ class Env(ParallelEnv):
 
   def _compute_scripted_agent_actions(self, actions: Dict[int, Dict[str, Dict[str, Any]]]):
     '''Compute actions for scripted agents and add them into the action dict'''
-    for eid in self.scripted_agents:
-      # remove the dead scripted agent from the list
-      if eid in self._dead_agents or eid not in self.realm.players:
-        self.scripted_agents.discard(eid)
-        continue
+    dead_agents = set()
+    for agent_id in self.scripted_agents:
+      if agent_id in self.realm.players:
+        # override the provided scripted agents' actions
+        actions[agent_id] = self.realm.players[agent_id].agent(self.obs[agent_id])
+      else:
+        dead_agents.add(agent_id)
 
-      # override the provided scripted agents' actions
-      actions[eid] = self.realm.players[eid].agent(self.obs[eid])
+    # remove the dead scripted agent from the list
+    self.scripted_agents -= dead_agents
 
     return actions
 
+  def _make_dummy_obs(self):
+    dummy_tiles = np.zeros((0, len(Tile.State.attr_name_to_col)), dtype=np.int16)
+    dummy_entities = np.zeros((0, len(Entity.State.attr_name_to_col)), dtype=np.int16)
+    dummy_inventory = np.zeros((0, len(Item.State.attr_name_to_col)), dtype=np.int16)
+    dummy_market = np.zeros((0, len(Item.State.attr_name_to_col)), dtype=np.int16)
+    return Observation(self.config, self.realm.tick, 0, self._dummy_task_embedding,
+                       dummy_tiles, dummy_entities, dummy_inventory, dummy_market)
+
   def _compute_observations(self):
-    '''Neural MMO Observation API
-
-    Args:
-        agents: List of agents to return observations for. If None, returns
-        observations for all agents
-
-    Returns:
-        obs: Dictionary of observations for each agent
-        obs[agent_id] = {
-          "Entity": [e1, e2, ...],
-          "Task": [encoded_task],
-          "Tile": [t1, t2, ...],
-          "Inventory": [i1, i2, ...],
-          "Market": [m1, m2, ...],
-          "ActionTargets": {
-              "Attack": [a1, a2, ...],
-              "Sell": [s1, s2, ...],
-              "Buy": [b1, b2, ...],
-              "Move": [m1, m2, ...],
-          }
-        '''
+    # Clean up unnecessary observations, which cause memory leaks
+    if self.obs is not None:
+      for agent_id, agent_obs in self.obs.items():
+        agent_obs.clear_cache()  # clear the lru_cache
+        self.obs[agent_id] = None
+        del agent_obs
+      self.obs = None
 
     obs = {}
-
     market = Item.Query.for_sale(self.realm.datastore)
 
+    # get tile map, to bypass the expensive tile window query
+    tile_map = Tile.Query.get_map(self.realm.datastore, self.config.MAP_SIZE)
+    radius = self.config.PLAYER_VISION_RADIUS
+    tile_obs_size = ((2*radius+1)**2, len(Tile.State.attr_name_to_col))
+
     for agent_id in self.agents:
-      agent = self.realm.players.get(agent_id)
-      agent_r = agent.row.val
-      agent_c = agent.col.val
+      if agent_id not in self.realm.players:
+        # return dummy obs for the agents in dead_this_tick
+        dummy_obs = copy(self._dummy_obs)
+        dummy_obs.current_tick = self.realm.tick
+        dummy_obs.agent_id = agent_id
+        obs[agent_id] = dummy_obs
+      else:
+        agent = self.realm.players.get(agent_id)
+        agent_r = agent.row.val
+        agent_c = agent.col.val
 
-      visible_entities = Entity.Query.window(
-          self.realm.datastore,
-          agent_r, agent_c,
-          self.config.PLAYER_VISION_RADIUS
-      )
-      visible_tiles = Tile.Query.window(
-          self.realm.datastore,
-          agent_r, agent_c,
-          self.config.PLAYER_VISION_RADIUS)
+        visible_entities = Entity.Query.window(
+            self.realm.datastore,
+            agent_r, agent_c,
+            radius
+        )
+        visible_tiles = tile_map[agent_r-radius:agent_r+radius+1,
+                                 agent_c-radius:agent_c+radius+1,:].reshape(tile_obs_size)
 
-      inventory = Item.Query.owned_by(self.realm.datastore, agent_id)
+        inventory = Item.Query.owned_by(self.realm.datastore, agent_id)
 
-      obs[agent_id] = Observation(self.config,
-                                  self.realm.tick,
-                                  agent_id,
-                                  visible_tiles,
-                                  visible_entities,
-                                  inventory, market)
+        # NOTE: the tasks for each agent is in self.agent_task_map, and task embeddings are
+        #   available in each task instance, via task.embedding
+        #   For now, each agent is assigned to a single task, so we just use the first task
+        # TODO: can the embeddings of multiple tasks be superposed while preserving the
+        #   task-specific information? This needs research
+        task_embedding = self._dummy_task_embedding
+        if agent_id in self.agent_task_map:
+          task_embedding = self.agent_task_map[agent_id][0].embedding # NOTE: first task only
+        obs[agent_id] = Observation(self.config, self.realm.tick, agent_id, task_embedding,
+                                    visible_tiles, visible_entities, inventory, market)
     return obs
 
-  def _compute_rewards(self, agents: List[AgentID], dones: Dict[AgentID, bool]):
+  def _compute_rewards(self):
     '''Computes the reward for the specified agent
 
     Override this method to create custom reward functions. You have full
@@ -412,23 +490,30 @@ class Env(ParallelEnv):
           entity identified by ent_id.
     '''
     # Initialization
+    agents = set(self.agents)
     infos = {agent_id: {'task': {}} for agent_id in agents}
     rewards = defaultdict(int)
-    agents = set(agents)
-    reward_cache = {}
+
+    # Clean up unnecessary game state, which cause memory leaks
+    if self.game_state is not None:
+      self.game_state.clear_cache()
+      self.game_state = None
 
     # Compute Rewards and infos
     self.game_state = self._gamestate_generator.generate(self.realm, self.obs)
     for task in self.tasks:
-      if task in reward_cache:
-        task_rewards, task_infos = reward_cache[task]
-      else:
+      if agents.intersection(task.assignee): # evaluate only if the agents are current
         task_rewards, task_infos = task.compute_rewards(self.game_state)
-        reward_cache[task] = (task_rewards, task_infos)
-      for agent_id, reward in task_rewards.items():
-        if agent_id in agents and agent_id not in dones:
-          rewards[agent_id] = rewards.get(agent_id,0) + reward
-          infos[agent_id]['task'][task.name] = task_infos[agent_id] # progress
+        for agent_id, reward in task_rewards.items():
+          if agent_id in agents:
+            rewards[agent_id] = rewards.get(agent_id,0) + reward
+            infos[agent_id]['task'][task.name] = task_infos[agent_id] # include progress, etc.
+      else:
+        task.close()  # To prevent memory leak
+
+    # Make sure the dead agents return the rewards of -1
+    for agent_id in self._dead_this_tick:
+      rewards[agent_id] = -1
 
     return rewards, infos
 
@@ -441,14 +526,24 @@ class Env(ParallelEnv):
 
   @property
   def agents(self) -> List[AgentID]:
-    '''For conformity with the PettingZoo API only; rendering is external'''
-    return list(set(self.realm.players.keys()) - self._dead_agents)
+    '''For conformity with the PettingZoo API'''
+    # returns the list of "current" agents, both alive and dead_this_tick
+    return self._agents
 
   def close(self):
     '''For conformity with the PettingZoo API only; rendering is external'''
 
   def seed(self, seed=None):
-    return self._init_random(seed)
+    '''Reseeds the environment. reset() must be called after seed(), and before step().
+       - self._np_seed is None: seed() has not been called, e.g. __init__() -> new RNG
+       - self._np_seed is set, and seed is not None: seed() or reset() with seed -> new RNG
+
+       If self._np_seed is set, but seed is None
+         probably called from reset() without seed, so don't change the RNG
+    '''
+    if self._np_seed is None or seed is not None:
+      self._np_random, self._np_seed = seeding.np_random(seed)
+      self._reset_required = True
 
   def state(self) -> np.ndarray:
     raise NotImplementedError

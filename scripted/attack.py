@@ -1,31 +1,28 @@
-# pylint: disable=all
-
+# pylint: disable=invalid-name, unused-argument
 import numpy as np
 
 import nmmo
 from nmmo.core.observation import Observation
 from nmmo.entity.entity import EntityState
+from nmmo.lib import utils
 
-from scripted import utils
 
 def closestTarget(config, ob: Observation):
   shortestDist = np.inf
   closestAgent = None
 
   agent  = ob.agent()
-
   start = (agent.row, agent.col)
 
-  for target in ob.entities.values:
-    target = EntityState.parse_array(target)
-    if target.id == agent.id:
+  for target_ent in ob.entities.values:
+    target_ent = EntityState.parse_array(target_ent)
+    if target_ent.id == agent.id:
       continue
 
-    dist = utils.l1(start, (target.row, target.col))
-
+    dist = utils.linf_single(start, (target_ent.row, target_ent.col))
     if dist < shortestDist and dist != 0:
       shortestDist = dist
-      closestAgent = target
+      closestAgent = target_ent
 
   if closestAgent is None:
     return None, None
@@ -36,18 +33,17 @@ def attacker(config, ob: Observation):
   agent = ob.agent()
 
   attacker_id = agent.attacker_id
-
   if attacker_id == 0:
     return None, None
 
-  target = ob.entity(attacker_id)
-  if target == None:
+  target_ent = ob.entity(attacker_id)
+  if target_ent is None:
     return None, None
-      
-  return target, utils.l1((agent.row, agent.col), (target.row, target.col))
+
+  return target_ent,\
+         utils.linf_single((agent.row, agent.col), (target_ent.row, target_ent.col))
 
 def target(config, actions, style, targetID):
   actions[nmmo.action.Attack] = {
         nmmo.action.Style: style,
         nmmo.action.Target: targetID}
-

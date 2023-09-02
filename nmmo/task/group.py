@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Dict, Union, Iterable, TYPE_CHECKING
 from collections import OrderedDict
 from collections.abc import Set, Sequence
+import weakref
 
 if TYPE_CHECKING:
   from nmmo.task.game_state import GameState, GroupView
@@ -25,6 +26,8 @@ class Group(Sequence, Set):
     self._sd: GroupView = None
     self._gs: GameState = None
 
+    self._hash = hash(self._agents)
+
   @property
   def agents(self):
     return self._agents
@@ -42,7 +45,7 @@ class Group(Sequence, Set):
     return len(self._agents)
 
   def __hash__(self):
-    return hash(self._agents)
+    return self._hash
 
   def __getitem__(self, key):
     if len(self) == 1 and key == 0:
@@ -73,7 +76,16 @@ class Group(Sequence, Set):
       "agents": self._agents
     }
 
+  def clear_prev_state(self) -> None:
+    if self._gs is not None:
+      self._gs.clear_cache()  # prevent memory leak
+      self._gs = None
+    if self._sd is not None:
+      weakref.ref(self._sd)  # prevent memory leak
+      self._sd = None
+
   def update(self, gs: GameState) -> None:
+    self.clear_prev_state()
     self._gs = gs
     self._sd = gs.get_subject_view(self)
 

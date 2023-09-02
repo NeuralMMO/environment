@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, List, Optional, Tuple, Union, Iterable, TYPE_CHECKING
+from typing import Callable, List, Optional, Tuple, Union, Iterable, Type, TYPE_CHECKING
 from types import FunctionType
 from abc import ABC, abstractmethod
 import inspect
@@ -53,18 +53,23 @@ class Predicate(ABC):
     for group in self._groups:
       group.update(gs)
     # Calculate score
-    # cache = gs.cache_result
-    if self.name in gs.cache_result:
-      progress = gs.cache_result[self.name]
+    cache = gs.cache_result
+    if self.name in cache:
+      progress = cache[self.name]
     else:
       progress = max(min(self._evaluate(gs)*1.0,1.0),0.0)
-      gs.cache_result[self.name] = progress
+      cache[self.name] = progress
     return progress
 
   def _reset(self, config: Config):
     self._config = config
     if not self.check(self._config):
       raise InvalidConstraint()
+
+  def close(self):
+    # To prevent memory leak, clear all refs to old game state
+    for group in self._groups:
+      group.clear_prev_state()
 
   def check(self, config: Config):
     """ Checks whether the predicate is valid
@@ -124,13 +129,34 @@ class Predicate(ABC):
   def __str__(self):
     return self.name
 
+  @abstractmethod
+  def get_source_code(self) -> str:
+    """ Returns the actual source code how the game state/progress evaluation is done.
+    """
+    raise NotImplementedError
+
+  @abstractmethod
+  def get_signature(self) -> List:
+    """ Returns the signature of the game state/progress evaluation function.
+    """
+    raise NotImplementedError
+
+  @property
+  def args(self):
+    return self._args
+
+  @property
+  def kwargs(self):
+    return self._kwargs
+
   @property
   def subject(self):
     return self._subject
 
-  def create_task(self, task_cls: Task=None,
+  def create_task(self,
+                  task_cls: Optional[Type[Task]]=None,
                   assignee: Union[Iterable[int], int]=None,
-                  reward_multiplier=1.0) -> Task:
+                  **kwargs) -> Task:
     """ Creates a task from this predicate"""
     if task_cls is None:
       from nmmo.task.task_api import Task
@@ -140,7 +166,7 @@ class Predicate(ABC):
       # the new task is assigned to this predicate's subject
       assignee = self._subject.agents
 
-    return task_cls(eval_fn=self, assignee=assignee, reward_multiplier=reward_multiplier)
+    return task_cls(eval_fn=self, assignee=assignee, **kwargs)
 
   def __and__(self, other):
     return AND(self, other)
@@ -171,7 +197,7 @@ def arg_to_string(arg):
 
 ################################################
 
-def make_predicate(fn: Callable) -> type[Predicate]:
+def make_predicate(fn: Callable) -> Type[Predicate]:
   """ Syntactic sugar API for defining predicates from function
   """
   signature = inspect.signature(fn)
@@ -205,12 +231,11 @@ def make_predicate(fn: Callable) -> type[Predicate]:
       self._kwargs = kwargs
       self.name = self._make_name(fn.__name__, args, kwargs)
     def _evaluate(self, gs: GameState) -> float:
-      # pylint: disable=redefined-builtin, unused-variable
-      __doc = fn.__doc__
-      result = fn(gs, *self._args, **self._kwargs)
-      if isinstance(result, Predicate):
-        return result(gs)
-      return result
+      return fn(gs, *self._args, **self._kwargs)
+    def get_source_code(self):
+      return inspect.getsource(fn).strip()
+    def get_signature(self) -> List:
+      return list(self._signature.parameters)
 
   return FunctionPredicate
 
@@ -239,11 +264,43 @@ class PredicateOperator(Predicate):
     return all((p.check(config) if isinstance(p, Predicate)
                 else True for p in self._predicates))
 
-  def sample(self, config: Config, cls: type[PredicateOperator], **kwargs):
+  def sample(self, config: Config, cls: Type[PredicateOperator], **kwargs):
     subject = self._subject_argument if 'subject' not in kwargs else kwargs['subject']
     predicates = [p.sample(config, **kwargs) if isinstance(p, Predicate)
                   else p(None) for p in self._predicates]
     return cls(*predicates, subject=subject)
+
+  def get_source_code(self) -> str:
+    # NOTE: get_source_code() of the combined predicates returns the joined str
+    #   of each predicate's source code, which may NOT represent what the actual
+    #   predicate is doing
+    # TODO: try to generate "the source code" that matches
+    #   what the actual instantiated predicate returns,
+    #   which perhaps should reflect the actual agent ids, etc...
+    src_list = []
+    for pred in self._predicates:
+      if isinstance(pred, Predicate):
+        src_list.append(pred.get_source_code())
+    return '\n\n'.join(src_list).strip()
+
+  def get_signature(self):
+    # TODO: try to generate the correct signature
+    return []
+
+  @property
+  def args(self):
+    # TODO: try to generate the correct args
+    return []
+
+  @property
+  def kwargs(self):
+    # NOTE: This is incorrect implementation. kwargs of the combined predicates returns
+    #   all summed kwargs dict, which can OVERWRITE the values of duplicated keys
+    # TODO: try to match the eval function and kwargs, which can be correctly used downstream
+    # for pred in self._predicates:
+    #   if isinstance(pred, Predicate):
+    #     kwargs.update(pred.kwargs)
+    return {}
 
 class OR(PredicateOperator, Predicate):
   def __init__(self, *predicates: Predicate, subject: Group=None):

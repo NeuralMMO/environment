@@ -144,28 +144,26 @@ class Config(Template):
   def game_system_enabled(self, name) -> bool:
     return hasattr(self, name)
 
-
   PROVIDE_ACTION_TARGETS       = True
-  '''Flag used to provide action targets mask'''
+  '''Provide action targets mask'''
+
+  PROVIDE_NOOP_ACTION_TARGET         = False
+  '''Provide a no-op option for each action'''
 
   PLAYERS                      = [Agent]
   '''Player classes from which to spawn'''
 
-  ############################################################################
-  ### Emulation Parameters
+  HORIZON = 1024
+  '''Number of steps before the environment resets'''
 
-  EMULATE_FLAT_OBS       = False
-  '''Emulate a flat observation space'''
+  CURRICULUM_FILE_PATH = None
+  '''Path to a curriculum task file containing a list of task specs for training'''
 
-  EMULATE_FLAT_ATN       = False
-  '''Emulate a flat action space'''
+  TASK_EMBED_DIM = 1024
+  '''Dimensionality of task embeddings'''
 
-  EMULATE_CONST_PLAYER_N = False
-  '''Emulate a constant number of agents'''
-
-  EMULATE_CONST_HORIZON  = False
-  '''Emulate a constant HORIZON simulations steps'''
-
+  ALLOW_MULTI_TASKS_PER_AGENT = False
+  '''Whether to allow multiple tasks per agent'''
 
   ############################################################################
   ### Population Parameters
@@ -218,6 +216,9 @@ class Config(Template):
   ### Agent Parameters
   IMMORTAL = False
   '''Debug parameter: prevents agents from dying except by void'''
+
+  RESET_ON_DEATH = False
+  '''Whether to reset the environment whenever an agent dies'''
 
   BASE_HEALTH                = 10
   '''Initial Constitution level and agent health'''
@@ -436,19 +437,19 @@ class Progression:
   PROGRESSION_LEVEL_MAX             = 10
   '''Max skill level'''
 
-  PROGRESSION_MELEE_BASE_DAMAGE     = 0
+  PROGRESSION_MELEE_BASE_DAMAGE     = 20
   '''Base Melee attack damage'''
 
   PROGRESSION_MELEE_LEVEL_DAMAGE    = 5
   '''Bonus Melee attack damage per level'''
 
-  PROGRESSION_RANGE_BASE_DAMAGE     = 0
+  PROGRESSION_RANGE_BASE_DAMAGE     = 20
   '''Base Range attack damage'''
 
   PROGRESSION_RANGE_LEVEL_DAMAGE    = 5
   '''Bonus Range attack damage per level'''
 
-  PROGRESSION_MAGE_BASE_DAMAGE      = 0
+  PROGRESSION_MAGE_BASE_DAMAGE      = 20
   '''Base Mage attack damage '''
 
   PROGRESSION_MAGE_LEVEL_DAMAGE     = 5
@@ -491,13 +492,13 @@ class NPC:
   NPC_BASE_DEFENSE                    = 0
   '''Base NPC defense'''
 
-  NPC_LEVEL_DEFENSE                   = 30
+  NPC_LEVEL_DEFENSE                   = 15
   '''Bonus NPC defense per level'''
 
   NPC_BASE_DAMAGE                     = 15
   '''Base NPC damage'''
 
-  NPC_LEVEL_DAMAGE                    = 30
+  NPC_LEVEL_DAMAGE                    = 15
   '''Bonus NPC damage per level'''
 
 
@@ -610,12 +611,8 @@ class Exchange:
   EXCHANGE_LISTING_DURATION           = 5
   '''The number of ticks, during which the item is listed for sale'''
 
-  @property
-  def MARKET_N_OBS(self):
-    # TODO(kywch): This is a hack. Check if the limit is reached
-    # pylint: disable=no-member
-    '''Number of distinct item observations'''
-    return self.PLAYER_N * self.EXCHANGE_LISTING_DURATION
+  MARKET_N_OBS = 1024
+  '''Number of distinct item observations'''
 
   PRICE_N_OBS = 99 # make it different from PLAYER_N_OBS
   '''Number of distinct price observations
