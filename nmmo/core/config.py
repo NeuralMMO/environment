@@ -413,29 +413,35 @@ class Combat:
   '''Reach of attacks using the Mage skill'''
 
 
+def default_exp_threshold(max_level):
+  import math
+  additional_exp_per_level = [round(90*math.sqrt(lvl))
+                              for lvl in range(1, max_level+1)]
+  return [sum(additional_exp_per_level[:lvl]) for lvl in range(max_level)]
+
 class Progression:
   '''Progression Game System'''
 
   PROGRESSION_SYSTEM_ENABLED        = True
   '''Game system flag'''
 
-  PROGRESSION_BASE_XP_SCALE         = 1
-  '''Base XP awarded for each skill usage -- multiplied by skill level'''
-
-  PROGRESSION_COMBAT_XP_SCALE       = 1
-  '''Multiplier on top of XP_SCALE for Melee, Range, and Mage'''
-
-  PROGRESSION_AMMUNITION_XP_SCALE   = 1
-  '''Multiplier on top of XP_SCALE for Prospecting, Carving, and Alchemy'''
-
-  PROGRESSION_CONSUMABLE_XP_SCALE   = 5
-  '''Multiplier on top of XP_SCALE for Fishing and Herbalism'''
-
   PROGRESSION_BASE_LEVEL            = 1
   '''Initial skill level'''
 
   PROGRESSION_LEVEL_MAX             = 10
   '''Max skill level'''
+
+  PROGRESSION_EXP_THRESHOLD         = default_exp_threshold(PROGRESSION_LEVEL_MAX)
+  '''A list of experience thresholds for each level'''
+
+  PROGRESSION_COMBAT_XP_SCALE       = 3
+  '''Additional XP for each attack for skills Melee, Range, and Mage'''
+
+  PROGRESSION_AMMUNITION_XP_SCALE   = 15
+  '''Additional XP for each harvest for Prospecting, Carving, and Alchemy'''
+
+  PROGRESSION_CONSUMABLE_XP_SCALE   = 30
+  '''Multiplier XP for each harvest for Fishing and Herbalism'''
 
   PROGRESSION_MELEE_BASE_DAMAGE     = 20
   '''Base Melee attack damage'''
@@ -585,13 +591,13 @@ class Profession:
   PROFESSION_HERB_CAPACITY            = 1
   '''Maximum number of harvests before an herb tile decays'''
 
-  PROFESSION_HERB_RESPAWN             = 0.01
+  PROFESSION_HERB_RESPAWN             = 0.02
   '''Probability that a harvested herb tile will regenerate each tick'''
 
   PROFESSION_FISH_CAPACITY            = 1
   '''Maximum number of harvests before a fish tile decays'''
 
-  PROFESSION_FISH_RESPAWN             = 0.01
+  PROFESSION_FISH_RESPAWN             = 0.02
   '''Probability that a harvested fish tile will regenerate each tick'''
 
   @staticmethod

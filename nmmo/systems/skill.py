@@ -6,17 +6,37 @@ import numpy as np
 from ordered_set import OrderedSet
 
 from nmmo.lib import material
-from nmmo.systems import combat, experience
+from nmmo.systems import combat
 from nmmo.lib.log import EventCode
 
 ### Infrastructure ###
+class ExperienceCalculator:
+  def __init__(self, config):
+    if not config.PROGRESSION_SYSTEM_ENABLED:
+      return
+    self.config = config
+    self.exp_threshold = np.array(config.PROGRESSION_EXP_THRESHOLD)
+    assert len(self.exp_threshold) >= config.PROGRESSION_LEVEL_MAX,\
+      "PROGRESSION_LEVEL_BY_EXP must have at least PROGRESSION_LEVEL_MAX entries"
+    self.max_exp = self.exp_threshold[self.config.PROGRESSION_LEVEL_MAX - 1]
+
+  def exp_at_level(self, level):
+    level = min(max(level, self.config.PROGRESSION_BASE_LEVEL),
+                self.config.PROGRESSION_LEVEL_MAX)
+    return int(self.exp_threshold[level - 1])
+
+  def level_at_exp(self, exp):
+    if exp >= self.max_exp:
+      return self.config.PROGRESSION_LEVEL_MAX
+    return np.argmin(exp >= self.exp_threshold)
+
 class SkillGroup:
   def __init__(self, realm, entity):
     self.config  = realm.config
     self.realm   = realm
     self.entity = entity
 
-    self.experience_calculator = experience.ExperienceCalculator()
+    self.experience_calculator = ExperienceCalculator(self.config)
     self.skills  = OrderedSet() # critical for determinism
 
   def update(self):
@@ -38,21 +58,17 @@ class Skill(abc.ABC):
 
     self.experience_calculator = skill_group.experience_calculator
     self.skill_group = skill_group
-    self.exp = 0
-
     skill_group.skills.add(self)
 
   def packet(self):
     data = {}
-
-    data['exp']   = self.exp
+    data['exp']   = self.exp.val
     data['level'] = self.level.val
-
     return data
 
   def add_xp(self, xp):
-    self.exp += xp * self.config.PROGRESSION_BASE_XP_SCALE
-    new_level = int(self.experience_calculator.level_at_exp(self.exp))
+    self.exp.increment(xp)
+    new_level = int(self.experience_calculator.level_at_exp(self.exp.val))
 
     if new_level > self.level.val:
       self.level.update(new_level)
@@ -64,13 +80,18 @@ class Skill(abc.ABC):
         tags={"player_id": self.entity.ent_id})
 
   def set_experience_by_level(self, level):
-    self.exp = self.experience_calculator.level_at_exp(level)
+    self.exp.update(self.experience_calculator.level_at_exp(level))
     self.level.update(int(level))
 
   @property
   def level(self):
     raise NotImplementedError(f"Skill {self.__class__.__name__} "\
       "does not implement 'level' property")
+
+  @property
+  def exp(self):
+    raise NotImplementedError(f"Skill {self.__class__.__name__} "\
+      "does not implement 'exp' property")
 
 ### Skill Bases ###
 class CombatSkill(Skill):
@@ -224,13 +245,17 @@ class Combat(SkillGroup):
 class Skills(Basic, Harvest, Combat):
   pass
 
-### Skills ###
+### Combat Skills ###
 class Melee(CombatSkill):
   SKILL_ID = 1
 
   @property
   def level(self):
     return self.entity.melee_level
+
+  @property
+  def exp(self):
+    return self.entity.melee_exp
 
 class Range(CombatSkill):
   SKILL_ID = 2
@@ -239,6 +264,10 @@ class Range(CombatSkill):
   def level(self):
     return self.entity.range_level
 
+  @property
+  def exp(self):
+    return self.entity.range_exp
+
 class Mage(CombatSkill):
   SKILL_ID = 3
 
@@ -246,11 +275,16 @@ class Mage(CombatSkill):
   def level(self):
     return self.entity.mage_level
 
+  @property
+  def exp(self):
+    return self.entity.mage_exp
+
 Melee.weakness = Mage
 Range.weakness = Melee
 Mage.weakness  = Range
 
-### Individual Skills ###
+
+### Basic/Harvest Skills ###
 
 class DummyLevel:
   def __init__(self, val=0):
@@ -281,7 +315,6 @@ class Water(HarvestSkill):
 
     self.realm.event_log.record(EventCode.DRINK_WATER, self.entity)
 
-
 class Food(HarvestSkill):
   def update(self):
     config = self.config
@@ -304,13 +337,16 @@ class Food(HarvestSkill):
 
     self.realm.event_log.record(EventCode.EAT_FOOD, self.entity)
 
-
 class Fishing(ConsumableSkill):
   SKILL_ID = 4
 
   @property
   def level(self):
     return self.entity.fishing_level
+
+  @property
+  def exp(self):
+    return self.entity.fishing_exp
 
   def update(self):
     self.harvest_adjacent(material.Fish)
@@ -322,6 +358,10 @@ class Herbalism(ConsumableSkill):
   def level(self):
     return self.entity.herbalism_level
 
+  @property
+  def exp(self):
+    return self.entity.herbalism_exp
+
   def update(self):
     self.harvest(material.Herb)
 
@@ -331,6 +371,10 @@ class Prospecting(AmmunitionSkill):
   @property
   def level(self):
     return self.entity.prospecting_level
+
+  @property
+  def exp(self):
+    return self.entity.prospecting_exp
 
   def update(self):
     self.harvest(material.Ore)
@@ -342,6 +386,10 @@ class Carving(AmmunitionSkill):
   def level(self):
     return self.entity.carving_level
 
+  @property
+  def exp(self):
+    return self.entity.carving_exp
+
   def update(self,):
     self.harvest(material.Tree)
 
@@ -351,6 +399,10 @@ class Alchemy(AmmunitionSkill):
   @property
   def level(self):
     return self.entity.alchemy_level
+
+  @property
+  def exp(self):
+    return self.entity.alchemy_exp
 
   def update(self):
     self.harvest(material.Crystal)

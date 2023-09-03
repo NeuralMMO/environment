@@ -32,17 +32,25 @@ EntityState = SerializedState.subclass(
     "food",
     "water",
 
-    # Combat
+    # Combat Skills
     "melee_level",
+    "melee_exp",
     "range_level",
+    "range_exp",
     "mage_level",
+    "mage_exp",
 
-    # Skills
+    # Harvest Skills
     "fishing_level",
+    "fishing_exp",
     "herbalism_level",
+    "herbalism_exp",
     "prospecting_level",
+    "prospecting_exp",
     "carving_level",
+    "carving_exp",
     "alchemy_level",
+    "alchemy_exp",
   ])
 
 EntityState.Limits = lambda config: {
@@ -69,13 +77,21 @@ EntityState.Limits = lambda config: {
   } if config.RESOURCE_SYSTEM_ENABLED else {}),
   **({
     "melee_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "melee_exp": (0, math.inf),
     "range_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "range_exp": (0, math.inf),
     "mage_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "mage_exp": (0, math.inf),
     "fishing_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "fishing_exp": (0, math.inf),
     "herbalism_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "herbalism_exp": (0, math.inf),
     "prospecting_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "prospecting_exp": (0, math.inf),
     "carving_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "carving_exp": (0, math.inf),
     "alchemy_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "alchemy_exp": (0, math.inf),
   } if config.PROGRESSION_SYSTEM_ENABLED else {}),
 }
 
