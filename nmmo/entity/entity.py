@@ -122,6 +122,7 @@ class Resources:
     self.water = ent.water
     self.food = ent.food
     self.health_restore = 0
+    self.resilient = False
 
     self.health.update(config.PLAYER_BASE_HEALTH)
     if config.RESOURCE_SYSTEM_ENABLED:
@@ -144,10 +145,16 @@ class Resources:
       self.health.increment(restore)
 
     if self.food.empty:
-      self.health.decrement(self.config.RESOURCE_STARVATION_RATE)
+      starvation_damage = self.config.RESOURCE_STARVATION_RATE
+      if self.resilient:
+        starvation_damage *= self.config.RESOURCE_DAMAGE_REDUCTION
+      self.health.decrement(int(starvation_damage))
 
     if self.water.empty:
-      self.health.decrement(self.config.RESOURCE_DEHYDRATION_RATE)
+      dehydration_damage = self.config.RESOURCE_DEHYDRATION_RATE
+      if self.resilient:
+        dehydration_damage *= self.config.RESOURCE_DAMAGE_REDUCTION
+      self.health.decrement(int(dehydration_damage))
 
     # records both increase and decrease in health due to food and water
     self.health_restore = self.health.val - org_health
@@ -273,7 +280,6 @@ class Entity(EntityState):
 
   def packet(self):
     data = {}
-
     data['status'] = self.status.packet()
     data['history'] = self.history.packet()
     data['inventory'] = self.inventory.packet()
