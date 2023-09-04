@@ -101,11 +101,15 @@ class CombatSkill(Skill):
 class NonCombatSkill(Skill):
   def __init__(self, skill_group: SkillGroup):
     super().__init__(skill_group)
-    self._level = DummyLevel()
+    self._dummy_value = DummyValue()  # for water and food
 
   @property
   def level(self):
-    return self._level
+    return self._dummy_value
+
+  @property
+  def exp(self):
+    return self._dummy_value
 
 class HarvestSkill(NonCombatSkill):
   def process_drops(self, matl, drop_table):
@@ -286,7 +290,7 @@ Mage.weakness  = Range
 
 ### Basic/Harvest Skills ###
 
-class DummyLevel:
+class DummyValue:
   def __init__(self, val=0):
     self.val = val
 
