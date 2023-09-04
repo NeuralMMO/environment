@@ -79,7 +79,8 @@ def DistanceTraveled(gs: GameState, subject: Group, dist: int):
   dists = utils.linf(list(zip(r,c)),[gs.spawn_pos[id_] for id_ in subject.entity.id])
   return norm(dists.sum() / dist)
 
-def AttainSkill(gs: GameState, subject: Group, skill: Skill, level: int, num_agent: int):
+def AttainSkill(gs: GameState, subject: Group,
+                skill: type[Skill], level: int, num_agent: int):
   """True if the number of agents having skill level GE level
         is greather than or equal to num_agent
   """
@@ -88,7 +89,8 @@ def AttainSkill(gs: GameState, subject: Group, skill: Skill, level: int, num_age
   skill_level = getattr(subject,skill.__name__.lower() + '_level') - 1  # base level is 1
   return norm(sum(skill_level) / (num_agent * (level-1)))
 
-def GainExperience(gs: GameState, subject: Group, skill: Skill, experience: int, num_agent: int):
+def GainExperience(gs: GameState, subject: Group,
+                   skill: type[Skill], experience: int, num_agent: int):
   """True if the experience gained for the skill is greater than or equal to experience."""
   skill_exp = getattr(subject,skill.__name__.lower() + '_exp')
   return norm(sum(skill_exp) / (experience*num_agent))
