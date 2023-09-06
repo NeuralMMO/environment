@@ -388,6 +388,41 @@ class TestBasePredicate(unittest.TestCase):
 
     # DONE
 
+  def test_gain_experience(self):
+    attain_gain_exp_cls = make_predicate(bp.GainExperience)
+
+    goal_exp = 5
+    test_preds = [ # (Predicate, Team), the reward is 1 by default
+      (attain_gain_exp_cls(Group([1]), Skill.Melee, goal_exp, 1), ALL_AGENT), # False
+      (attain_gain_exp_cls(Group([2]), Skill.Melee, goal_exp, 1), ALL_AGENT), # False
+      (attain_gain_exp_cls(Group([1]), Skill.Range, goal_exp, 1), ALL_AGENT), # True
+      (attain_gain_exp_cls(Group([1,3]), Skill.Fishing, goal_exp, 1), ALL_AGENT), # True
+      (attain_gain_exp_cls(Group([1,2,3]), Skill.Carving, goal_exp, 3), ALL_AGENT), # False
+      (attain_gain_exp_cls(Group([2,4]), Skill.Carving, goal_exp, 2), ALL_AGENT)] # True
+
+    env = self._get_taskenv(test_preds)
+
+    # AttainSkill(Group([1]), Skill.Melee, goal_level, 1) is false
+    # AttainSkill(Group([2]), Skill.Melee, goal_level, 1) is false
+    env.realm.players[1].skills.melee.exp.update(goal_exp-1)
+    # AttainSkill(Group([1]), Skill.Range, goal_level, 1) is true
+    env.realm.players[1].skills.range.exp.update(goal_exp)
+    # AttainSkill(Group([1,3]), Skill.Fishing, goal_level, 1) is true
+    env.realm.players[1].skills.fishing.exp.update(goal_exp)
+    # AttainSkill(Group([1,2,3]), Skill.Carving, goal_level, 3) is false
+    env.realm.players[1].skills.carving.exp.update(goal_exp)
+    env.realm.players[2].skills.carving.exp.update(goal_exp)
+    # AttainSkill(Group([2,4]), Skill.Carving, goal_level, 2) is true
+    env.realm.players[4].skills.carving.exp.update(goal_exp+2)
+    env.obs = env._compute_observations()
+
+    _, _, _, infos = env.step({})
+
+    true_task = [2, 3, 5]
+    self._check_result(env, test_preds, infos, true_task)
+
+    # DONE
+
   def test_inventory_space_ge_not(self):
     inv_space_ge_pred_cls = make_predicate(bp.InventorySpaceGE)
 

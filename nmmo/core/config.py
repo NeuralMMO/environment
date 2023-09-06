@@ -147,7 +147,7 @@ class Config(Template):
   PROVIDE_ACTION_TARGETS       = True
   '''Provide action targets mask'''
 
-  PROVIDE_NOOP_ACTION_TARGET         = False
+  PROVIDE_NOOP_ACTION_TARGET   = True
   '''Provide a no-op option for each action'''
 
   PLAYERS                      = [Agent]
@@ -159,7 +159,7 @@ class Config(Template):
   CURRICULUM_FILE_PATH = None
   '''Path to a curriculum task file containing a list of task specs for training'''
 
-  TASK_EMBED_DIM = 1024
+  TASK_EMBED_DIM = 4096
   '''Dimensionality of task embeddings'''
 
   ALLOW_MULTI_TASKS_PER_AGENT = False
@@ -188,7 +188,7 @@ class Config(Template):
   PLAYER_N                     = None
   '''Maximum number of players spawnable in the environment'''
 
-  # TODO(kywch): CHECK if there could be 100+ entities within one's vision
+  # TODO: CHECK if there could be 100+ entities within one's vision
   PLAYER_N_OBS                 = 100
   '''Number of distinct agent observations'''
 
@@ -211,18 +211,6 @@ class Config(Template):
   PLAYER_DEATH_FOG             = None
   '''How long before spawning death fog. None for no death fog'''
 
-
-  ############################################################################
-  ### Agent Parameters
-  IMMORTAL = False
-  '''Debug parameter: prevents agents from dying except by void'''
-
-  RESET_ON_DEATH = False
-  '''Whether to reset the environment whenever an agent dies'''
-
-  BASE_HEALTH                = 10
-  '''Initial Constitution level and agent health'''
-
   PLAYER_DEATH_FOG_SPEED       = 1
   '''Number of tiles per tick that the fog moves in'''
 
@@ -240,6 +228,14 @@ class Config(Template):
     if __debug__:
       assert not self.PLAYER_N % len(self.PLAYERS)
     return self.PLAYER_N // len(self.PLAYERS)
+
+  ############################################################################
+  ### Debug Parameters
+  IMMORTAL = False
+  '''Debug parameter: prevents agents from dying except by void'''
+
+  RESET_ON_DEATH = False
+  '''Debug parameter: whether to reset the environment whenever an agent dies'''
 
   ############################################################################
   ### Map Parameters
@@ -358,10 +354,18 @@ class Resource:
   RESOURCE_DEHYDRATION_RATE           = 10
   '''Damage per tick without water'''
 
-  RESOURCE_FOILAGE_CAPACITY            = 1
+  RESOURCE_RESILIENT_POPULATION       = 0
+  '''Training helper: proportion of population that is resilient to starvation and dehydration
+     (e.g. 0.1 means 10% of the population is resilient to starvation and dehydration)
+     This is to make some agents live longer during training to sample from "advanced" agents.'''
+
+  RESOURCE_DAMAGE_REDUCTION           = 0.5
+  '''Training helper: damage reduction from starvation and dehydration for resilient agents'''
+
+  RESOURCE_FOILAGE_CAPACITY           = 1
   '''Maximum number of harvests before a foilage tile decays'''
 
-  RESOURCE_FOILAGE_RESPAWN             = 0.025
+  RESOURCE_FOILAGE_RESPAWN            = 0.025
   '''Probability that a harvested foilage tile will regenerate each tick'''
 
   RESOURCE_HARVEST_RESTORE_FRACTION   = 1.0
@@ -413,29 +417,35 @@ class Combat:
   '''Reach of attacks using the Mage skill'''
 
 
+def default_exp_threshold(max_level):
+  import math
+  additional_exp_per_level = [round(90*math.sqrt(lvl))
+                              for lvl in range(1, max_level+1)]
+  return [sum(additional_exp_per_level[:lvl]) for lvl in range(max_level)]
+
 class Progression:
   '''Progression Game System'''
 
   PROGRESSION_SYSTEM_ENABLED        = True
   '''Game system flag'''
 
-  PROGRESSION_BASE_XP_SCALE         = 1
-  '''Base XP awarded for each skill usage -- multiplied by skill level'''
-
-  PROGRESSION_COMBAT_XP_SCALE       = 1
-  '''Multiplier on top of XP_SCALE for Melee, Range, and Mage'''
-
-  PROGRESSION_AMMUNITION_XP_SCALE   = 1
-  '''Multiplier on top of XP_SCALE for Prospecting, Carving, and Alchemy'''
-
-  PROGRESSION_CONSUMABLE_XP_SCALE   = 5
-  '''Multiplier on top of XP_SCALE for Fishing and Herbalism'''
-
   PROGRESSION_BASE_LEVEL            = 1
   '''Initial skill level'''
 
   PROGRESSION_LEVEL_MAX             = 10
   '''Max skill level'''
+
+  PROGRESSION_EXP_THRESHOLD         = default_exp_threshold(PROGRESSION_LEVEL_MAX)
+  '''A list of experience thresholds for each level'''
+
+  PROGRESSION_COMBAT_XP_SCALE       = 3
+  '''Additional XP for each attack for skills Melee, Range, and Mage'''
+
+  PROGRESSION_AMMUNITION_XP_SCALE   = 15
+  '''Additional XP for each harvest for Prospecting, Carving, and Alchemy'''
+
+  PROGRESSION_CONSUMABLE_XP_SCALE   = 30
+  '''Multiplier XP for each harvest for Fishing and Herbalism'''
 
   PROGRESSION_MELEE_BASE_DAMAGE     = 20
   '''Base Melee attack damage'''
@@ -523,7 +533,6 @@ class Item:
     return self.ITEM_INVENTORY_CAPACITY
 
 
-
 class Equipment:
   '''Equipment Game System'''
 
@@ -585,13 +594,13 @@ class Profession:
   PROFESSION_HERB_CAPACITY            = 1
   '''Maximum number of harvests before an herb tile decays'''
 
-  PROFESSION_HERB_RESPAWN             = 0.01
+  PROFESSION_HERB_RESPAWN             = 0.02
   '''Probability that a harvested herb tile will regenerate each tick'''
 
   PROFESSION_FISH_CAPACITY            = 1
   '''Maximum number of harvests before a fish tile decays'''
 
-  PROFESSION_FISH_RESPAWN             = 0.01
+  PROFESSION_FISH_RESPAWN             = 0.02
   '''Probability that a harvested fish tile will regenerate each tick'''
 
   @staticmethod

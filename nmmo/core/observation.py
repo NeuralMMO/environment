@@ -199,8 +199,8 @@ class Observation:
         "MarketItem": self._make_buy_mask()
       }
       masks["GiveGold"] = {
-        "Price": self._make_give_gold_mask(), # reusing Price
-        "Target": self._make_give_target_mask()
+        "Price": self._make_give_gold_mask(),  # reusing Price
+        "Target": self._make_give_gold_target_mask()
       }
 
     if self.config.COMMUNICATION_SYSTEM_ENABLED:
@@ -213,8 +213,9 @@ class Observation:
   def _make_move_mask(self):
     if self.dummy_obs:
       mask = np.zeros(len(action.Direction.edges), dtype=np.int8)
-      mask[-1] = 1  # make sure the noop action is available
+      mask[-1] = 1  # for no-op
       return mask
+
     # pylint: disable=not-an-iterable
     return np.array([self.tile(*d.delta).material_id in material.Habitable.indices
                      for d in action.Direction.edges], dtype=np.int8)
@@ -251,6 +252,11 @@ class Observation:
     not_me = self.entities.ids != agent.id
 
     attack_mask[:self.entities.len] = within_range & not_me & no_spawn_immunity
+    if sum(attack_mask[:self.entities.len]) > 0:
+      # Mask the no-op option, since there should be at least one allowed move
+      # NOTE: this will make agents always attack if there is a valid target
+      attack_mask[-1] = 0
+
     return attack_mask
 
   def _make_use_mask(self):
@@ -325,9 +331,28 @@ class Observation:
     give_mask = np.zeros(self.config.PLAYER_N_OBS + self._noop_action, dtype=np.int8)
     if self.config.PROVIDE_NOOP_ACTION_TARGET:
       give_mask[-1] = 1
-    # empty inventory -- nothing to give
-    if not (self.config.ITEM_SYSTEM_ENABLED and self.inventory.len > 0)\
-        or self.dummy_obs or self.agent_in_combat:
+
+    if not self.config.ITEM_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat\
+       or self.inventory.len == 0:
+      return give_mask
+
+    agent = self.agent()
+    entities_pos = self.entities.values[:,[EntityState.State.attr_name_to_col["row"],
+                                           EntityState.State.attr_name_to_col["col"]]]
+    same_tile = utils.linf(entities_pos, (agent.row, agent.col)) == 0
+    not_me = self.entities.ids != self.agent_id
+    player = (self.entities.values[:,EntityState.State.attr_name_to_col["npc_type"]] == 0)
+
+    give_mask[:self.entities.len] = same_tile & player & not_me
+    return give_mask
+
+  def _make_give_gold_target_mask(self):
+    give_mask = np.zeros(self.config.PLAYER_N_OBS + self._noop_action, dtype=np.int8)
+    if self.config.PROVIDE_NOOP_ACTION_TARGET:
+      give_mask[-1] = 1
+
+    if not self.config.EXCHANGE_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat\
+       or int(self.agent().gold) == 0:
       return give_mask
 
     agent = self.agent()
@@ -343,13 +368,11 @@ class Observation:
   def _make_give_gold_mask(self):
     mask = np.zeros(self.config.PRICE_N_OBS, dtype=np.int8)
     mask[0] = 1  # To avoid all-0 masks. If the agent has no gold, this action will be ignored.
-    if self.dummy_obs:
+    if self.dummy_obs or self.agent_in_combat:
       return mask
 
     gold = int(self.agent().gold)
-    if gold and not self.agent_in_combat:
-      mask[:gold] = 1 # NOTE that action.Price starts from Discrete_1
-
+    mask[:gold] = 1 # NOTE that action.Price starts from Discrete_1
     return mask
 
   def _make_sell_mask(self):
@@ -373,7 +396,8 @@ class Observation:
     if self.config.PROVIDE_NOOP_ACTION_TARGET:
       buy_mask[-1] = 1
 
-    if not self.config.EXCHANGE_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat:
+    if not self.config.EXCHANGE_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat \
+       or self.market.len == 0:
       return buy_mask
 
     agent = self.agent()

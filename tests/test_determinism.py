@@ -63,9 +63,11 @@ class TestDeterminism(unittest.TestCase):
     config1 = ScriptedAgentTestConfig()
     setattr(config1, 'MAP_FORCE_GENERATION', True)
     setattr(config1, 'PATH_MAPS', 'maps/det1')
+    setattr(config1, 'RESOURCE_RESILIENT_POPULATION', 0.2)  # uses np_random
     config2 = ScriptedAgentTestConfig()
     setattr(config2, 'MAP_FORCE_GENERATION', True)
     setattr(config2, 'PATH_MAPS', 'maps/det2')
+    setattr(config2, 'RESOURCE_RESILIENT_POPULATION', 0.2)
 
     # to create the same maps, seed must be provided
     env1 = ScriptedAgentTestEnv(config1, seed=RANDOM_SEED)
