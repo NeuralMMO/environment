@@ -148,14 +148,23 @@ class PlayerManager(EntityGroup):
     self._agent_loader = self.loader_class(self.config, self._np_random)
     self.spawned = set()
 
-  def spawn_individual(self, r, c, idx):
+  def spawn_individual(self, r, c, idx, resilient=False):
     agent = next(self._agent_loader)
-    agent      = agent(self.config, idx)
-    player     = Player(self.realm, (r, c), agent)
+    agent = agent(self.config, idx)
+    player = Player(self.realm, (r, c), agent, resilient)
     super().spawn(player)
     self.spawned.add(idx)
 
   def spawn(self):
+    # Check and assign the constant heal flag
+    resilient_flag = [False] * self.config.PLAYER_N
+    if self.config.RESOURCE_SYSTEM_ENABLED:
+      num_resilient = round(self.config.RESOURCE_RESILIENT_POPULATION * self.config.PLAYER_N)
+      for idx in range(num_resilient):
+        resilient_flag[idx] = self.config.RESOURCE_DAMAGE_REDUCTION > 0
+      self._np_random.shuffle(resilient_flag)
+
+    # Spawn the players
     idx = 0
     while idx < self.config.PLAYER_N:
       idx += 1
@@ -167,4 +176,4 @@ class PlayerManager(EntityGroup):
       if idx in self.spawned:
         continue
 
-      self.spawn_individual(r, c, idx)
+      self.spawn_individual(r, c, idx, resilient_flag[idx-1])

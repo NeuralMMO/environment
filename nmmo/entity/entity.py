@@ -32,17 +32,25 @@ EntityState = SerializedState.subclass(
     "food",
     "water",
 
-    # Combat
+    # Combat Skills
     "melee_level",
+    "melee_exp",
     "range_level",
+    "range_exp",
     "mage_level",
+    "mage_exp",
 
-    # Skills
+    # Harvest Skills
     "fishing_level",
+    "fishing_exp",
     "herbalism_level",
+    "herbalism_exp",
     "prospecting_level",
+    "prospecting_exp",
     "carving_level",
+    "carving_exp",
     "alchemy_level",
+    "alchemy_exp",
   ])
 
 EntityState.Limits = lambda config: {
@@ -69,13 +77,21 @@ EntityState.Limits = lambda config: {
   } if config.RESOURCE_SYSTEM_ENABLED else {}),
   **({
     "melee_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "melee_exp": (0, math.inf),
     "range_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "range_exp": (0, math.inf),
     "mage_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "mage_exp": (0, math.inf),
     "fishing_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "fishing_exp": (0, math.inf),
     "herbalism_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "herbalism_exp": (0, math.inf),
     "prospecting_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "prospecting_exp": (0, math.inf),
     "carving_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "carving_exp": (0, math.inf),
     "alchemy_level": (0, config.PROGRESSION_LEVEL_MAX),
+    "alchemy_exp": (0, math.inf),
   } if config.PROGRESSION_SYSTEM_ENABLED else {}),
 }
 
@@ -106,6 +122,7 @@ class Resources:
     self.water = ent.water
     self.food = ent.food
     self.health_restore = 0
+    self.resilient = False
 
     self.health.update(config.PLAYER_BASE_HEALTH)
     if config.RESOURCE_SYSTEM_ENABLED:
@@ -128,10 +145,16 @@ class Resources:
       self.health.increment(restore)
 
     if self.food.empty:
-      self.health.decrement(self.config.RESOURCE_STARVATION_RATE)
+      starvation_damage = self.config.RESOURCE_STARVATION_RATE
+      if self.resilient:
+        starvation_damage *= self.config.RESOURCE_DAMAGE_REDUCTION
+      self.health.decrement(int(starvation_damage))
 
     if self.water.empty:
-      self.health.decrement(self.config.RESOURCE_DEHYDRATION_RATE)
+      dehydration_damage = self.config.RESOURCE_DEHYDRATION_RATE
+      if self.resilient:
+        dehydration_damage *= self.config.RESOURCE_DAMAGE_REDUCTION
+      self.health.decrement(int(dehydration_damage))
 
     # records both increase and decrease in health due to food and water
     self.health_restore = self.health.val - org_health
@@ -257,7 +280,6 @@ class Entity(EntityState):
 
   def packet(self):
     data = {}
-
     data['status'] = self.status.packet()
     data['history'] = self.history.packet()
     data['inventory'] = self.inventory.packet()

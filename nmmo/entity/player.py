@@ -4,11 +4,12 @@ from nmmo.lib.log import EventCode
 
 # pylint: disable=no-member
 class Player(entity.Entity):
-  def __init__(self, realm, pos, agent):
+  def __init__(self, realm, pos, agent, resilient=False):
     super().__init__(realm, pos, agent.iden, agent.policy)
 
     self.agent    = agent
     self.immortal = realm.config.IMMORTAL
+    self.resources.resilient = resilient
 
     # Scripted hooks
     self.target = None
@@ -97,9 +98,7 @@ class Player(entity.Entity):
 
   def packet(self):
     data = super().packet()
-
     data['entID']     = self.ent_id
-
     data['resource']  = self.resources.packet()
     data['skills']    = self.skills.packet()
     data['inventory'] = self.inventory.packet()

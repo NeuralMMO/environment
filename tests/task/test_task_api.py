@@ -9,9 +9,9 @@ from nmmo.task.predicate_api import make_predicate, Predicate
 from nmmo.task.task_api import Task, OngoingTask, HoldDurationTask
 from nmmo.task.task_spec import TaskSpec, make_task_from_spec
 from nmmo.task.group import Group
-from nmmo.task.constraint import ScalarConstraint, GroupConstraint, AGENT_LIST_CONSTRAINT
+from nmmo.task.constraint import ScalarConstraint
 from nmmo.task.base_predicates import (
-    TickGE, CanSeeGroup, AllMembersWithinRange, StayAlive, HoardGold
+    TickGE, AllMembersWithinRange, StayAlive, HoardGold
 )
 
 from nmmo.systems import item as Item
@@ -144,30 +144,6 @@ class TestTaskAPI(unittest.TestCase):
       self.assertTrue(scalar.sample(mock_gs.config)<10)
       self.assertTrue(scalar.sample(mock_gs.config)>=-10)
 
-  def test_sample_predicate(self):
-    # pylint: disable=no-value-for-parameter,expression-not-assigned
-    # make predicate class from function
-    canseegrp_pred_cls = make_predicate(CanSeeGroup)
-    tickge_pred_cls = make_predicate(TickGE)
-
-    # if the predicate class is instantiated without the subject,
-    mock_gs = MockGameState()
-    predicate = canseegrp_pred_cls(subject=GroupConstraint, target=AGENT_LIST_CONSTRAINT) &\
-                tickge_pred_cls(subject=GroupConstraint, num_tick=ScalarConstraint)
-    self.assertEqual(predicate.name,
-                     "(AND_(CanSeeGroup_subject:GroupConstraint_target:AgentListConstraint)_"+\
-                     "(TickGE_subject:GroupConstraint_num_tick:ScalarConstraint))")
-
-    # this predicate cannot calculate progress becuase it has no subject
-    with self.assertRaises(AttributeError):
-      predicate(mock_gs)
-
-    # this predicate supports sampling with valid arguments
-    config = nmmo.config.Default()
-    tickge_pred_cls().sample(config)
-    predicate.sample(config).name
-
-    # DONE
 
   def test_task_api_with_predicate(self):
     # pylint: disable=no-value-for-parameter,no-member
@@ -181,7 +157,7 @@ class TestTaskAPI(unittest.TestCase):
     self.assertEqual(predicate.get_source_code(),
                      "def Fake(gs, subject, a,b,c):\n  return False")
     self.assertEqual(predicate.get_signature(), ["gs", "subject", "a", "b", "c"])
-    self.assertEqual(predicate.args, [group])
+    self.assertEqual(predicate.args, tuple(group,))
     self.assertDictEqual(predicate.kwargs, {"a": 1, "b": item, "c": action})
 
     assignee = [1,2,3] # list of agent ids
@@ -193,7 +169,7 @@ class TestTaskAPI(unittest.TestCase):
     self.assertEqual(task.get_source_code(),
                      "def Fake(gs, subject, a,b,c):\n  return False")
     self.assertEqual(task.get_signature(), ["gs", "subject", "a", "b", "c"])
-    self.assertEqual(task.args, [group])
+    self.assertEqual(task.args, tuple(group,))
     self.assertDictEqual(task.kwargs, {"a": 1, "b": item, "c": action})
     for agent_id in assignee:
       self.assertEqual(rewards[agent_id], 0)

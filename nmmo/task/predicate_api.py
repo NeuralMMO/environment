@@ -8,7 +8,7 @@ from numbers import Real
 from nmmo.core.config import Config
 from nmmo.task.group import Group, union
 from nmmo.task.game_state import GameState
-from nmmo.task.constraint import Constraint, InvalidConstraint, GroupConstraint
+from nmmo.task.constraint import Constraint, GroupConstraint
 
 if TYPE_CHECKING:
   from nmmo.task.task_api import Task
@@ -33,7 +33,7 @@ class Predicate(ABC):
 
     self._args = args
     self._kwargs = kwargs
-    self._constraints = constraints
+    self._constraints = constraints  # NOTE: not used
     self._config = None
     self._subject = subject
 
@@ -46,9 +46,6 @@ class Predicate(ABC):
     Returns:
       progress: float bounded between [0, 1], 1 is considered to be true
     """
-    if not self._config == gs.config:
-      # TODO(mark) should we make this explicitly called by environment
-      self._reset(gs.config)
     # Update views
     for group in self._groups:
       group.update(gs)
@@ -61,56 +58,10 @@ class Predicate(ABC):
       cache[self.name] = progress
     return progress
 
-  def _reset(self, config: Config):
-    self._config = config
-    if not self.check(self._config):
-      raise InvalidConstraint()
-
   def close(self):
     # To prevent memory leak, clear all refs to old game state
     for group in self._groups:
       group.clear_prev_state()
-
-  def check(self, config: Config):
-    """ Checks whether the predicate is valid
-
-    A satisfiable predicate "makes sense" given a config
-    ie. Not trying to reach target off the map
-    """
-    if not GroupConstraint().check(config, self._subject):
-      return False
-    for i, (name, constraint) in enumerate(self._constraints):
-      if constraint is None:
-        continue
-      if i < len(self._args):
-        if not constraint.check(config, self._args[i]):
-          return False
-      elif not constraint.check(config, self._kwargs[name]):
-        return False
-    return True
-
-  def sample(self, config: Config, **overload):
-    """ Samples a concrete instance of a given task.
-    
-    Allows overloading of previous parameters.
-    """
-    # Sample Constraint
-    nargs = [arg.sample(config) if isinstance(arg, Constraint) else arg
-              for arg in self._args]
-    nkwargs = {k : v.sample(config) if isinstance(v, Constraint) else v
-                for k,v in self._kwargs.items()}
-    for i, (name, _) in enumerate(self._constraints):
-      if i < len(nargs):
-        if name in nkwargs:
-          raise InvalidPredicateDefinition("Constraints should match arguments.")
-        nkwargs[name] = nargs[i]
-      else:
-        break
-
-    for k, v in overload.items():
-      nkwargs[k] = v
-     # Result
-    return self.__class__(**nkwargs)
 
   @abstractmethod
   def _evaluate(self, gs: GameState) -> float:
@@ -209,24 +160,8 @@ def make_predicate(fn: Callable) -> Type[Predicate]:
 
   class FunctionPredicate(Predicate):
     def __init__(self, *args, **kwargs) -> None:
-      constraints = []
       self._signature = signature
-      args = list(args)
-      for i, param in enumerate(self._signature.parameters.values()):
-        if i == 0:
-          continue
-        # Calculate list of constraints
-        if isinstance(param.default, Constraint):
-          constraints.append((param.name,param.default))
-        else:
-          constraints.append((param.name,None))
-        # Insert default values from function definition
-        if not param.name in kwargs and i-1 >= len(args):
-          if param.default == inspect.Parameter.empty:
-            args.append(param.default)
-          else:
-            kwargs[param.name] = param.default
-      super().__init__(*args, **kwargs, constraints=constraints)
+      super().__init__(*args, **kwargs)
       self._args = args
       self._kwargs = kwargs
       self.name = self._make_name(fn.__name__, args, kwargs)
