@@ -79,9 +79,9 @@ def attack(realm, player, target, skill_fn):
     equipment_offense = player.equipment.total(offense_fn)
     equipment_defense = target.equipment.total(defense_fn)
 
-    # after tallying ammo damage, consume ammo (i.e., fire)
+    # after tallying ammo damage, consume ammo (i.e., fire) when the skill type matches
     ammunition = player.equipment.ammunition.item
-    if ammunition is not None:
+    if ammunition is not None and getattr(ammunition, skill_name.lower() + '_attack').val > 0:
       ammunition.fire(player)
 
   else:
