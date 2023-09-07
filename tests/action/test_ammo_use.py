@@ -141,6 +141,30 @@ class TestAmmoUse(ScriptedTestTemplate):
 
     # DONE
 
+  def test_use_ammo_only_when_attack_style_match(self):
+    env = self._setup_env(random_seed=RANDOM_SEED, remove_immunity=True)
+
+    # First tick actions: USE (equip) level-0 ammo
+    env.step({ ent_id: { action.Use:
+        { action.InventoryItem: env.obs[ent_id].inventory.sig(ent_ammo, 0) }
+      } for ent_id, ent_ammo in self.ammo.items() })
+
+    # Second tick actions: Melee attack should not consume Arrow
+    ent_id = 2
+    env.step({ 2: { action.Attack:
+        { action.Style: action.Melee,
+          action.Target: env.obs[ent_id].entities.index((ent_id+1)%3+1) } }})
+
+    ent_ammo = self.ammo[ent_id]
+    inventory = env.obs[ent_id].inventory
+    inv_idx = inventory.sig(ent_ammo, 0)
+    item_info = ItemState.parse_array(inventory.values[inv_idx])
+
+    # Did not consume ammo
+    self.assertEqual(self.ammo_quantity, item_info.quantity)
+
+    # DONE
+
   def test_cannot_use_listed_items(self):
     env = self._setup_env(random_seed=RANDOM_SEED)
 
