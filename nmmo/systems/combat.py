@@ -67,13 +67,14 @@ def attack(realm, player, target, skill_fn):
 
   # Compute modifiers
   multiplier        = damage_multiplier(config, skill, target)
-  skill_offense     = base_damage + level_damage * skill.level.val
 
-  if config.PROGRESSION_SYSTEM_ENABLED:
-    skill_defense     = config.PROGRESSION_BASE_DEFENSE  + \
+  # NOTE: skill offense and defense are only for agents, NOT npcs
+  skill_offense = base_damage + level_damage * skill.level.val if player.is_player else 0
+  if config.PROGRESSION_SYSTEM_ENABLED and target.is_player:
+    skill_defense = config.PROGRESSION_BASE_DEFENSE  + \
       config.PROGRESSION_LEVEL_DEFENSE*level(target.skills)
   else:
-    skill_defense     = 0
+    skill_defense = 0
 
   if config.EQUIPMENT_SYSTEM_ENABLED:
     equipment_offense = player.equipment.total(offense_fn)
