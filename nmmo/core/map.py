@@ -66,6 +66,10 @@ class Map:
     for r, row in enumerate(map_file):
       for c, idx in enumerate(row):
         mat  = materials[idx]
+        if mat == material.Stone and \
+           config.TERRAIN_SYSTEM_ENABLED and config.TERRAIN_DISABLE_STONE:
+          mat = material.Grass
+
         tile = self.tiles[r, c]
         tile.reset(mat, config, np_random)
         self.habitable_tiles[r, c] = tile.habitable
@@ -77,10 +81,10 @@ class Map:
 
   def step(self):
     '''Evaluate updatable tiles'''
-    for e in self.update_list.copy():
-      if not e.depleted:
-        self.update_list.remove(e)
-      e.step()
+    for tile in self.update_list.copy():
+      if not tile.depleted:
+        self.update_list.remove(tile)
+      tile.step()
 
   def harvest(self, r, c, deplete=True):
     '''Called by actions that harvest a resource tile'''

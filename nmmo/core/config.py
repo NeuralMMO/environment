@@ -4,20 +4,27 @@ from __future__ import annotations
 import os
 import sys
 import logging
+import re
 
 import nmmo
 from nmmo.core.agent import Agent
 from nmmo.core.terrain import MapGenerator
-from nmmo.lib import utils, material, spawn
+from nmmo.lib import utils, material, spawn, team_helper
+
+# These attributes are critical for trainer and must not change from the initial values
+IMMUTABLE_ATTRS = set(["PLAYER_N", "TASK_EMBED_DIM", "CURRICULUM_FILE_PATH"])
+
 
 class Template(metaclass=utils.StaticIterable):
   def __init__(self):
-    self.data = {}
-    cls       = type(self)
+    self._data = {}
+    self._attr_to_reset = []
+    cls = type(self)
 
     #Set defaults from static properties
-    for k, v in cls:
-      self.set(k, v)
+    for attr in dir(cls):
+      if re.match(r"^[A-Z_]+$", attr):
+        self.set(attr, getattr(cls, attr))
 
   def override(self, **kwargs):
     for k, v in kwargs.items():
@@ -32,30 +39,53 @@ class Template(metaclass=utils.StaticIterable):
       except AttributeError:
         logging.error('Cannot set attribute: %s to %s', str(k), str(v))
         sys.exit()
-    self.data[k] = v
+    self._data[k] = v
+
+  def set_for_episode(self, k, v):
+    '''Set a config property for the current episode'''
+    assert hasattr(self, k), f'Invalid config property: {k}'
+    assert k not in IMMUTABLE_ATTRS, f'Cannot change {k} during the episode'
+    assert not k.endswith('_OBS'), f'Cannot change OBS config {k} during the episode'
+    # Cannot turn on a game system that was not enabled when the env was created
+    if k.endswith('_SYSTEM_ENABLED') and self._data[k] is False and v is True:
+      raise AttributeError(f'Cannot turn on {k} because it was not enabled during env init')
+
+    # Change only the attribute and keep the original value in the data dict
+    setattr(self, k, v)
+    self._attr_to_reset.append(k)
+
+  def reset(self):
+    '''Reset all attributes changed during the episode'''
+    for attr in self._attr_to_reset:
+      setattr(self, attr, self._data[attr])
+    self._attr_to_reset.clear()
 
   # pylint: disable=bad-builtin
   def print(self):
     key_len = 0
-    for k in self.data:
+    for k in self._data:
       key_len = max(key_len, len(k))
 
     print('Configuration')
-    for k, v in self.data.items():
+    for k, v in self._data.items():
       print(f'   {k:{key_len}s}: {v}')
 
   def items(self):
-    return self.data.items()
+    return self._data.items()
 
   def __iter__(self):
-    for k in self.data:
+    for k in self._data:
       yield k
 
   def keys(self):
-    return self.data.keys()
+    return self._data.keys()
 
   def values(self):
-    return self.data.values()
+    return self._data.values()
+
+  @property
+  def original(self):
+    return self._data
 
 def validate(config):
   err = 'config.Config is a base class. Use config.{Small, Medium Large}'''
@@ -144,14 +174,25 @@ class Config(Template):
   def game_system_enabled(self, name) -> bool:
     return hasattr(self, name)
 
-  PROVIDE_ACTION_TARGETS       = True
-  '''Provide action targets mask'''
-
-  PROVIDE_NOOP_ACTION_TARGET   = True
-  '''Provide a no-op option for each action'''
-
   PLAYERS                      = [Agent]
   '''Player classes from which to spawn'''
+
+  @property
+  def PLAYER_POLICIES(self):
+    '''Number of player policies'''
+    return len(self.PLAYERS)
+
+  PLAYER_N                     = None
+  '''Maximum number of players spawnable in the environment'''
+
+  @property
+  def POSSIBLE_AGENTS(self):
+    '''List of possible agents to spawn'''
+    return list(range(1, self.PLAYER_N + 1))
+
+  # TODO: CHECK if there could be 100+ entities within one's vision
+  PLAYER_N_OBS                 = 100
+  '''Number of distinct agent observations'''
 
   HORIZON = 1024
   '''Number of steps before the environment resets'''
@@ -165,20 +206,27 @@ class Config(Template):
   ALLOW_MULTI_TASKS_PER_AGENT = False
   '''Whether to allow multiple tasks per agent'''
 
+  PROVIDE_ACTION_TARGETS       = True
+  '''Provide action targets mask'''
+
+  PROVIDE_NOOP_ACTION_TARGET   = True  # TODO: remove
+  '''Provide a no-op option for each action'''
+
+  DISALLOW_ATTACK_NOOP_WHEN_TARGET_PRESENT = True  # TODO: remove
+  '''Disallow attack noop when there is a target present
+     This will make agents always attack if there is a valid target'''
+
+  # NOTE: For backward compatibility. Should be removed in the future.
+  PROVIDE_DEATH_FOG_OBS = False
+  '''Provide death fog observation'''
+
+  ALLOW_MOVE_INTO_OCCUPIED_TILE = True
+  '''Whether agents can move into tiles occupied by other agents/npcs
+     However, this does not apply to spawning'''
+
+
   ############################################################################
   ### Player Parameters
-  PLAYER_N                     = None
-  '''Maximum number of players spawnable in the environment'''
-
-  # TODO: CHECK if there could be 100+ entities within one's vision
-  PLAYER_N_OBS                 = 100
-  '''Number of distinct agent observations'''
-
-  @property
-  def PLAYER_POLICIES(self):
-    '''Number of player policies'''
-    return len(self.PLAYERS)
-
   PLAYER_BASE_HEALTH           = 100
   '''Initial agent health'''
 
@@ -189,6 +237,9 @@ class Config(Template):
   def PLAYER_VISION_DIAMETER(self):
     '''Size of the square tile crop visible to an agent'''
     return 2*self.PLAYER_VISION_RADIUS + 1
+
+  PLAYER_HEALTH_INCREMENT      = False
+  '''Whether to increment health by 1 per tick for players, like npcs'''
 
   PLAYER_DEATH_FOG             = None
   '''How long before spawning death fog. None for no death fog'''
@@ -202,14 +253,15 @@ class Config(Template):
   PLAYER_LOADER                = spawn.SequentialLoader
   '''Agent loader class specifying spawn sampling'''
 
-  PLAYER_SPAWN_TEAMMATE_DISTANCE = 1
-  '''Buffer tiles between teammates at spawn'''
 
-  @property
-  def PLAYER_TEAM_SIZE(self):
-    if __debug__:
-      assert not self.PLAYER_N % len(self.PLAYERS)
-    return self.PLAYER_N // len(self.PLAYERS)
+  ############################################################################
+  ### Team Parameters
+  TEAMS                        = None  # Dict[Any, List[int]]
+  '''A dictionary of team assignments: key is team_id, value is a list of agent_ids'''
+
+  TEAM_LOADER                  = team_helper.TeamLoader
+  '''Team loader class specifying team spawn sampling'''
+
 
   ############################################################################
   ### Debug Parameters
@@ -218,6 +270,7 @@ class Config(Template):
 
   RESET_ON_DEATH = False
   '''Debug parameter: whether to reset the environment whenever an agent dies'''
+
 
   ############################################################################
   ### Map Parameters
@@ -317,6 +370,9 @@ class Terrain:
   TERRAIN_FOILAGE              = 0.85
   '''Noise threshold for foilage (food tile)'''
 
+  TERRAIN_DISABLE_STONE        = False
+  '''Disable stone (obstacle) tiles'''
+
 
 class Resource:
   '''Resource Game System'''
@@ -376,23 +432,27 @@ class Combat:
   COMBAT_WEAKNESS_MULTIPLIER         = 1.5
   '''Multiplier for super-effective attacks'''
 
-  def COMBAT_DAMAGE_FORMULA(self, offense, defense, multiplier):
-    '''Damage formula'''
-    return int(multiplier * (offense * (15 / (15 + defense))))
+  COMBAT_MINIMUM_DAMAGE_PROPORTION   = 0.25
+  '''Minimum proportion of damage to inflict on a target'''
 
-  COMBAT_MELEE_DAMAGE                = 30
+  @staticmethod
+  def COMBAT_DAMAGE_FORMULA(offense, defense, multiplier, minimum_proportion):
+    '''Damage formula'''
+    return int(max(multiplier * offense - defense, offense * minimum_proportion))
+
+  COMBAT_MELEE_DAMAGE                = 10
   '''Melee attack damage'''
 
   COMBAT_MELEE_REACH                 = 3
   '''Reach of attacks using the Melee skill'''
 
-  COMBAT_RANGE_DAMAGE                = 30
+  COMBAT_RANGE_DAMAGE                = 10
   '''Range attack damage'''
 
   COMBAT_RANGE_REACH                 = 3
   '''Reach of attacks using the Range skill'''
 
-  COMBAT_MAGE_DAMAGE                 = 30
+  COMBAT_MAGE_DAMAGE                 = 10
   '''Mage attack damage'''
 
   COMBAT_MAGE_REACH                  = 3

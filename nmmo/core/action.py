@@ -124,6 +124,10 @@ class Move(Node):
        realm.map.tiles[r_new, c_new].impassible:
       return
 
+    if not realm.config.ALLOW_MOVE_INTO_OCCUPIED_TILE and \
+       realm.map.tiles[r_new, c_new].occupied:
+      return
+
     if entity.status.freeze > 0:
       return
 

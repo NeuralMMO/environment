@@ -51,11 +51,10 @@ class Exchange:
     item = self._item_listings.pop(item_id).item
     item.listed_price.update(0)
 
-  def step(self, current_tick: int):
+  def step(self):
     """
     Remove expired listings from the exchange's listings queue
-    and item listings dictionary. It takes in one parameter,
-    current_tick, which is the current time in the game.
+    and item listings dictionary.
 
     The method starts by checking the oldest listing in the listings
     queue using a while loop. If the current tick minus the
@@ -71,6 +70,7 @@ class Exchange:
     the item's listed price. The process repeats until all expired listings
     are removed from the queue and dictionary.
     """
+    current_tick = self._realm.tick
 
     # Remove expired listings
     while self._listings_queue:

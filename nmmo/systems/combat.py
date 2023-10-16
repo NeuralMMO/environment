@@ -92,11 +92,12 @@ def attack(realm, attacker, target, skill_fn):
   # Total damage calculation
   offense = skill_offense + equipment_offense
   defense = skill_defense + equipment_defense
-  damage  = config.COMBAT_DAMAGE_FORMULA(offense, defense, multiplier)
+  min_damage_prop = config.COMBAT_MINIMUM_DAMAGE_PROPORTION
+  damage  = config.COMBAT_DAMAGE_FORMULA(offense, defense, multiplier, min_damage_prop)
   damage  = max(int(damage), 0)
 
   if attacker.is_player:
-    realm.event_log.record(EventCode.SCORE_HIT, attacker,
+    realm.event_log.record(EventCode.SCORE_HIT, attacker, target=target,
                            combat_style=skill_type, damage=damage)
 
   attacker.apply_damage(damage, skill.__class__.__name__.lower())

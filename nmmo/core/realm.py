@@ -118,7 +118,7 @@ class Realm:
 
   @property
   def num_players(self):
-    """Number of player agents"""
+    """Number of alive player agents"""
     return len(self.players.entities)
 
   def entity(self, ent_id):
@@ -182,12 +182,13 @@ class Realm:
 
     # Update map
     self.map.step()
-    self.exchange.step(self.tick)
+
+    self.tick += 1
+
+    self.exchange.step()
     self.event_log.update()
     if self._replay_helper is not None:
       self._replay_helper.update()
-
-    self.tick += 1
 
     return dead
 

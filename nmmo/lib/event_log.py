@@ -99,10 +99,12 @@ class EventLogger(EventCode):
     if event_code == EventCode.SCORE_HIT:
       # kwargs['combat_style'] should be Skill.CombatSkill
       if ('combat_style' in kwargs and kwargs['combat_style'].SKILL_ID in [1, 2, 3]) & \
+         ('target' in kwargs and isinstance(kwargs['target'], Entity)) & \
          ('damage' in kwargs and kwargs['damage'] >= 0):
         log = self._create_event(entity, event_code)
         log.type.update(kwargs['combat_style'].SKILL_ID)
         log.number.update(kwargs['damage'])
+        log.target_ent.update(kwargs['target'].ent_id)
         return
 
     if event_code == EventCode.PLAYER_KILL:
@@ -110,8 +112,6 @@ class EventLogger(EventCode):
         target = kwargs['target']
         log = self._create_event(entity, event_code)
         log.target_ent.update(target.ent_id)
-
-        # CHECK ME: attack_level or "general" level?? need to clarify
         log.level.update(target.attack_level)
         return
 
@@ -161,13 +161,15 @@ class EventLogger(EventCode):
     raise ValueError(f"Event code: {event_code}", kwargs)
 
   def update(self):
-    curr_tick = self.realm.tick + 1  # update happens before the tick update
+    curr_tick = self.realm.tick
     if curr_tick > self._last_tick:
       self._data_by_tick[curr_tick] = EventState.Query.by_tick(self.datastore, curr_tick)
       self._last_tick = curr_tick
 
   def get_data(self, event_code=None, agents: List[int]=None, tick: int=None) -> np.ndarray:
     if tick is not None:
+      if tick == -1:
+        tick = self._last_tick
       if tick not in self._data_by_tick:
         return self._empty_data
       event_data = self._data_by_tick[tick]
