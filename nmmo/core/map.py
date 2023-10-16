@@ -77,9 +77,6 @@ class Map:
 
   def step(self):
     '''Evaluate updatable tiles'''
-    self.realm.log_milestone('Resource_Depleted', len(self.update_list),
-        f'RESOURCE: Depleted {len(self.update_list)} resource tiles')
-
     for e in self.update_list.copy():
       if not e.depleted:
         self.update_list.remove(e)

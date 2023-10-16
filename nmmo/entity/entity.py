@@ -7,7 +7,7 @@ import numpy as np
 from nmmo.core.config import Config
 from nmmo.datastore.serialized import SerializedState
 from nmmo.systems import inventory
-from nmmo.lib.log import EventCode
+from nmmo.lib.event_code import EventCode
 
 # pylint: disable=no-member
 EntityState = SerializedState.subclass(

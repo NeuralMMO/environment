@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import random
+from abc import ABC
 from numbers import Number
-from typing import Union, Callable, Dict
-from abc import ABC, abstractmethod
+from typing import Union, Callable
 
 from nmmo.systems import skill, item
 from nmmo.lib import material
-from nmmo.lib.log import EventCode
+from nmmo.lib.event_code import EventCode
 from nmmo.core.config import Config
 
 class InvalidConstraint(Exception):
@@ -34,36 +33,12 @@ class Constraint(ABC):
         return False
     return True
 
-  @abstractmethod
-  def sample(self, config: Config):
-    """ Generator to sample valid values given config
-    """
-    raise NotImplementedError
-
   def __str__(self):
     return self.__class__.__name__
-
-# This is a dummy function for GroupConstraint
-# NOTE: config does not have team info
-def sample_one_big_team(config):
-  from nmmo.task.group import Group
-  team = list(range(1, config.PLAYER_N+1))
-  return [Group(team, 'All')]
 
 class GroupConstraint(Constraint):
   """ Ensures that all agents of a group exist in a config
   """
-  def __init__(self,
-               sample_fn = sample_one_big_team,
-               systems = None):
-    """
-    Params
-      sample_fn: given a Config, return groups to select from
-      systems: systems required to operate
-    """
-    super().__init__(systems)
-    self._sample_fn = sample_fn
-
   def check(self, config, value):
     if not super().check(config,value):
       return False
@@ -71,14 +46,6 @@ class GroupConstraint(Constraint):
       if agent > config.PLAYER_N:
         return False
     return True
-
-  def sample(self, config):
-    return random.choice(self._sample_fn(config))
-
-  def sample_from_teams(self, teams: Dict[int, Dict]):
-    from nmmo.task.group import Group
-    team_id = random.choice(list(teams.keys()))
-    return Group(teams[team_id], str(team_id))
 
 class AgentListConstraint(Constraint):
   """ Ensures that all agents of the list exist in a config
@@ -88,9 +55,6 @@ class AgentListConstraint(Constraint):
       if agent > config.PLAYER_N:
         return False
     return True
-
-  def sample(self, config):
-    return None
 
 class ScalarConstraint(Constraint):
   def __init__(self,
@@ -114,10 +78,6 @@ class ScalarConstraint(Constraint):
       return True
     return False
 
-  def sample(self, config):
-    l, h = self._low(config), self._high(config)
-    return self._dtype(random.random()*(h-l)+l)
-
 class DiscreteConstraint(Constraint):
   def __init__(self, space, systems=None):
     super().__init__(systems)
@@ -127,10 +87,6 @@ class DiscreteConstraint(Constraint):
     if not super().check(config,value):
       return False
     return value in self._space
-
-  def sample(self, config: Config):
-    # NOTE: this does NOT need to be deterministic
-    return random.choice(self._space)
 
 # Group Constraints
 TEAM_GROUPS = GroupConstraint()

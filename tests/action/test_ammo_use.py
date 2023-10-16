@@ -10,7 +10,7 @@ from nmmo.systems.item import ItemState
 
 RANDOM_SEED = 284
 
-LOGFILE = 'tests/action/test_ammo_use.log'
+LOGFILE = None  # 'tests/action/test_ammo_use.log'
 
 class TestAmmoUse(ScriptedTestTemplate):
   # pylint: disable=protected-access,multiple-statements,no-member
@@ -20,8 +20,7 @@ class TestAmmoUse(ScriptedTestTemplate):
     super().setUpClass()
 
     # config specific to the tests here
-    cls.config.LOG_VERBOSE = False
-    if cls.config.LOG_VERBOSE:
+    if LOGFILE:  # for debugging
       logging.basicConfig(filename=LOGFILE, level=logging.INFO)
 
   def _assert_action_targets_zero(self, gym_obs):

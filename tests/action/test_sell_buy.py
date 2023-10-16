@@ -10,7 +10,7 @@ from scripted import baselines
 
 RANDOM_SEED = 985
 
-LOGFILE = 'tests/action/test_sell_buy.log'
+LOGFILE = None  # 'tests/action/test_sell_buy.log'
 
 class TestSellBuy(ScriptedTestTemplate):
   # pylint: disable=protected-access,multiple-statements,unsubscriptable-object,no-member
@@ -27,10 +27,8 @@ class TestSellBuy(ScriptedTestTemplate):
     cls.ammo = { 1:Item.Whetstone, 2:Item.Arrow, 3:Item.Whetstone,
                  4:Item.Arrow, 5:Item.Whetstone, 6:Item.Arrow }
 
-    cls.config.LOG_VERBOSE = False
-    if cls.config.LOG_VERBOSE:
+    if LOGFILE:  # for debugging
       logging.basicConfig(filename=LOGFILE, level=logging.INFO)
-
 
   def test_sell_buy(self):
     # cannot list an item with 0 price --> impossible to do this

@@ -3,7 +3,7 @@ import unittest
 import nmmo
 from nmmo.datastore.numpy_datastore import NumpyDatastore
 from nmmo.lib.event_log import EventState, EventLogger
-from nmmo.lib.log import EventCode
+from nmmo.lib.event_code import EventCode
 from nmmo.entity.entity import Entity
 from nmmo.systems.item import ItemState
 from nmmo.systems.item import Whetstone, Ration, Hat

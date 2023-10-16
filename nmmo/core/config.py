@@ -166,24 +166,6 @@ class Config(Template):
   '''Whether to allow multiple tasks per agent'''
 
   ############################################################################
-  ### Population Parameters
-  LOG_VERBOSE                  = False
-  '''Whether to log server messages or just stats'''
-
-  LOG_ENV                      = False
-  '''Whether to log env steps (expensive)'''
-
-  LOG_MILESTONES               = True
-  '''Whether to log server-firsts (semi-expensive)'''
-
-  LOG_EVENTS                   = True
-  '''Whether to log events (semi-expensive)'''
-
-  LOG_FILE                     = None
-  '''Where to write logs (defaults to console)'''
-
-
-  ############################################################################
   ### Player Parameters
   PLAYER_N                     = None
   '''Maximum number of players spawnable in the environment'''

@@ -155,10 +155,6 @@ class Inventory:
       item.destroy()
       return False
 
-    self.realm.log_milestone(f'Receive_{item.__class__.__name__}', item.level.val,
-      f'INVENTORY: Received level {item.level.val} {item.__class__.__name__}',
-      tags={"player_id": self.entity.ent_id})
-
     item.owner_id.update(self.entity.id.val)
     self.items.add(item)
     return True

@@ -7,7 +7,7 @@ import numpy as np
 from nmmo.datastore.serialized import SerializedState
 from nmmo.entity import Entity
 from nmmo.systems.item import Item
-from nmmo.lib.log import EventCode
+from nmmo.lib.event_code import EventCode
 
 # pylint: disable=no-member
 EventState = SerializedState.subclass("Event", [

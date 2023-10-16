@@ -15,7 +15,7 @@ from nmmo.core.observation import Observation
 from nmmo.task.group import Group
 from nmmo.entity.entity import EntityState
 from nmmo.lib.event_log import EventState, ATTACK_COL_MAP, ITEM_COL_MAP, LEVEL_COL_MAP
-from nmmo.lib.log import EventCode
+from nmmo.lib.event_code import EventCode
 from nmmo.systems.item import ItemState
 from nmmo.core.tile import TileState
 

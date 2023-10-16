@@ -1,6 +1,6 @@
 from nmmo.systems.skill import Skills
 from nmmo.entity import entity
-from nmmo.lib.log import EventCode
+from nmmo.lib.event_code import EventCode
 
 # pylint: disable=no-member
 class Player(entity.Entity):

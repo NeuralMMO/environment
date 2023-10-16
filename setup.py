@@ -35,8 +35,6 @@ setup(
     'scipy==1.10.0',
     'pytest==7.3.0',
     'pytest-benchmark==3.4.1',
-    'autobahn==19.3.3',
-    'Twisted==19.2.0',
     'vec-noise==1.1.4',
     'imageio==2.23.0',
     'ordered-set==4.1.0',

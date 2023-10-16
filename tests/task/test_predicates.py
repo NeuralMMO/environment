@@ -11,7 +11,7 @@ from nmmo.entity.entity import EntityState
 from nmmo.systems import item as Item
 from nmmo.systems import skill as Skill
 from nmmo.lib import material as Material
-from nmmo.lib.log import EventCode
+from nmmo.lib.event_code import EventCode
 
 # pylint: disable=import-error
 from nmmo.core.env import Env

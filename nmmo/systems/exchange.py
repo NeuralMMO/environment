@@ -5,7 +5,7 @@ import math
 from typing import Dict
 
 from nmmo.systems.item import Item, Stack
-from nmmo.lib.log import EventCode
+from nmmo.lib.event_code import EventCode
 
 """
 The Exchange class is a simulation of an in-game item exchange.
@@ -97,14 +97,8 @@ class Exchange:
     assert item.listed_price.val == 0, 'Item is already listed'
     assert item.equipped.val == 0, 'Item has been equiped so cannot be listed'
     assert price > 0, 'Price must be larger than 0'
-
     self._list_item(item, seller, price, tick)
-
     self._realm.event_log.record(EventCode.LIST_ITEM, seller, item=item, price=price)
-
-    self._realm.log_milestone(f'Sell_{item.__class__.__name__}', item.level.val,
-      f'EXCHANGE: Offered level {item.level.val} {item.__class__.__name__} for {price} gold',
-      tags={"player_id": seller.ent_id})
 
   def buy(self, buyer, item: Item):
     assert item.quantity.val > 0, f'{item} purchase has quantity {item.quantity.val}'
@@ -133,9 +127,6 @@ class Exchange:
     buyer.gold.decrement(price)
     listing.seller.gold.increment(price)
 
-    # TODO(kywch): tidy up the logs - milestone, event, etc ...
-    #self._realm.log_milestone(f'Buy_{item.__name__}', item.level.val)
-    #self._realm.log_milestone('Transaction_Amount', item.listed_price.val)
     self._realm.event_log.record(EventCode.BUY_ITEM, buyer, item=item, price=price)
     self._realm.event_log.record(EventCode.EARN_GOLD, listing.seller, amount=price)
 

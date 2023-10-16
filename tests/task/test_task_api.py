@@ -9,7 +9,6 @@ from nmmo.task.predicate_api import make_predicate, Predicate
 from nmmo.task.task_api import Task, OngoingTask, HoldDurationTask
 from nmmo.task.task_spec import TaskSpec, make_task_from_spec
 from nmmo.task.group import Group
-from nmmo.task.constraint import ScalarConstraint
 from nmmo.task.base_predicates import (
     TickGE, AllMembersWithinRange, StayAlive, HoardGold
 )
@@ -136,14 +135,6 @@ class TestTaskAPI(unittest.TestCase):
     self.assertEqual(combination.name,
       "(OR_(AND_(Success_(0,2))_(NOT_(OR_(Failure_(0,))_(Fake_(2,)_1_Hat_Melee))))_"+\
       "(SUB_(ADD_(MUL_(Failure_(0,))_(Fake_(2,)_1_Hat_Melee))_0.3)_0.4))")
-
-  def test_constraint(self):
-    mock_gs = MockGameState()
-    scalar = ScalarConstraint(low=-10,high=10)
-    for _ in range(10):
-      self.assertTrue(scalar.sample(mock_gs.config)<10)
-      self.assertTrue(scalar.sample(mock_gs.config)>=-10)
-
 
   def test_task_api_with_predicate(self):
     # pylint: disable=no-value-for-parameter,no-member

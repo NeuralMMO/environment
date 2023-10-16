@@ -1,11 +1,8 @@
 from __future__ import annotations
-
-import logging
 from collections import defaultdict
 from typing import Dict
 
 import nmmo
-from nmmo.core.log_helper import LogHelper
 from nmmo.core.map import Map
 from nmmo.core.tile import TileState
 from nmmo.core.action import Action, Buy
@@ -52,7 +49,7 @@ class Realm:
     # Load the world file
     self.map = Map(config, self, self._np_random)
 
-    self.log_helper = LogHelper.create(self)
+    # Event logger
     self.event_log = EventLogger(self)
 
     # Entity handlers
@@ -75,7 +72,6 @@ class Realm:
         idx: Map index to load
     """
     self._np_random = np_random
-    self.log_helper.reset()
     self.event_log.reset()
 
     map_id = map_id or self._np_random.integers(self.config.MAP_N) + 1
@@ -187,7 +183,6 @@ class Realm:
     # Update map
     self.map.step()
     self.exchange.step(self.tick)
-    self.log_helper.update(dead)
     self.event_log.update()
     if self._replay_helper is not None:
       self._replay_helper.update()
@@ -195,17 +190,6 @@ class Realm:
     self.tick += 1
 
     return dead
-
-  def log_milestone(self, category: str, value: float, message: str = None, tags: Dict = None):
-    self.log_helper.log_milestone(category, value)
-    self.log_helper.log_event(category, value)
-
-    if self.config.LOG_VERBOSE:
-      # TODO: more general handling of tags, if necessary
-      if tags and 'player_id' in tags:
-        logging.info("Milestone (Player %d): %s %s %s", tags['player_id'], category, value, message)
-      else:
-        logging.info("Milestone: %s %s %s", category, value, message)
 
   def record_replay(self, replay_helper: ReplayHelper) -> ReplayHelper:
     self._replay_helper = replay_helper

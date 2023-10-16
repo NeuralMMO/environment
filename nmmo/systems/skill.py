@@ -7,7 +7,7 @@ from ordered_set import OrderedSet
 
 from nmmo.lib import material
 from nmmo.systems import combat
-from nmmo.lib.log import EventCode
+from nmmo.lib.event_code import EventCode
 
 ### Infrastructure ###
 class ExperienceCalculator:
@@ -75,10 +75,6 @@ class Skill(abc.ABC):
       self.realm.event_log.record(EventCode.LEVEL_UP, self.entity,
                                   skill=self, level=new_level)
 
-      self.realm.log_milestone(f'Level_{self.__class__.__name__}', new_level,
-        f"PROGRESSION: Reached level {new_level} {self.__class__.__name__}",
-        tags={"player_id": self.entity.ent_id})
-
   def set_experience_by_level(self, level):
     self.exp.update(self.experience_calculator.level_at_exp(level))
     self.level.update(int(level))
@@ -128,12 +124,6 @@ class HarvestSkill(NonCombatSkill):
     #TODO: double-check drop table quantity
     for drop in drop_table.roll(self.realm, level):
       assert drop.level.val == level, 'Drop level does not match roll specification'
-
-      self.realm.log_milestone(f'Gather_{drop.__class__.__name__}',
-        level, f"PROFESSION: Gathered level {level} {drop.__class__.__name__} "
-        f"(level {self.level.val} {self.__class__.__name__})",
-        tags={"player_id": entity.ent_id})
-
       if entity.inventory.space:
         entity.inventory.receive(drop)
         self.realm.event_log.record(EventCode.HARVEST_ITEM, entity, item=drop)

@@ -3,7 +3,7 @@ import unittest
 from tests.testhelpers import ScriptedAgentTestConfig
 
 from nmmo.core.env import Env
-from nmmo.lib.log import EventCode
+from nmmo.lib.event_code import EventCode
 from nmmo.systems import skill
 from nmmo.task import predicate_api as p
 from nmmo.task import task_api as t

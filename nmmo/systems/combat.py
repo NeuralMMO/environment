@@ -3,7 +3,7 @@
 import numpy as np
 
 from nmmo.systems import skill as Skill
-from nmmo.lib.log import EventCode
+from nmmo.lib.event_code import EventCode
 
 def level(skills):
   return max(e.level.val for e in skills.skills)
@@ -24,9 +24,9 @@ def damage_multiplier(config, skill, targ):
   return 1.0
 
 # pylint: disable=unnecessary-lambda-assignment
-def attack(realm, player, target, skill_fn):
-  config       = player.config
-  skill        = skill_fn(player)
+def attack(realm, attacker, target, skill_fn):
+  config       = attacker.config
+  skill        = skill_fn(attacker)
   skill_type   = type(skill)
   skill_name   = skill_type.__name__
 
@@ -69,7 +69,7 @@ def attack(realm, player, target, skill_fn):
   multiplier        = damage_multiplier(config, skill, target)
 
   # NOTE: skill offense and defense are only for agents, NOT npcs
-  skill_offense = base_damage + level_damage * skill.level.val if player.is_player else 0
+  skill_offense = base_damage + level_damage * skill.level.val if attacker.is_player else 0
   if config.PROGRESSION_SYSTEM_ENABLED and target.is_player:
     skill_defense = config.PROGRESSION_BASE_DEFENSE  + \
       config.PROGRESSION_LEVEL_DEFENSE*level(target.skills)
@@ -77,13 +77,13 @@ def attack(realm, player, target, skill_fn):
     skill_defense = 0
 
   if config.EQUIPMENT_SYSTEM_ENABLED:
-    equipment_offense = player.equipment.total(offense_fn)
+    equipment_offense = attacker.equipment.total(offense_fn)
     equipment_defense = target.equipment.total(defense_fn)
 
     # after tallying ammo damage, consume ammo (i.e., fire) when the skill type matches
-    ammunition = player.equipment.ammunition.item
+    ammunition = attacker.equipment.ammunition.item
     if ammunition is not None and getattr(ammunition, skill_name.lower() + '_attack').val > 0:
-      ammunition.fire(player)
+      ammunition.fire(attacker)
 
   else:
     equipment_offense = 0
@@ -93,27 +93,14 @@ def attack(realm, player, target, skill_fn):
   offense = skill_offense + equipment_offense
   defense = skill_defense + equipment_defense
   damage  = config.COMBAT_DAMAGE_FORMULA(offense, defense, multiplier)
-  #damage  = multiplier * (offense - defense)
   damage  = max(int(damage), 0)
 
-  if player.is_player:
-    equipment_level_offense = 0
-    equipment_level_defense = 0
-    if config.EQUIPMENT_SYSTEM_ENABLED:
-      equipment_level_offense = player.equipment.total(lambda e: e.level)
-      equipment_level_defense = target.equipment.total(lambda e: e.level)
-
-    realm.event_log.record(EventCode.SCORE_HIT, player,
+  if attacker.is_player:
+    realm.event_log.record(EventCode.SCORE_HIT, attacker,
                            combat_style=skill_type, damage=damage)
 
-    realm.log_milestone(f'Damage_{skill_name}', damage,
-                        f'COMBAT: Inflicted {damage} {skill_name} damage ' +
-                        f'(attack equip lvl {equipment_level_offense} vs ' +
-                        f'defense equip lvl {equipment_level_defense})',
-                        tags={"player_id": player.ent_id})
-
-  player.apply_damage(damage, skill.__class__.__name__.lower())
-  target.receive_damage(player, damage)
+  attacker.apply_damage(damage, skill.__class__.__name__.lower())
+  target.receive_damage(attacker, damage)
 
   return damage
 

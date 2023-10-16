@@ -5,7 +5,7 @@ from nmmo.systems.ai import policy
 from nmmo.systems import item as Item
 from nmmo.systems import skill
 from nmmo.systems.inventory import EquipmentSlot
-from nmmo.lib.log import EventCode
+from nmmo.lib.event_code import EventCode
 
 class Equipment:
   def __init__(self, total,

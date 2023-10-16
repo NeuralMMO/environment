@@ -8,7 +8,7 @@ from nmmo.core.observation import Observation
 from nmmo.lib import utils
 from nmmo.lib.utils import staticproperty
 from nmmo.systems.item import Stack
-from nmmo.lib.log import EventCode
+from nmmo.lib.event_code import EventCode
 
 
 class NodeType(Enum):
