@@ -1,13 +1,17 @@
 class SequentialLoader:
   '''config.PLAYER_LOADER that spreads out agent populations'''
-  def __init__(self, config, np_random):
+  def __init__(self, config, np_random,
+               candidate_spawn_pos=None):
     items = config.PLAYERS
 
     self.items = items
     self.idx   = -1
 
-    # np_random is the env-level rng
-    self.candidate_spawn_pos = spawn_concurrent(config, np_random)
+    if candidate_spawn_pos:
+      self.candidate_spawn_pos = candidate_spawn_pos
+    else:
+      # np_random is the env-level rng
+      self.candidate_spawn_pos = spawn_concurrent(config, np_random)
 
   def __iter__(self):
     return self
@@ -21,7 +25,7 @@ class SequentialLoader:
     # the basic SequentialLoader just provides a random spawn position
     return self.candidate_spawn_pos.pop()
 
-def spawn_continuous(config, np_random):
+def get_random_border_coord(config, np_random):
   '''Generates spawn positions for new agents
 
   Randomly selects spawn positions around
@@ -60,7 +64,6 @@ def get_edge_tiles(config):
   sides.append(list(zip(inc, highs)))
   sides.append(list(zip(highs, inc[::-1])))
   sides.append(list(zip(inc[::-1], lows)))
-
   return sides
 
 def spawn_concurrent(config, np_random):
@@ -75,41 +78,8 @@ def spawn_concurrent(config, np_random):
   position:
       The position (row, col) to spawn the given agent
   '''
-  team_size = config.PLAYER_TEAM_SIZE
-  team_n = len(config.PLAYERS)
-  teammate_sep = config.PLAYER_SPAWN_TEAMMATE_DISTANCE
-
-  # Number of total border tiles
-  total_tiles = 4 * config.MAP_CENTER
-
-  # Number of tiles, including within-team sep, occupied by each team
-  tiles_per_team = teammate_sep*(team_size-1) + team_size
-
-  # Number of total tiles dedicated to separating teams
-  buffer_tiles = 0
-  if team_n > 1:
-    buffer_tiles = total_tiles - tiles_per_team*team_n
-
-  # Number of tiles between teams
-  team_sep = buffer_tiles // team_n
-
   sides = []
   for side in get_edge_tiles(config):
     sides += side
-
-  if team_n > 1:
-    # Space across and within teams
-    spawn_positions = []
-    for idx in range(team_sep//2, len(sides), tiles_per_team+team_sep):
-      for offset in list(range(0,  tiles_per_team, teammate_sep+1)):
-        if len(spawn_positions) >= config.PLAYER_N:
-          continue
-        pos = sides[idx + offset]
-        spawn_positions.append(pos)
-  else:
-    # team_n = 1: to fit 128 agents in a small map, ignore spacing and spawn randomly
-    # np_random is the env-level RNG, a drop-in replacement of numpy.random
-    np_random.shuffle(sides)
-    spawn_positions = sides[:config.PLAYER_N]
-
-  return spawn_positions
+  np_random.shuffle(sides)
+  return sides[:config.PLAYER_N]
