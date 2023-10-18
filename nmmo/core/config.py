@@ -30,7 +30,7 @@ class Template(metaclass=utils.StaticIterable):
     for attr in dir(cls):
       val = getattr(cls, attr)
       if re.match(CONFIG_ATTR_PATTERN, attr) and not isinstance(val, property):
-        self.set(attr, val)
+        self._data[attr] = val
 
   def override(self, **kwargs):
     for k, v in kwargs.items():
@@ -110,6 +110,7 @@ class Config(Template):
 
   def __init__(self):
     super().__init__()
+    self._attr_to_reset = []
 
     # TODO: Come up with a better way
     # to resolve mixin MRO conflicts
@@ -158,10 +159,8 @@ class Config(Template):
 
   def reset(self):
     '''Reset all attributes changed during the episode'''
-    for attr, val in self.original.items():
-      if isinstance(val, property) or val == getattr(self, attr):
-        continue
-      setattr(self, attr, val)
+    for attr in self._attr_to_reset:
+      setattr(self, attr, self.original[attr])
 
   def set(self, k, v):
     assert self.env_initialized is False, 'Cannot set config attr after env init'
@@ -178,6 +177,7 @@ class Config(Template):
 
     # Change only the attribute and keep the original value in the data dict
     setattr(self, k, v)
+    self._attr_to_reset.append(k)
 
 
   ############################################################################
@@ -449,7 +449,7 @@ class Combat:
   COMBAT_MINIMUM_DAMAGE_PROPORTION   = 0.25
   '''Minimum proportion of damage to inflict on a target'''
 
-  COMBAT_DAMAGE_FORMULA = original_combat_damage_formula
+  COMBAT_DAMAGE_FORMULA = lambda self, *args: original_combat_damage_formula(*args)
   '''Damage formula'''
 
   COMBAT_MELEE_DAMAGE                = 10
@@ -658,7 +658,7 @@ class Profession:
   '''Probability that a harvested fish tile will regenerate each tick'''
 
   # pylint: disable=unnecessary-lambda-assignment
-  PROFESSION_CONSUMABLE_RESTORE       = lambda level: 50 + 5*level
+  PROFESSION_CONSUMABLE_RESTORE       = lambda self, level: 50 + 5*level
   '''Amount of food/water restored by consuming a consumable item'''
 
 class Exchange:

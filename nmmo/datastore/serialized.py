@@ -106,7 +106,7 @@ class SerializedState():
               SerializedAttribute(attr, self.datastore_record, col,
                 *limits.get(attr, (-math.inf, math.inf))))
           except Exception as exc:
-            raise RuntimeError('Failed to set attribute' + attr) from exc
+            raise RuntimeError('Failed to set attribute "' + attr + '"') from exc
 
       @classmethod
       def parse_array(cls, data) -> SimpleNamespace:
