@@ -62,7 +62,7 @@ EntityState.Limits = lambda config: {
     "damage": (0, math.inf),
     "time_alive": (0, math.inf),
     "freeze": (0, 3),
-    "item_level": (0, 5*config.NPC_LEVEL_MAX),
+    "item_level": (0, math.inf),
     "attacker_id": (-np.inf, math.inf),
     "latest_combat_tick": (0, math.inf),
     "health": (0, config.PLAYER_BASE_HEALTH),

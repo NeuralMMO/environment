@@ -35,7 +35,7 @@ ItemState = SerializedState.subclass("Item", [
 # TODO: These limits should be defined in the config.
 ItemState.Limits = lambda config: {
   "id": (0, math.inf),
-  "type_id": (0, (config.ITEM_N + 1) if config.ITEM_SYSTEM_ENABLED else 0),
+  "type_id": (0, 99),
   "owner_id": (-math.inf, math.inf),
   "level": (0, 99),
   "capacity": (0, 99),
