@@ -449,6 +449,7 @@ class Combat:
   COMBAT_MINIMUM_DAMAGE_PROPORTION   = 0.25
   '''Minimum proportion of damage to inflict on a target'''
 
+  # pylint: disable=unnecessary-lambda-assignment
   COMBAT_DAMAGE_FORMULA = lambda self, *args: original_combat_damage_formula(*args)
   '''Damage formula'''
 
