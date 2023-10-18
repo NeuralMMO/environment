@@ -127,6 +127,8 @@ class HarvestSkill(NonCombatSkill):
       if entity.inventory.space:
         entity.inventory.receive(drop)
         self.realm.event_log.record(EventCode.HARVEST_ITEM, entity, item=drop)
+      else:
+        drop.destroy()  # this was the source of the item leak
 
   def harvest(self, matl, deplete=True):
     entity = self.entity

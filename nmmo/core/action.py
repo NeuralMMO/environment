@@ -76,7 +76,7 @@ class Action(Node):
       action.init(config)
       for args in action.edges: # pylint: disable=not-an-iterable
         args.init(config)
-        if not 'edges' in args.__dict__:
+        if not "edges" in args.__dict__:
           continue
         for arg in args.edges:
           arguments.append(arg)
@@ -92,7 +92,7 @@ class Action(Node):
   # pylint: disable=invalid-overridden-method
   @classmethod
   def edges(cls, config):
-    '''List of valid actions'''
+    """List of valid actions"""
     edges = [Move]
     if config.COMBAT_SYSTEM_ENABLED:
       edges.append(Attack)
@@ -180,7 +180,7 @@ def deserialize_fixed_arg(arg, index):
     val = min(index, len(arg.edges)-1)
     return arg.edges[val]
 
-  # if index is not int, it's probably already deserialized
+  # if index is not int, it"s probably already deserialized
   if index not in arg.edges:
     return None # so that the action will be discarded
   return index
@@ -251,14 +251,14 @@ class Attack(Node):
     if entity.ent_id == target.ent_id:
       return None
 
-    #Can't attack out of range
+    #Can"t attack out of range
     if utils.linf_single(entity.pos, target.pos) > style.attack_range(config):
       return None
 
     #Execute attack
     entity.history.attack = {}
-    entity.history.attack['target'] = target.ent_id
-    entity.history.attack['style'] = style.__name__
+    entity.history.attack["target"] = target.ent_id
+    entity.history.attack["style"] = style.__name__
     target.attacker = entity
     target.attacker_id.update(entity.ent_id)
 
@@ -536,7 +536,7 @@ class Buy(Node):
     assert entity.alive, "Dead entity cannot act"
     assert entity.is_player, "Npcs cannot buy an item"
     assert item.quantity.val > 0, "Item quantity cannot be 0" # indicates item leak
-    assert item.equipped.val == 0, 'Listed item must not be equipped'
+    assert item.equipped.val == 0, "Listed item must not be equipped"
 
     if not realm.config.EXCHANGE_SYSTEM_ENABLED:
       return
@@ -605,8 +605,8 @@ class Sell(Node):
 def init_discrete(values):
   classes = []
   for i in values:
-    name = f'Discrete_{i}'
-    cls  = type(name, (object,), {'val': i})
+    name = f"Discrete_{i}"
+    cls  = type(name, (object,), {"val": i})
     classes.append(cls)
 
   return classes

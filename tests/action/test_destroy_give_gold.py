@@ -20,8 +20,8 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
     super().setUpClass()
 
     # config specific to the tests here
-    cls.config.PLAYERS = [baselines.Melee, baselines.Range]
-    cls.config.PLAYER_N = 6
+    cls.config.set("PLAYERS", [baselines.Melee, baselines.Range])
+    cls.config.set("PLAYER_N", 6)
 
     cls.policy = { 1:'Melee', 2:'Range', 3:'Melee', 4:'Range', 5:'Melee', 6:'Range' }
     cls.spawn_locs = { 1:(17,17), 2:(21,21), 3:(17,17), 4:(21,21), 5:(21,21), 6:(17,17) }

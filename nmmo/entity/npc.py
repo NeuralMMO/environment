@@ -73,7 +73,7 @@ class NPC(entity.Entity):
     # pylint: disable=no-member
     if self.gold.val > 0:
       source.gold.increment(self.gold.val)
-      self.realm.event_log.record(EventCode.EARN_GOLD, source, amount=self.gold.val)
+      self.realm.event_log.record(EventCode.LOOT_GOLD, source, amount=self.gold.val, target=self)
       self.gold.update(0)
 
     for item in self.droptable.roll(self.realm, self.attack_level):
@@ -81,7 +81,7 @@ class NPC(entity.Entity):
         # inventory.receive() returns True if the item is received
         # if source doesn't have space, inventory.receive() destroys the item
         if source.inventory.receive(item):
-          self.realm.event_log.record(EventCode.LOOT_ITEM, source, item=item)
+          self.realm.event_log.record(EventCode.LOOT_ITEM, source, item=item, target=self)
       else:
         item.destroy()
 

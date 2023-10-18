@@ -7,8 +7,8 @@ import nmmo
 class TestMapGeneration(unittest.TestCase):
   def test_insufficient_maps(self):
     config = nmmo.config.Small()
-    config.PATH_MAPS = 'maps/test_map_gen'
-    config.MAP_N = 20
+    config.set("PATH_MAPS", "maps/test_map_gen")
+    config.set("MAP_N", 20)
 
     # clear the directory
     path_maps = os.path.join(config.PATH_CWD, config.PATH_MAPS)

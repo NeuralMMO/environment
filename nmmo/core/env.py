@@ -1,21 +1,22 @@
+import os
 import functools
 from typing import Any, Dict, List, Callable
 from collections import defaultdict
 from copy import copy, deepcopy
-import dill
 
 import gym
+import dill
 import numpy as np
 from pettingzoo.utils.env import AgentID, ParallelEnv
 
 import nmmo
 from nmmo.core import realm
+from nmmo.core import game_api
 from nmmo.core.config import Default
 from nmmo.core.observation import Observation
 from nmmo.core.tile import Tile
 from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
-from nmmo.task import task_api, task_spec
 from nmmo.task.game_state import GameStateGenerator
 from nmmo.lib import seeding
 
@@ -33,30 +34,39 @@ class Env(ParallelEnv):
     super().__init__()
 
     self.config = config
+    self.config.env_initialized = True
     self.realm = realm.Realm(config, self._np_random)
-    self.obs = None
-    self._dummy_obs = None
 
-    self.possible_agents = list(range(1, config.PLAYER_N + 1))
+    self.possible_agents = self.config.POSSIBLE_AGENTS
     self._agents = None
     self._dead_agents = set()
     self._dead_this_tick = None
     self.scripted_agents = set()
 
+    self.obs = None
+    self._dummy_task_embedding = np.zeros(self.config.TASK_EMBED_DIM, dtype=np.float16)
+    self._dummy_obs = self._make_dummy_obs()
+
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
     self.game_state = None
-    # Default task: rewards 1 each turn agent is alive
-    self.tasks = task_api.nmmo_default_task(self.possible_agents)
-    self.agent_task_map = None
-    self._dummy_task_embedding = np.zeros(self.config.TASK_EMBED_DIM, dtype=np.float16)
+    self.tasks = None
+    self.agent_task_map = {}
 
     # curriculum file path, if provided, should exist
     self.curriculum_file_path = config.CURRICULUM_FILE_PATH
     if self.curriculum_file_path is not None:
       # try to open the file to check if it exists
       with open(self.curriculum_file_path, 'rb') as f:
-        curriculum = dill.load(f) # pylint: disable=unused-variable
+        dill.load(f)
       f.close()
+
+    self.game = None
+    # NOTE: The default game runs with the full provided config and unmodded realm.reset()
+    self.default_game = game_api.DefaultGame(self.config, self.realm)
+    self.game_packs = None
+    if config.GAME_PACKS:  # assume List[Tuple(class, weight)]
+      self.game_packs = [game_cls(self.config, self.realm, weight)
+                         for game_cls, weight in config.GAME_PACKS]
 
   @functools.cached_property
   def _obs_space(self):
@@ -68,23 +78,27 @@ class Env(ParallelEnv):
     def mask_box(length):
       return gym.spaces.Box(low=0, high=1, shape=(length,), dtype=np.int8)
 
+    # NOTE: obs space-related config attributes must NOT be changed after init
+    num_tile_attributes = len(Tile.State.attr_name_to_col)
+    num_tile_attributes += 1 if self.config.original["PROVIDE_DEATH_FOG_OBS"] else 0
     obs_space = {
       "CurrentTick": gym.spaces.Discrete(self.config.HORIZON+1),
       "AgentId": gym.spaces.Discrete(self.config.PLAYER_N+1),
-      "Tile": box(self.config.MAP_N_OBS, Tile.State.num_attributes),
+      "Tile": box(self.config.MAP_N_OBS, num_tile_attributes),
       "Entity": box(self.config.PLAYER_N_OBS, Entity.State.num_attributes),
       "Task": gym.spaces.Box(low=-2**15, high=2**15-1,
                              shape=(self.config.TASK_EMBED_DIM,),
                              dtype=np.float16),
     }
 
-    if self.config.ITEM_SYSTEM_ENABLED:
+    # NOTE: cannot turn on a game system that was not enabled during env init
+    if self.config.original["ITEM_SYSTEM_ENABLED"]:
       obs_space["Inventory"] = box(self.config.INVENTORY_N_OBS, Item.State.num_attributes)
 
-    if self.config.EXCHANGE_SYSTEM_ENABLED:
+    if self.config.original["EXCHANGE_SYSTEM_ENABLED"]:
       obs_space["Market"] = box(self.config.MARKET_N_OBS, Item.State.num_attributes)
 
-    if self.config.PROVIDE_ACTION_TARGETS:
+    if self.config.original["PROVIDE_ACTION_TARGETS"]:
       mask_spec = deepcopy(self._atn_space)
       for atn_str in mask_spec:
         for arg_str in mask_spec[atn_str]:
@@ -106,6 +120,7 @@ class Env(ParallelEnv):
         for the specified agent.'''
     return self._obs_space
 
+  # NOTE: make sure this runs once during trainer init and does NOT change afterwards
   @functools.cached_property
   def _atn_space(self):
     actions = {}
@@ -150,7 +165,8 @@ class Env(ParallelEnv):
   # TODO: This doesn't conform to the PettingZoo API
   # pylint: disable=arguments-renamed
   def reset(self, map_id=None, seed=None, options=None,
-            make_task_fn: Callable=None):
+            make_task_fn: Callable=None,
+            game: game_api.Game=None):
     '''OpenAI Gym API reset function
 
     Loads a new game map and returns initial observations
@@ -159,6 +175,7 @@ class Env(ParallelEnv):
         map_id: Map index to load. Selects a random map by default
         seed: random seed to use
         make_task_fn: A function to make tasks
+        game: A game object
 
     Returns:
         observations, as documented by _compute_observations()
@@ -173,27 +190,52 @@ class Env(ParallelEnv):
         5000+ timesteps for large maps
     '''
     self.seed(seed)
-    self.realm.reset(self._np_random, map_id)
-    self._agents = list(self.realm.players.keys())
-    self._dead_agents = set()
-    self._dead_this_tick = {}
+    map_np_array = self._load_map_file(map_id)
 
-    # check if there are scripted agents
+    # Choose and reset the game, realm, and tasks
+    if make_task_fn is not None:
+      # Use the provided tasks with the default game (full config, unmodded realm)
+      self.tasks = make_task_fn()
+      self.game = self.default_game
+      self.game.reset(self._np_random, map_np_array, self.tasks)  # also does realm.reset()
+    elif game is not None:
+      # Use the provided game, which comes with its own tasks
+      self.game = game
+      self.game.reset(self._np_random, map_np_array)
+      self.tasks = self.game.tasks
+    elif self.curriculum_file_path is not None:
+      # Assume training -- pick a random game from the game packs
+      self.game = self.default_game
+      if self.game_packs:
+        weights = [game.sampling_weight for game in self.game_packs]
+        self.game = self._np_random.choice(self.game_packs, p=weights/np.sum(weights))
+      self.game.reset(self._np_random, map_np_array)
+      # use the sampled tasks from self.game
+      self.tasks = self.game.tasks
+    else:
+      # Just reset the same game and tasks as before
+      self.game = self.default_game  # full config, unmodded realm
+      self.game.reset(self._np_random, map_np_array, self.tasks)  # use existing tasks
+      if self.tasks is None:
+        self.tasks = self.game.tasks
+      else:
+        for task in self.tasks:
+          task.reset()
+
+    # Reset the agent vars
+    self._agents = list(self.realm.players.keys())
+    self._dead_agents.clear()
+    self._dead_this_tick = {}
+    self._map_task_to_agent()
+
+    # Check scripted agents
+    self.scripted_agents.clear()
     for eid, ent in self.realm.players.items():
       if isinstance(ent.agent, nmmo.Scripted):
         self.scripted_agents.add(eid)
         ent.agent.set_rng(self._np_random)
 
-    if self.curriculum_file_path is not None:
-      self.tasks = self._sample_training_tasks()
-    elif make_task_fn is not None:
-      self.tasks = make_task_fn()
-    else:
-      for task in self.tasks:
-        task.reset()
-    self.agent_task_map = self._map_task_to_agent()
-
-    self._dummy_obs = self._make_dummy_obs()
+    # Reset the obs, game state generator
     self.obs = self._compute_observations()
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
     if self.game_state is not None:
@@ -204,38 +246,29 @@ class Env(ParallelEnv):
 
     return {a: o.to_gym() for a,o in self.obs.items()}
 
-  def _sample_training_tasks(self):
-    with open(self.curriculum_file_path, 'rb') as f:
-      # curriculum file may have been changed, so read the file when sampling
-      curriculum = dill.load(f) # a list of TaskSpec
-
-    sampling_weights = [spec.sampling_weight for spec in curriculum]
-    sampled_spec = self._np_random.choice(curriculum, size=len(self.possible_agents),
-                                          p=sampling_weights/np.sum(sampling_weights))
-
-    return task_spec.make_task_from_spec(self.possible_agents, sampled_spec)
+  def _load_map_file(self, map_id: int=None) -> np.ndarray:
+    '''Loads a map file, which is a 2D numpy array'''
+    map_id = map_id or self._np_random.integers(self.config.MAP_N) + 1
+    path_map_suffix = self.config.PATH_MAP_SUFFIX.format(map_id)
+    map_file_path = os.path.join(self.config.PATH_CWD, self.config.PATH_MAPS, path_map_suffix)
+    return np.load(map_file_path)
 
   def _map_task_to_agent(self):
-    agent_task_map: Dict[int, List[task_api.Task]] = {}
+    self.agent_task_map.clear()
     for task in self.tasks:
       if task.embedding is None:
         task.set_embedding(self._dummy_task_embedding)
-      # validate task embedding
-      assert self._obs_space['Task'].contains(task.embedding), "Task embedding is not valid"
-
       # map task to agents
       for agent_id in task.assignee:
-        if agent_id in agent_task_map:
-          agent_task_map[agent_id].append(task)
+        if agent_id in self.agent_task_map:
+          self.agent_task_map[agent_id].append(task)
         else:
-          agent_task_map[agent_id] = [task]
+          self.agent_task_map[agent_id] = [task]
 
     # for now we only support one task per agent
     if self.config.ALLOW_MULTI_TASKS_PER_AGENT is False:
-      for agent_tasks in agent_task_map.values():
+      for agent_tasks in self.agent_task_map.values():
         assert len(agent_tasks) == 1, "Only one task per agent is supported"
-
-    return agent_task_map
 
   def step(self, actions: Dict[int, Dict[str, Dict[str, Any]]]):
     '''Simulates one game tick or timestep
@@ -352,6 +385,9 @@ class Env(ParallelEnv):
       else:
         dones[agent_id] = False
 
+    # Update the game stats, determine winners, if any
+    self.game.update(dones, self._dead_this_tick)
+
     # Store the observations, since actions reference them
     self.obs = self._compute_observations()
     gym_obs = {a: o.to_gym() for a,o in self.obs.items()}
@@ -383,7 +419,7 @@ class Env(ParallelEnv):
         action_valid = True
         deserialized_action = {}
         atn = self._str_atn_map[atn_key] if isinstance(atn_key, str) else atn_key
-        if not atn.enabled(self.config):
+        if not atn.enabled(self.config):  # This can change from episode to episode
           action_valid = False
           break
 
@@ -416,11 +452,13 @@ class Env(ParallelEnv):
     return actions
 
   def _make_dummy_obs(self):
-    dummy_tiles = np.zeros((0, len(Tile.State.attr_name_to_col)), dtype=np.int16)
+    num_tile_attributes = len(Tile.State.attr_name_to_col)
+    num_tile_attributes += 1 if self.config.original["PROVIDE_DEATH_FOG_OBS"] else 0
+    dummy_tiles = np.zeros((0, num_tile_attributes), dtype=np.int16)
     dummy_entities = np.zeros((0, len(Entity.State.attr_name_to_col)), dtype=np.int16)
     dummy_inventory = np.zeros((0, len(Item.State.attr_name_to_col)), dtype=np.int16)
     dummy_market = np.zeros((0, len(Item.State.attr_name_to_col)), dtype=np.int16)
-    return Observation(self.config, self.realm.tick, 0, self._dummy_task_embedding,
+    return Observation(self.config, 0, 0, self._dummy_task_embedding,
                        dummy_tiles, dummy_entities, dummy_inventory, dummy_market)
 
   def _compute_observations(self):
@@ -439,6 +477,11 @@ class Env(ParallelEnv):
     tile_map = Tile.Query.get_map(self.realm.datastore, self.config.MAP_SIZE)
     radius = self.config.PLAYER_VISION_RADIUS
     tile_obs_size = ((2*radius+1)**2, len(Tile.State.attr_name_to_col))
+
+    if self.config.original["PROVIDE_DEATH_FOG_OBS"]:
+      fog_map = np.round(self.realm.fog_map[:,:,np.newaxis]).astype(np.int16)
+      tile_map = np.concatenate((tile_map, fog_map), axis=2)
+      tile_obs_size = ((2*radius+1)**2, len(Tile.State.attr_name_to_col)+1)
 
     for agent_id in self.agents:
       if agent_id not in self.realm.players:

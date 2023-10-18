@@ -19,7 +19,8 @@ class Task(ABC):
                assignee: Union[Iterable[int], int],
                reward_multiplier = 1.0,
                embedding = None,
-               spec_name: str = None):
+               spec_name: str = None,
+               reward_to = None):
     if isinstance(assignee, int):
       self._assignee = (assignee,)
     else:
@@ -28,7 +29,8 @@ class Task(ABC):
     self._eval_fn = eval_fn
     self._reward_multiplier = reward_multiplier
     self._embedding = None if embedding is None else np.array(embedding, dtype=np.float16)
-    self.spec_name = spec_name # None if not created using TaskSpec
+    self.spec_name = spec_name  # None if not created using TaskSpec
+    self.reward_to = reward_to  # None if not created using TaskSpec
     self.name = self._make_name(self.__class__.__name__,
                                 eval_fn=eval_fn, assignee=self._assignee)
     self.reset()
@@ -55,6 +57,10 @@ class Task(ABC):
   @property
   def completed(self) -> bool:
     return self._completed_tick is not None
+
+  @property
+  def progress(self) -> float:
+    return self._progress
 
   @property
   def reward_multiplier(self) -> float:
@@ -245,5 +251,4 @@ def nmmo_default_task(agent_list: Iterable[int], test_mode=None) -> List[Task]:
     # pylint: disable=unused-argument
     return make_same_task(lambda gs, subject: True, agent_list, task_cls=OngoingTask)
 
-  # the default is to use the predicate class
-  return make_same_task(bp.StayAlive, agent_list, task_cls=OngoingTask)
+  return make_same_task(bp.TickGE, agent_list)

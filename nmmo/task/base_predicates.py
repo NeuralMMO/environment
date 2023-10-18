@@ -20,10 +20,12 @@ def Success(gs: GameState, subject: Group):
   '''
   return True
 
-def TickGE(gs: GameState, subject: Group, num_tick: int):
+def TickGE(gs: GameState, subject: Group, num_tick: int = None):
   """True if the current tick is greater than or equal to the specified num_tick.
   Is progress counter.
   """
+  if num_tick is None:
+    num_tick = gs.config.HORIZON
   return norm(gs.current_tick / num_tick)
 
 def CanSeeTile(gs: GameState, subject: Group, tile_type: type[Material]):
@@ -40,6 +42,19 @@ def AllDead(gs: GameState, subject: Group):
   """True if all subjects are dead.
   """
   return norm(1.0 - count(subject.health) / len(subject))
+
+def CheckAgentStatus(gs: GameState, subject: Group, target: Iterable[int], status: str):
+  """Check if target agents are alive or dead using the game status"""
+  if isinstance(target, int):
+    target = [target]
+  num_agents = len(target)
+  num_alive = sum(1 for agent in target if agent in gs.alive_agents)
+  if status == 'alive':
+    return num_alive / num_agents
+  if status == 'dead':
+    return (num_agents - num_alive) / num_agents
+  # invalid status
+  return 0.0
 
 def OccupyTile(gs: GameState, subject: Group, row: int, col: int):
   """True if any subject agent is on the desginated tile.
@@ -129,7 +144,8 @@ def HoardGold(gs: GameState, subject: Group, amount: int):
 def EarnGold(gs: GameState, subject: Group, amount: int):
   """ True if the total amount of gold earned is greater than or equal to amount.
   """
-  return norm(subject.event.EARN_GOLD.gold.sum() / amount)
+  gold = subject.event.EARN_GOLD.gold.sum() + subject.event.LOOT_GOLD.gold.sum()
+  return norm(gold / amount)
 
 def SpendGold(gs: GameState, subject: Group, amount: int):
   """ True if the total amount of gold spent is greater than or equal to amount.
@@ -139,7 +155,7 @@ def SpendGold(gs: GameState, subject: Group, amount: int):
 def MakeProfit(gs: GameState, subject: Group, amount: int):
   """ True if the total amount of gold earned-spent is greater than or equal to amount.
   """
-  profits = subject.event.EARN_GOLD.gold.sum()
+  profits = subject.event.EARN_GOLD.gold.sum() + subject.event.LOOT_GOLD.gold.sum()
   costs = subject.event.BUY_ITEM.gold.sum()
   return  norm((profits-costs) / amount)
 
@@ -206,6 +222,13 @@ def HarvestItem(gs: GameState, subject: Group, item: type[Item], level: int, qua
   type_flt = subject.event.HARVEST_ITEM.type == item.ITEM_TYPE_ID
   lvl_flt = subject.event.HARVEST_ITEM.level >= level
   return norm(subject.event.HARVEST_ITEM.number[type_flt & lvl_flt].sum() / quantity)
+
+def FireAmmo(gs: GameState, subject: Group, item: type[Item], level: int, quantity: int):
+  """True if total quantity consumed of item type above level is >= quantity
+  """
+  type_flt = subject.event.FIRE_AMMO.type == item.ITEM_TYPE_ID
+  lvl_flt = subject.event.FIRE_AMMO.level >= level
+  return norm(subject.event.FIRE_AMMO.number[type_flt & lvl_flt].sum() / quantity)
 
 def ListItem(gs: GameState, subject: Group, item: type[Item], level: int, quantity: int):
   """True if total quantity listed of item type above level is >= quantity

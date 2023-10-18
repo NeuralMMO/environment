@@ -86,17 +86,17 @@ class TestEventLog(unittest.TestCase):
       [1,  2, 1, EventCode.DRINK_WATER, 0, 0, 0, 0, 0],
       [1,  2, 1, EventCode.SCORE_HIT, 1, 0, 50, 0, 1],
       [1,  3, 1, EventCode.PLAYER_KILL, 0, 5, 0, 0, 5],
-      [1,  4, 2, EventCode.CONSUME_ITEM, 16, 8, 1, 0, 0],
+      [1,  4, 2, EventCode.CONSUME_ITEM, 16, 8, 1, 0, 1],
       [1,  4, 2, EventCode.GIVE_ITEM, 0, 0, 0, 0, 0],
       [1,  5, 2, EventCode.DESTROY_ITEM, 0, 0, 0, 0, 0],
-      [1,  6, 2, EventCode.HARVEST_ITEM, 13, 3, 1, 0, 0],
+      [1,  6, 2, EventCode.HARVEST_ITEM, 13, 3, 1, 0, 2],
       [1,  7, 3, EventCode.GIVE_GOLD, 0, 0, 0, 0, 0],
-      [1,  8, 3, EventCode.LIST_ITEM, 16, 5, 1, 11, 0],
+      [1,  8, 3, EventCode.LIST_ITEM, 16, 5, 1, 11, 3],
       [1,  9, 3, EventCode.EARN_GOLD, 0, 0, 0, 15, 0],
-      [1, 10, 3, EventCode.BUY_ITEM, 13, 7, 1, 21, 0],
+      [1, 10, 3, EventCode.BUY_ITEM, 13, 7, 1, 21, 4],
       [1, 12, 4, EventCode.LEVEL_UP, 4, 3, 0, 0, 0],
       [1, 12, 5, EventCode.GO_FARTHEST, 0, 0, 6, 0, 0],
-      [1, 12, 5, EventCode.EQUIP_ITEM, 2, 4, 1, 0, 0]])
+      [1, 12, 5, EventCode.EQUIP_ITEM, 2, 4, 1, 0, 5]])
 
     log_by_tick = [list(row) for row in event_log.get_data(tick = 4)]
     self.assertListEqual(log_by_tick, [
@@ -104,14 +104,14 @@ class TestEventLog(unittest.TestCase):
 
     log_by_event = [list(row) for row in event_log.get_data(event_code = EventCode.CONSUME_ITEM)]
     self.assertListEqual(log_by_event, [
-      [1,  4, 2, EventCode.CONSUME_ITEM, 16, 8, 1, 0, 0]])
+      [1,  4, 2, EventCode.CONSUME_ITEM, 16, 8, 1, 0, 1]])
 
     log_by_tick_agent = [list(row) for row in \
                          event_log.get_data(tick = 5,
                                             agents = [12],
                                             event_code = EventCode.EQUIP_ITEM)]
     self.assertListEqual(log_by_tick_agent, [
-      [1, 12, 5, EventCode.EQUIP_ITEM, 2, 4, 1, 0, 0]])
+      [1, 12, 5, EventCode.EQUIP_ITEM, 2, 4, 1, 0, 5]])
 
     empty_log = event_log.get_data(tick = 10)
     self.assertTrue(empty_log.shape[0] == 0)

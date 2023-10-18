@@ -190,10 +190,10 @@ class ScriptedTestTemplate(unittest.TestCase):
   def setUpClass(cls):
     # only use Combat agents
     cls.config = ScriptedAgentTestConfig()
-    cls.config.PROVIDE_ACTION_TARGETS = True
+    cls.config.set("PROVIDE_ACTION_TARGETS", True)
 
-    cls.config.PLAYERS = [baselines.Melee, baselines.Range, baselines.Mage]
-    cls.config.PLAYER_N = 3
+    cls.config.set("PLAYERS", [baselines.Melee, baselines.Range, baselines.Mage])
+    cls.config.set("PLAYER_N", 3)
     #cls.config.IMMORTAL = True
 
     # set up agents to test ammo use
@@ -223,7 +223,7 @@ class ScriptedTestTemplate(unittest.TestCase):
     config = deepcopy(self.config)
 
     if remove_immunity:
-      config.COMBAT_SPAWN_IMMUNITY = 0
+      config.set("COMBAT_SPAWN_IMMUNITY", 0)
 
     env = ScriptedAgentTestEnv(config, seed=random_seed)
     env.reset()
@@ -378,9 +378,9 @@ class ScriptedTestTemplate(unittest.TestCase):
 # pylint: disable=unnecessary-lambda,bad-builtin
 def profile_env_step(action_target=True, tasks=None, condition=None):
   config = nmmo.config.Default()
-  config.PLAYERS = [baselines.Sleeper] # the scripted agents doing nothing
-  config.IMMORTAL = True # otherwise the agents will die
-  config.PROVIDE_ACTION_TARGETS = action_target
+  config.set("PLAYERS", [baselines.Sleeper])  # the scripted agents doing nothing
+  config.set("IMMORTAL", True)  # otherwise the agents will die
+  config.set("PROVIDE_ACTION_TARGETS", action_target)
   env = nmmo.Env(config, seed=0)
   if tasks is None:
     tasks = []

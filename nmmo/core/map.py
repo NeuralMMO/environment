@@ -1,5 +1,3 @@
-import os
-import logging
 import numpy as np
 from ordered_set import OrderedSet
 
@@ -20,16 +18,21 @@ class Map:
     self.pathfinding_cache = {} # Avoid recalculating A*, paths don't move
 
     sz          = config.MAP_SIZE
-    self.tiles  = np.zeros((sz, sz), dtype=object)
+    self.tiles  = np.zeros((sz,sz), dtype=object)
     self.habitable_tiles = np.zeros((sz,sz))
 
     for r in range(sz):
       for c in range(sz):
         self.tiles[r, c] = Tile(realm, r, c, np_random)
 
-    self.dist_border_center = config.MAP_CENTER // 2
-    self.center_coord = (config.MAP_BORDER + self.dist_border_center,
-                         config.MAP_BORDER + self.dist_border_center)
+    self.dist_border_center = None
+    self.center_coord = None
+
+    # used to place border
+    x      = np.abs(np.arange(sz) - sz//2)
+    X, Y   = np.meshgrid(x, x)
+    data   = np.stack((X, Y), -1)
+    self.l1 = np.max(abs(data), -1)
 
   @property
   def packet(self):
@@ -44,40 +47,56 @@ class Map:
     '''Flat matrix of tile material indices'''
     if not self._repr:
       self._repr = [[t.material.index for t in row] for row in self.tiles]
-
     return self._repr
 
-  def reset(self, map_id, np_random):
+  def reset(self, map_np_array, np_random):
     '''Reuse the current tile objects to load a new map'''
     config = self.config
+    assert map_np_array.shape == (config.MAP_SIZE,config.MAP_SIZE),\
+      "Map shape is inconsistent with config.MAP_SIZE"
+
+    # NOTE: MAP_CENTER and MAP_BORDER can change from episode to episode
+    self.dist_border_center = config.MAP_CENTER // 2
+    self.center_coord = (config.MAP_BORDER + self.dist_border_center,
+                         config.MAP_BORDER + self.dist_border_center)
+    assert config.MAP_BORDER > config.PLAYER_VISION_RADIUS,\
+      "MAP_BORDER must be greater than PLAYER_VISION_RADIUS"
+
+    self._repr = None
     self.update_list = OrderedSet() # critical for determinism
-
-    path_map_suffix = config.PATH_MAP_SUFFIX.format(map_id)
-    f_path = os.path.join(config.PATH_CWD, config.PATH_MAPS, path_map_suffix)
-
-    try:
-      map_file = np.load(f_path)
-    except FileNotFoundError:
-      logging.error('Maps not found')
-      raise
-
     materials = {mat.index: mat for mat in material.All}
-    r, c = 0, 0
-    for r, row in enumerate(map_file):
-      for c, idx in enumerate(row):
-        mat  = materials[idx]
-        if mat == material.Stone and \
-           config.TERRAIN_SYSTEM_ENABLED and config.TERRAIN_DISABLE_STONE:
-          mat = material.Grass
 
+    # process map_np_array according to config
+    map_np_array = self._process_map(map_np_array, np_random)
+
+    # reset tiles
+    for r, row in enumerate(map_np_array):
+      for c, idx in enumerate(row):
+        mat = materials[idx]
         tile = self.tiles[r, c]
         tile.reset(mat, config, np_random)
         self.habitable_tiles[r, c] = tile.habitable
 
-    assert c == config.MAP_SIZE - 1
-    assert r == config.MAP_SIZE - 1
+  def _process_map(self, map_np_array, np_random):  # pylint: disable=unused-argument
+    # resources, other configs
+    if not self.config.TERRAIN_SYSTEM_ENABLED:
+      map_np_array[:] = material.Grass.index
+    else:
+      if self.config.TERRAIN_DISABLE_STONE:
+        map_np_array[map_np_array == material.Stone.index] = material.Grass.index
 
-    self._repr = None
+    # border
+    size = self.config.MAP_SIZE
+    border = self.config.MAP_BORDER
+    map_np_array[self.l1 > size/2 - border] = material.Void.index
+    map_np_array[self.l1 == size/2 - border] = material.Grass.index
+    if self.config.TERRAIN_SYSTEM_ENABLED:
+      # replace the edge stone/water tiles to foilage
+      edge = self.l1 == size//2 - border - 1
+      stone = (map_np_array == material.Stone.index) | (map_np_array == material.Grass.index)
+      map_np_array[edge & stone] = material.Foilage.index
+
+    return map_np_array
 
   def step(self):
     '''Evaluate updatable tiles'''

@@ -11,8 +11,8 @@ class TestSkillLevel(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
     cls.config = ScriptedAgentTestConfig()
-    cls.config.PROGRESSION_EXP_THRESHOLD = [0, 10, 20, 30, 40, 50]
-    cls.config.PROGRESSION_LEVEL_MAX = len(cls.config.PROGRESSION_EXP_THRESHOLD)
+    cls.config.set("PROGRESSION_EXP_THRESHOLD", [0, 10, 20, 30, 40, 50])
+    cls.config.set("PROGRESSION_LEVEL_MAX", len(cls.config.PROGRESSION_EXP_THRESHOLD))
     cls.env = ScriptedAgentTestEnv(cls.config)
 
   def test_experience_calculator(self):

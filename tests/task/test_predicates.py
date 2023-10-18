@@ -26,17 +26,17 @@ ALL_AGENT = list(range(1, NUM_AGENT+1))
 
 
 class TestBasePredicate(unittest.TestCase):
-  # pylint: disable=protected-access,invalid-name,no-member
+  # pylint: disable=protected-access,no-member,invalid-name
 
   def _get_taskenv(self,
                    test_preds: List[Tuple[Predicate, Union[Iterable[int], int]]],
                    grass_map=False):
 
     config = ScriptedAgentTestConfig()
-    config.PLAYERS = [Sleeper]
-    config.PLAYER_N = NUM_AGENT
-    config.IMMORTAL = True
-    config.ALLOW_MULTI_TASKS_PER_AGENT = True
+    config.set("PLAYERS", [Sleeper])
+    config.set("PLAYER_N", NUM_AGENT)
+    config.set("IMMORTAL", True)
+    config.set("ALLOW_MULTI_TASKS_PER_AGENT", True)
 
     # OngoingTask keeps evaluating and returns progress as the reward
     #   vs. Task stops evaluating once the task is completed, returns reward = delta(progress)
@@ -122,7 +122,7 @@ class TestBasePredicate(unittest.TestCase):
     entities = list(entities[:, EntityState.State.attr_name_to_col['id']]) # ent_ids
 
     # make sure the dead agents are not in the realm & datastore
-    for ent_id in env.realm.players.spawned:
+    for ent_id in env.realm.players:
       if ent_id in death_note:
         # make sure that dead players not in the realm nor the datastore
         self.assertTrue(ent_id not in env.realm.players)

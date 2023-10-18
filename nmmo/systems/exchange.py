@@ -38,6 +38,10 @@ class Exchange:
     self._realm = realm
     self._config = realm.config
 
+  def reset(self):
+    self._listings_queue.clear()
+    self._item_listings.clear()
+
   def _list_item(self, item: Item, seller, price: int, tick: int):
     item.listed_price.update(price)
     self._item_listings[item.id.val] = ItemListing(item, seller, price, tick)
@@ -70,6 +74,9 @@ class Exchange:
     the item's listed price. The process repeats until all expired listings
     are removed from the queue and dictionary.
     """
+    if self._config.EXCHANGE_SYSTEM_ENABLED is False:
+      return
+
     current_tick = self._realm.tick
 
     # Remove expired listings

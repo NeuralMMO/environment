@@ -50,16 +50,16 @@ class EntityGroup(Mapping):
           item.destroy()
       ent.datastore_record.delete()
 
-    self.entities = {}
-    self.dead_this_tick = {}
+    self.entities.clear()
+    self.dead_this_tick.clear()
 
-  def spawn(self, entity):
+  def spawn_entity(self, entity):
     pos, ent_id = entity.pos, entity.id.val
     self.realm.map.tiles[pos].add_entity(entity)
     self.entities[ent_id] = entity
 
   def cull(self):
-    self.dead_this_tick = {}
+    self.dead_this_tick.clear()
     for ent_id in list(self.entities):
       player = self.entities[ent_id]
       if not player.alive:
@@ -94,7 +94,7 @@ class NPCManager(EntityGroup):
   def reset(self, np_random):
     super().reset(np_random)
     self.next_id = -1
-    self.spawn_dangers = []
+    self.spawn_dangers.clear()
 
   def spawn(self):
     config = self.config
@@ -117,7 +117,7 @@ class NPCManager(EntityGroup):
 
       npc = NPC.spawn(self.realm, (r, c), self.next_id, self._np_random)
       if npc:
-        super().spawn(npc)
+        super().spawn_entity(npc)
         self.next_id -= 1
 
     if self.spawn_dangers:
@@ -137,26 +137,11 @@ class NPCManager(EntityGroup):
     return actions
 
 class PlayerManager(EntityGroup):
-  def __init__(self, realm, np_random):
-    super().__init__(realm, np_random)
-    self.loader_class = self.realm.config.PLAYER_LOADER
-    self._agent_loader: spawn.SequentialLoader = None
-    self.spawned = None
+  def spawn(self, agent_loader: spawn.SequentialLoader = None):
+    if agent_loader is None:
+      agent_loader = self.config.PLAYER_LOADER(self.config, self._np_random)
 
-  def reset(self, np_random):
-    super().reset(np_random)
-    self._agent_loader = self.loader_class(self.config, self._np_random)
-    self.spawned = set()
-
-  def spawn_individual(self, r, c, idx, resilient=False):
-    agent = next(self._agent_loader)
-    agent = agent(self.config, idx)
-    player = Player(self.realm, (r, c), agent, resilient)
-    super().spawn(player)
-    self.spawned.add(idx)
-
-  def spawn(self):
-    # Check and assign the constant heal flag
+    # Check and assign the reslient flag
     resilient_flag = [False] * self.config.PLAYER_N
     if self.config.RESOURCE_SYSTEM_ENABLED:
       num_resilient = round(self.config.RESOURCE_RESILIENT_POPULATION * self.config.PLAYER_N)
@@ -165,15 +150,14 @@ class PlayerManager(EntityGroup):
       self._np_random.shuffle(resilient_flag)
 
     # Spawn the players
-    idx = 0
-    while idx < self.config.PLAYER_N:
-      idx += 1
-      r, c = self._agent_loader.get_spawn_position(idx)
+    for agent_id in self.config.POSSIBLE_AGENTS:
+      r, c = agent_loader.get_spawn_position(agent_id)
 
-      if idx in self.entities:
+      if agent_id in self.entities:
         continue
 
-      if idx in self.spawned:
-        continue
-
-      self.spawn_individual(r, c, idx, resilient_flag[idx-1])
+      # NOTE: put spawn_individual() here. Is a separate function necessary?
+      agent = next(agent_loader)  # get agent cls from config.PLAYERS
+      agent = agent(self.config, agent_id)
+      player = Player(self.realm, (r, c), agent, resilient_flag[agent_id-1])
+      super().spawn_entity(player)

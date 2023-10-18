@@ -84,7 +84,7 @@ class TestDemoTask(unittest.TestCase):
 
     # Test rollout
     config = ScriptedAgentTestConfig()
-    config.ALLOW_MULTI_TASKS_PER_AGENT = True
+    config.set("ALLOW_MULTI_TASKS_PER_AGENT", True)
     env = Env(config)
 
     # Creating and testing "team" tasks

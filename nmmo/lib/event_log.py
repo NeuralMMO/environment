@@ -42,7 +42,8 @@ ATTACK_COL_MAP = {
 ITEM_COL_MAP = {
   'item_type': EventAttr['type'],
   'quantity': EventAttr['number'],
-  'price': EventAttr['gold'] }
+  'price': EventAttr['gold'],
+  'item_id': EventAttr['target_ent'] }
 
 LEVEL_COL_MAP = { 'skill': EventAttr['type'] }
 
@@ -115,18 +116,34 @@ class EventLogger(EventCode):
         log.level.update(target.attack_level)
         return
 
+    if event_code == EventCode.LOOT_ITEM:
+      if ('item' in kwargs and isinstance(kwargs['item'], Item)) & \
+         ('target' in kwargs and isinstance(kwargs['target'], Entity)):
+        item = kwargs['item']
+        log = self._create_event(entity, event_code)
+        log.type.update(item.ITEM_TYPE_ID)
+        log.level.update(item.level.val)
+        log.number.update(item.quantity.val)
+        log.target_ent.update(item.id.val)
+        return
+
+    if event_code == EventCode.LOOT_GOLD:
+      if ('amount' in kwargs and kwargs['amount'] > 0) & \
+         ('target' in kwargs and isinstance(kwargs['target'], Entity)):
+        log = self._create_event(entity, event_code)
+        log.gold.update(kwargs['amount'])
+        log.target_ent.update(kwargs['target'].ent_id)
+        return
+
     if event_code in [EventCode.CONSUME_ITEM, EventCode.HARVEST_ITEM, EventCode.EQUIP_ITEM,
-                      EventCode.LOOT_ITEM]:
-      # CHECK ME: item types should be checked. For example,
-      #   Only Ration and Potion can be consumed
-      #   Only Ration, Potion, Whetstone, Arrow, Runes can be produced
-      #   The quantity should be 1 for all of these events
+                      EventCode.FIRE_AMMO]:
       if ('item' in kwargs and isinstance(kwargs['item'], Item)):
         item = kwargs['item']
         log = self._create_event(entity, event_code)
         log.type.update(item.ITEM_TYPE_ID)
         log.level.update(item.level.val)
         log.number.update(item.quantity.val)
+        log.target_ent.update(item.id.val)
         return
 
     if event_code in [EventCode.LIST_ITEM, EventCode.BUY_ITEM]:
@@ -138,9 +155,9 @@ class EventLogger(EventCode):
         log.level.update(item.level.val)
         log.number.update(item.quantity.val)
         log.gold.update(kwargs['price'])
+        log.target_ent.update(item.id.val)
         return
 
-    # NOTE: do we want to separate the source of income? from selling vs looting
     if event_code == EventCode.EARN_GOLD:
       if ('amount' in kwargs and kwargs['amount'] > 0):
         log = self._create_event(entity, event_code)

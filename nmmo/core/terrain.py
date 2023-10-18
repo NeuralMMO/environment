@@ -24,9 +24,10 @@ class Save:
 
   @staticmethod
   def fractal(terrain, path):
-    '''Render raw noise fractal to png'''
+    '''Render raw noise fractal to both png and npy'''
     frac = (256*terrain).astype(np.uint8)
     imsave(path, frac)
+    np.save(path.replace('.png', '.npy'), frac)
 
   @staticmethod
   def as_numpy(mats, path):
@@ -258,10 +259,10 @@ class MapGenerator:
 
       #Save/render
       Save.as_numpy(tiles, path)
+      Save.fractal(terrain, path+'/fractal.png')
       if config.MAP_GENERATE_PREVIEWS:
         b = config.MAP_BORDER
         tiles = [e[b:-b+1] for e in tiles][b:-b+1]
-        Save.fractal(terrain, path+'/fractal.png')
         Save.render(tiles, self.textures, path+'/map.png')
 
   def generate_map(self, idx, np_random=None):

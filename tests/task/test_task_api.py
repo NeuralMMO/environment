@@ -209,8 +209,8 @@ class TestTaskAPI(unittest.TestCase):
     team_ids= list(teams.keys())
 
     config = ScriptedAgentTestConfig()
-    config.PLAYERS =[Sleeper]
-    config.IMMORTAL = True
+    config.set("PLAYERS", [Sleeper])
+    config.set("IMMORTAL", True)
 
     env = Env(config)
     env.reset(make_task_fn=lambda: make_task_from_spec(teams, [task_spec]))
@@ -283,7 +283,7 @@ class TestTaskAPI(unittest.TestCase):
   def test_completed_tasks_in_info(self):
     # pylint: disable=no-value-for-parameter,no-member
     config = ScriptedAgentTestConfig()
-    config.ALLOW_MULTI_TASKS_PER_AGENT = True
+    config.set("ALLOW_MULTI_TASKS_PER_AGENT", True)
     env = Env(config)
 
     # make predicate class from function

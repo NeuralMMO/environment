@@ -9,22 +9,28 @@ import re
 import nmmo
 from nmmo.core.agent import Agent
 from nmmo.core.terrain import MapGenerator
-from nmmo.lib import utils, material, spawn, team_helper
+from nmmo.lib import utils, material, spawn
+
+CONFIG_ATTR_PATTERN = r"^[A-Z_]+$"
 
 # These attributes are critical for trainer and must not change from the initial values
-IMMUTABLE_ATTRS = set(["PLAYER_N", "TASK_EMBED_DIM", "CURRICULUM_FILE_PATH"])
+OBS_ATTRS = set(["HORIZON", "PLAYER_N", "MAP_N_OBS", "PLAYER_N_OBS", "TASK_EMBED_DIM",
+                 "INVENTORY_N_OBS", "MARKET_N_OBS", "PRICE_N_OBS", "COMMUNICATION_NUM_TOKENS",
+                 "PROVIDE_ACTION_TARGETS", "PROVIDE_DEATH_FOG_OBS",
+                 "PROVIDE_NOOP_ACTION_TARGET"])
+IMMUTABLE_ATTRS = set(["CURRICULUM_FILE_PATH", "PLAYER_VISION_RADIUS", "MAP_SIZE"])
 
 
 class Template(metaclass=utils.StaticIterable):
   def __init__(self):
     self._data = {}
-    self._attr_to_reset = []
     cls = type(self)
 
-    #Set defaults from static properties
+    # Set defaults from static properties
     for attr in dir(cls):
-      if re.match(r"^[A-Z_]+$", attr):
-        self.set(attr, getattr(cls, attr))
+      val = getattr(cls, attr)
+      if re.match(CONFIG_ATTR_PATTERN, attr) and not isinstance(val, property):
+        self.set(attr, val)
 
   def override(self, **kwargs):
     for k, v in kwargs.items():
@@ -40,25 +46,6 @@ class Template(metaclass=utils.StaticIterable):
         logging.error('Cannot set attribute: %s to %s', str(k), str(v))
         sys.exit()
     self._data[k] = v
-
-  def set_for_episode(self, k, v):
-    '''Set a config property for the current episode'''
-    assert hasattr(self, k), f'Invalid config property: {k}'
-    assert k not in IMMUTABLE_ATTRS, f'Cannot change {k} during the episode'
-    assert not k.endswith('_OBS'), f'Cannot change OBS config {k} during the episode'
-    # Cannot turn on a game system that was not enabled when the env was created
-    if k.endswith('_SYSTEM_ENABLED') and self._data[k] is False and v is True:
-      raise AttributeError(f'Cannot turn on {k} because it was not enabled during env init')
-
-    # Change only the attribute and keep the original value in the data dict
-    setattr(self, k, v)
-    self._attr_to_reset.append(k)
-
-  def reset(self):
-    '''Reset all attributes changed during the episode'''
-    for attr in self._attr_to_reset:
-      setattr(self, attr, self._data[attr])
-    self._attr_to_reset.clear()
 
   # pylint: disable=bad-builtin
   def print(self):
@@ -82,10 +69,6 @@ class Template(metaclass=utils.StaticIterable):
 
   def values(self):
     return self._data.values()
-
-  @property
-  def original(self):
-    return self._data
 
 def validate(config):
   err = 'config.Config is a base class. Use config.{Small, Medium Large}'''
@@ -123,6 +106,7 @@ class Config(Template):
     Config to add new static attributes -- CLI definitions will be
     generated automatically.
   '''
+  env_initialized = False
 
   def __init__(self):
     super().__init__()
@@ -130,34 +114,34 @@ class Config(Template):
     # TODO: Come up with a better way
     # to resolve mixin MRO conflicts
     if not hasattr(self, 'TERRAIN_SYSTEM_ENABLED'):
-      self.TERRAIN_SYSTEM_ENABLED = False
+      self.set('TERRAIN_SYSTEM_ENABLED', False)
 
     if not hasattr(self, 'RESOURCE_SYSTEM_ENABLED'):
-      self.RESOURCE_SYSTEM_ENABLED = False
+      self.set('RESOURCE_SYSTEM_ENABLED', False)
 
     if not hasattr(self, 'COMBAT_SYSTEM_ENABLED'):
-      self.COMBAT_SYSTEM_ENABLED = False
+      self.set('COMBAT_SYSTEM_ENABLED', False)
 
     if not hasattr(self, 'NPC_SYSTEM_ENABLED'):
-      self.NPC_SYSTEM_ENABLED = False
+      self.set('NPC_SYSTEM_ENABLED', False)
 
     if not hasattr(self, 'PROGRESSION_SYSTEM_ENABLED'):
-      self.PROGRESSION_SYSTEM_ENABLED = False
+      self.set('PROGRESSION_SYSTEM_ENABLED', False)
 
     if not hasattr(self, 'ITEM_SYSTEM_ENABLED'):
-      self.ITEM_SYSTEM_ENABLED = False
+      self.set('ITEM_SYSTEM_ENABLED', False)
 
     if not hasattr(self, 'EQUIPMENT_SYSTEM_ENABLED'):
-      self.EQUIPMENT_SYSTEM_ENABLED = False
+      self.set('EQUIPMENT_SYSTEM_ENABLED', False)
 
     if not hasattr(self, 'PROFESSION_SYSTEM_ENABLED'):
-      self.PROFESSION_SYSTEM_ENABLED = False
+      self.set('PROFESSION_SYSTEM_ENABLED', False)
 
     if not hasattr(self, 'EXCHANGE_SYSTEM_ENABLED'):
-      self.EXCHANGE_SYSTEM_ENABLED = False
+      self.set('EXCHANGE_SYSTEM_ENABLED', False)
 
     if not hasattr(self, 'COMMUNICATION_SYSTEM_ENABLED'):
-      self.COMMUNICATION_SYSTEM_ENABLED = False
+      self.set('COMMUNICATION_SYSTEM_ENABLED', False)
 
     if __debug__:
       validate(self)
@@ -167,6 +151,33 @@ class Config(Template):
 
     for attr in deprecated_attrs:
       assert not hasattr(self, attr), f'{attr} has been deprecated or renamed'
+
+  @property
+  def original(self):
+    return self._data
+
+  def reset(self):
+    '''Reset all attributes changed during the episode'''
+    for attr, val in self.original.items():
+      if isinstance(val, property) or val == getattr(self, attr):
+        continue
+      setattr(self, attr, val)
+
+  def set(self, k, v):
+    assert self.env_initialized is False, 'Cannot set config attr after env init'
+    super().set(k, v)
+
+  def set_for_episode(self, k, v):
+    '''Set a config property for the current episode'''
+    assert hasattr(self, k), f'Invalid config property: {k}'
+    assert k not in OBS_ATTRS, f'Cannot change OBS config {k} during the episode'
+    assert k not in IMMUTABLE_ATTRS, f'Cannot change {k} during the episode'
+    # Cannot turn on a game system that was not enabled when the env was created
+    if k.endswith('_SYSTEM_ENABLED') and self._data[k] is False and v is True:
+      raise AssertionError(f'Cannot turn on {k} because it was not enabled during env init')
+
+    # Change only the attribute and keep the original value in the data dict
+    setattr(self, k, v)
 
 
   ############################################################################
@@ -197,6 +208,9 @@ class Config(Template):
   HORIZON = 1024
   '''Number of steps before the environment resets'''
 
+  GAME_PACKS = None
+  '''List of game packs to load and sample: [(game class, sampling weight)]'''
+
   CURRICULUM_FILE_PATH = None
   '''Path to a curriculum task file containing a list of task specs for training'''
 
@@ -209,18 +223,13 @@ class Config(Template):
   PROVIDE_ACTION_TARGETS       = True
   '''Provide action targets mask'''
 
-  PROVIDE_NOOP_ACTION_TARGET   = True  # TODO: remove
+  PROVIDE_NOOP_ACTION_TARGET   = True
   '''Provide a no-op option for each action'''
 
-  DISALLOW_ATTACK_NOOP_WHEN_TARGET_PRESENT = True  # TODO: remove
-  '''Disallow attack noop when there is a target present
-     This will make agents always attack if there is a valid target'''
-
-  # NOTE: For backward compatibility. Should be removed in the future.
   PROVIDE_DEATH_FOG_OBS = False
   '''Provide death fog observation'''
 
-  ALLOW_MOVE_INTO_OCCUPIED_TILE = True
+  ALLOW_MOVE_INTO_OCCUPIED_TILE = False
   '''Whether agents can move into tiles occupied by other agents/npcs
      However, this does not apply to spawning'''
 
@@ -259,9 +268,6 @@ class Config(Template):
   TEAMS                        = None  # Dict[Any, List[int]]
   '''A dictionary of team assignments: key is team_id, value is a list of agent_ids'''
 
-  TEAM_LOADER                  = team_helper.TeamLoader
-  '''Team loader class specifying team spawn sampling'''
-
 
   ############################################################################
   ### Debug Parameters
@@ -285,15 +291,16 @@ class Config(Template):
     '''Number of distinct tile observations'''
     return int(self.PLAYER_VISION_DIAMETER ** 2)
 
-  MAP_CENTER                   = None
-  '''Size of each map (number of tiles along each side)'''
+  MAP_SIZE                     = None
+  '''Size of the whole map, including the center and borders'''
 
-  MAP_BORDER                   = 16
-  '''Number of void border tiles surrounding each side of the map'''
+  MAP_CENTER                   = None
+  '''Size of each map (number of tiles along each side), where agents can move around'''
 
   @property
-  def MAP_SIZE(self):
-    return int(self.MAP_CENTER + 2*self.MAP_BORDER)
+  def MAP_BORDER(self):
+    '''Number of background, void border tiles surrounding each side of the map'''
+    return int((self.MAP_SIZE - self.MAP_CENTER) // 2)
 
   MAP_GENERATOR                = MapGenerator
   '''Specifies a user map generator. Uses default generator if unspecified.'''
@@ -324,9 +331,6 @@ class Config(Template):
 
   PATH_MAPS                = None
   '''Generated map directory'''
-
-  PATH_MAP_SUFFIX          = 'map{}/map.npy'
-  '''Map file name'''
 
   PATH_MAP_SUFFIX          = 'map{}/map.npy'
   '''Map file name'''
@@ -416,6 +420,13 @@ class Resource:
   '''Fraction of health restored per tick when above half food+water'''
 
 
+def original_combat_damage_formula(offense, defense, multiplier, minimum_proportion):
+  # pylint: disable=unused-argument
+  return int(multiplier * (offense * (15 / (15 + defense))))
+
+def alt_combat_damage_formula(offense, defense, multiplier, minimum_proportion):
+  return int(max(multiplier * offense - defense, offense * minimum_proportion))
+
 class Combat:
   '''Combat Game System'''
 
@@ -424,6 +435,9 @@ class Combat:
 
   COMBAT_SPAWN_IMMUNITY              = 20
   '''Agents older than this many ticks cannot attack agents younger than this many ticks'''
+
+  COMBAT_ALLOW_FLEXIBLE_STYLE        = True
+  '''Whether to allow agents to attack with any style in a given turn''' 
 
   COMBAT_STATUS_DURATION             = 3
   '''Combat status lasts for this many ticks after the last combat event.
@@ -435,10 +449,8 @@ class Combat:
   COMBAT_MINIMUM_DAMAGE_PROPORTION   = 0.25
   '''Minimum proportion of damage to inflict on a target'''
 
-  @staticmethod
-  def COMBAT_DAMAGE_FORMULA(offense, defense, multiplier, minimum_proportion):
-    '''Damage formula'''
-    return int(max(multiplier * offense - defense, offense * minimum_proportion))
+  COMBAT_DAMAGE_FORMULA = original_combat_damage_formula
+  '''Damage formula'''
 
   COMBAT_MELEE_DAMAGE                = 10
   '''Melee attack damage'''
@@ -459,9 +471,9 @@ class Combat:
   '''Reach of attacks using the Mage skill'''
 
 
-def default_exp_threshold(max_level):
+def default_exp_threshold(base_exp, max_level):
   import math
-  additional_exp_per_level = [round(90*math.sqrt(lvl))
+  additional_exp_per_level = [round(base_exp * math.sqrt(lvl))
                               for lvl in range(1, max_level+1)]
   return [sum(additional_exp_per_level[:lvl]) for lvl in range(max_level)]
 
@@ -477,7 +489,7 @@ class Progression:
   PROGRESSION_LEVEL_MAX             = 10
   '''Max skill level'''
 
-  PROGRESSION_EXP_THRESHOLD         = default_exp_threshold(PROGRESSION_LEVEL_MAX)
+  PROGRESSION_EXP_THRESHOLD         = default_exp_threshold(90, PROGRESSION_LEVEL_MAX)
   '''A list of experience thresholds for each level'''
 
   PROGRESSION_COMBAT_XP_SCALE       = 3
@@ -645,10 +657,9 @@ class Profession:
   PROFESSION_FISH_RESPAWN             = 0.02
   '''Probability that a harvested fish tile will regenerate each tick'''
 
-  @staticmethod
-  def PROFESSION_CONSUMABLE_RESTORE(level):
-    return 50 + 5*level
-
+  # pylint: disable=unnecessary-lambda-assignment
+  PROFESSION_CONSUMABLE_RESTORE       = lambda level: 50 + 5*level
+  '''Amount of food/water restored by consuming a consumable item'''
 
 class Exchange:
   '''Exchange Game System'''
@@ -698,6 +709,7 @@ class Small(Config):
   PLAYER_N                     = 64
 
   MAP_PREVIEW_DOWNSCALE        = 4
+  MAP_SIZE                     = 64
   MAP_CENTER                   = 32
 
   TERRAIN_LOG_INTERPOLATE_MIN  = 0
@@ -720,6 +732,7 @@ class Medium(Config):
   PLAYER_N                     = 128
 
   MAP_PREVIEW_DOWNSCALE        = 16
+  MAP_SIZE                     = 160
   MAP_CENTER                   = 128
 
   NPC_N                        = 128
@@ -740,6 +753,7 @@ class Large(Config):
   PLAYER_N                     = 1024
 
   MAP_PREVIEW_DOWNSCALE        = 64
+  MAP_SIZE                     = 1056
   MAP_CENTER                   = 1024
 
   NPC_N                        = 1024

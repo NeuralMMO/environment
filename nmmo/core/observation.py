@@ -9,6 +9,9 @@ import nmmo.systems.item as item_system
 from nmmo.core import action
 from nmmo.lib import material, utils
 
+EMPTY_ARR = np.empty((0, ItemState.State.num_attributes),
+                     dtype=np.int16)  # to create empty Obs objects
+
 
 class BasicObs:
   def __init__(self, values, id_col):
@@ -54,9 +57,10 @@ class Observation:
     self.task_embedding = task_embedding
 
     self.tiles = tiles[0:config.MAP_N_OBS]
-    self.entities = BasicObs(entities[0:config.PLAYER_N_OBS],
+    self.entities = BasicObs(entities[0:config.original["PLAYER_N_OBS"]],
                               EntityState.State.attr_name_to_col["id"])
 
+    # NOTE: Systems can be turned off when these are enabled during env init
     self.dummy_obs = self.agent() is None
     if config.COMBAT_SYSTEM_ENABLED and not self.dummy_obs:
       latest_combat_tick = self.agent().latest_combat_tick
@@ -70,14 +74,16 @@ class Observation:
                                     ItemState.State.attr_name_to_col["id"])
     else:
       assert inventory.size == 0
+      self.inventory = InventoryObs(EMPTY_ARR, 0)
 
     if config.EXCHANGE_SYSTEM_ENABLED:
-      self.market = BasicObs(market[0:config.MARKET_N_OBS],
+      self.market = BasicObs(market[0:config.original["MARKET_N_OBS"]],
                              ItemState.State.attr_name_to_col["id"])
     else:
       assert market.size == 0
+      self.market = BasicObs(EMPTY_ARR, 0)
 
-    self._noop_action = 1 if config.PROVIDE_NOOP_ACTION_TARGET else 0
+    self._noop_action = 1 if config.original["PROVIDE_NOOP_ACTION_TARGET"] else 0
 
   # pylint: disable=method-cache-max-size-none
   @lru_cache(maxsize=None)
@@ -131,10 +137,10 @@ class Observation:
       "Tile": None, # np.zeros((self.config.MAP_N_OBS, self.tiles.shape[1])),
       "Entity": np.zeros((self.config.PLAYER_N_OBS,
                           self.entities.values.shape[1]), dtype=np.int16)}
-    if self.config.ITEM_SYSTEM_ENABLED:
+    if self.config.original["ITEM_SYSTEM_ENABLED"]:
       gym_obs["Inventory"] = np.zeros((self.config.INVENTORY_N_OBS,
                                        self.inventory.values.shape[1]), dtype=np.int16)
-    if self.config.EXCHANGE_SYSTEM_ENABLED:
+    if self.config.original["EXCHANGE_SYSTEM_ENABLED"]:
       gym_obs["Market"] = np.zeros((self.config.MARKET_N_OBS,
                                     self.market.values.shape[1]), dtype=np.int16)
     return gym_obs
@@ -145,7 +151,7 @@ class Observation:
     if self.dummy_obs:
       # return empty obs for the dead agents
       gym_obs['Tile'] = np.zeros((self.config.MAP_N_OBS, self.tiles.shape[1]), dtype=np.int16)
-      if self.config.PROVIDE_ACTION_TARGETS:
+      if self.config.original["PROVIDE_ACTION_TARGETS"]:
         gym_obs["ActionTargets"] = self._make_action_targets()
       return gym_obs
 
@@ -153,13 +159,13 @@ class Observation:
     gym_obs['Tile'] = self.tiles
     gym_obs['Entity'][:self.entities.values.shape[0],:] = self.entities.values
 
-    if self.config.ITEM_SYSTEM_ENABLED:
+    if self.config.original["ITEM_SYSTEM_ENABLED"]:
       gym_obs["Inventory"][:self.inventory.values.shape[0],:] = self.inventory.values
 
-    if self.config.EXCHANGE_SYSTEM_ENABLED:
+    if self.config.original["EXCHANGE_SYSTEM_ENABLED"]:
       gym_obs["Market"][:self.market.values.shape[0],:] = self.market.values
 
-    if self.config.PROVIDE_ACTION_TARGETS:
+    if self.config.original["PROVIDE_ACTION_TARGETS"]:
       gym_obs["ActionTargets"] = self._make_action_targets()
 
     return gym_obs
@@ -170,15 +176,16 @@ class Observation:
       "Direction": self._make_move_mask()
     }
 
-    if self.config.COMBAT_SYSTEM_ENABLED:
+    if self.config.original["COMBAT_SYSTEM_ENABLED"]:
       # Test below. see tests/core/test_observation_tile.py, test_action_target_consts()
       # assert len(action.Style.edges) == 3
+      style_mask, target_mask = self._make_attack_mask()
       masks["Attack"] = {
-        "Style": np.ones(3, dtype=np.int8),
-        "Target": self._make_attack_mask()
+        "Style": style_mask,
+        "Target": target_mask
       }
 
-    if self.config.ITEM_SYSTEM_ENABLED:
+    if self.config.original["ITEM_SYSTEM_ENABLED"]:
       masks["Use"] = {
         "InventoryItem": self._make_use_mask()
       }
@@ -190,7 +197,7 @@ class Observation:
         "InventoryItem": self._make_destroy_item_mask()
       }
 
-    if self.config.EXCHANGE_SYSTEM_ENABLED:
+    if self.config.original["EXCHANGE_SYSTEM_ENABLED"]:
       masks["Sell"] = {
         "InventoryItem": self._make_sell_mask(),
         "Price": np.ones(self.config.PRICE_N_OBS, dtype=np.int8)
@@ -203,7 +210,7 @@ class Observation:
         "Target": self._make_give_gold_target_mask()
       }
 
-    if self.config.COMMUNICATION_SYSTEM_ENABLED:
+    if self.config.original["COMMUNICATION_SYSTEM_ENABLED"]:
       masks["Comm"] = {
         "Token":np.ones(self.config.COMMUNICATION_NUM_TOKENS, dtype=np.int8)
       }
@@ -221,19 +228,20 @@ class Observation:
                      for d in action.Direction.edges], dtype=np.int8)
 
   def _make_attack_mask(self):
-    # NOTE: Currently, all attacks have the same range
-    #   if we choose to make ranges different, the masks
-    #   should be differently generated by attack styles
-    assert self.config.COMBAT_MELEE_REACH == self.config.COMBAT_RANGE_REACH
-    assert self.config.COMBAT_MELEE_REACH == self.config.COMBAT_MAGE_REACH
-    assert self.config.COMBAT_RANGE_REACH == self.config.COMBAT_MAGE_REACH
+    # TODO: implement the style mask
+    style_mask = np.ones(3, dtype=np.int8)
+    if self.config.COMBAT_ALLOW_FLEXIBLE_STYLE:
+      # NOTE: if the style is flexible, then the reach of all styles should be the same
+      assert self.config.COMBAT_MELEE_REACH == self.config.COMBAT_RANGE_REACH
+      assert self.config.COMBAT_MELEE_REACH == self.config.COMBAT_MAGE_REACH
+      assert self.config.COMBAT_RANGE_REACH == self.config.COMBAT_MAGE_REACH
 
-    attack_mask = np.zeros(self.config.PLAYER_N_OBS + self._noop_action, dtype=np.int8)
+    target_mask = np.zeros(self.config.PLAYER_N_OBS + self._noop_action, dtype=np.int8)
     if self.config.PROVIDE_NOOP_ACTION_TARGET:
-      attack_mask[-1] = 1
+      target_mask[-1] = 1
 
-    if self.dummy_obs:
-      return attack_mask
+    if not self.config.COMBAT_SYSTEM_ENABLED or self.dummy_obs:
+      return style_mask, target_mask
 
     agent = self.agent()
     within_range = np.maximum( # calculating the l-inf dist
@@ -251,13 +259,13 @@ class Observation:
     # allow friendly fire but no self shooting
     not_me = self.entities.ids != agent.id
 
-    attack_mask[:self.entities.len] = within_range & not_me & no_spawn_immunity
-    if sum(attack_mask[:self.entities.len]) > 0:
+    target_mask[:self.entities.len] = within_range & not_me & no_spawn_immunity
+    if sum(target_mask[:self.entities.len]) > 0:
       # Mask the no-op option, since there should be at least one allowed move
       # NOTE: this will make agents always attack if there is a valid target
-      attack_mask[-1] = 0
+      target_mask[-1] = 0
 
-    return attack_mask
+    return style_mask, target_mask
 
   def _make_use_mask(self):
     # empty inventory -- nothing to use
@@ -368,7 +376,7 @@ class Observation:
   def _make_give_gold_mask(self):
     mask = np.zeros(self.config.PRICE_N_OBS, dtype=np.int8)
     mask[0] = 1  # To avoid all-0 masks. If the agent has no gold, this action will be ignored.
-    if self.dummy_obs or self.agent_in_combat:
+    if not self.config.EXCHANGE_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat:
       return mask
 
     gold = int(self.agent().gold)

@@ -7,6 +7,7 @@ class EventCode:
   # Attack
   SCORE_HIT = 11
   PLAYER_KILL = 12
+  FIRE_AMMO = 13
 
   # Item
   CONSUME_ITEM = 21
@@ -21,7 +22,7 @@ class EventCode:
   LIST_ITEM = 32
   EARN_GOLD = 33
   BUY_ITEM = 34
-  #SPEND_GOLD = 35 # BUY_ITEM, price has the same info
+  LOOT_GOLD = 35
 
   # Level up
   LEVEL_UP = 41

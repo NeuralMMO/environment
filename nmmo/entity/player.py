@@ -69,7 +69,7 @@ class Player(entity.Entity):
     if self.config.EXCHANGE_SYSTEM_ENABLED and source is not None:
       if self.gold.val > 0:
         source.gold.increment(self.gold.val)
-        self.realm.event_log.record(EventCode.EARN_GOLD, source, amount=self.gold.val)
+        self.realm.event_log.record(EventCode.LOOT_GOLD, source, amount=self.gold.val, target=self)
         self.gold.update(0)
 
     # TODO: make source receive the highest-level items first
@@ -84,7 +84,7 @@ class Player(entity.Entity):
         # inventory.receive() returns True if the item is received
         # if source doesn't have space, inventory.receive() destroys the item
         if source.inventory.receive(item):
-          self.realm.event_log.record(EventCode.LOOT_ITEM, source, item=item)
+          self.realm.event_log.record(EventCode.LOOT_ITEM, source, item=item, target=self)
       else:
         item.destroy()
 
@@ -102,6 +102,13 @@ class Player(entity.Entity):
     data['resource']  = self.resources.packet()
     data['skills']    = self.skills.packet()
     data['inventory'] = self.inventory.packet()
+    # added for the 2.0 web client
+    data["metrics"] = {
+      "PlayerDefeats": self.history.player_kills,
+      "TimeAlive": self.time_alive.val,
+      "Gold": self.gold.val,
+      "DamageTaken": self.history.damage_received,
+    }
 
     return data
 
@@ -109,7 +116,7 @@ class Player(entity.Entity):
     '''Post-action update. Do not include history'''
     super().update(realm, actions)
 
-    # Spawsn battle royale style death fog
+    # Spawn battle royale style death fog
     # Starts at 0 damage on the specified config tick
     # Moves in from the edges by 1 damage per tile per tick
     # So after 10 ticks, you take 10 damage at the edge and 1 damage
@@ -118,22 +125,15 @@ class Player(entity.Entity):
     # MAP_CENTER / 2 + 100 ticks after spawning
     fog = self.config.PLAYER_DEATH_FOG
     if fog is not None and self.realm.tick >= fog:
-      row, col = self.pos
-      cent = self.config.MAP_BORDER + self.config.MAP_CENTER // 2
-
-      # Distance from center of the map
-      dist = max(abs(row - cent), abs(col - cent))
-
-      # Safe final area
-      if dist > self.config.PLAYER_DEATH_FOG_FINAL_SIZE:
-        # Damage based on time and distance from center
-        time_dmg = self.config.PLAYER_DEATH_FOG_SPEED * (self.realm.tick - fog + 1)
-        dist_dmg = dist - self.config.MAP_CENTER // 2
-        dmg = max(0, dist_dmg + time_dmg)
-        self.receive_damage(None, dmg)
+      dmg = self.realm.fog_map[self.pos]
+      if dmg > 0.5:  # fog_map has float values
+        self.receive_damage(None, round(dmg))
 
     if not self.alive:
       return
+
+    if self.config.PLAYER_HEALTH_INCREMENT:
+      self.resources.health.increment()
 
     self.resources.update()
     self.skills.update()

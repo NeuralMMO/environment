@@ -20,8 +20,8 @@ class TestSellBuy(ScriptedTestTemplate):
     super().setUpClass()
 
     # config specific to the tests here
-    cls.config.PLAYERS = [baselines.Melee, baselines.Range]
-    cls.config.PLAYER_N = 6
+    cls.config.set("PLAYERS", [baselines.Melee, baselines.Range])
+    cls.config.set("PLAYER_N", 6)
 
     cls.policy = { 1:'Melee', 2:'Range', 3:'Melee', 4:'Range', 5:'Melee', 6:'Range' }
     cls.ammo = { 1:Item.Whetstone, 2:Item.Arrow, 3:Item.Whetstone,

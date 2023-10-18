@@ -1,3 +1,4 @@
+# pylint: disable=no-member
 # import time
 import cProfile
 import io
@@ -25,16 +26,16 @@ def create_config(base, *systems):
 
   conf                    = type(name, systems, {})()
 
-  conf.TERRAIN_TRAIN_MAPS = 1
-  conf.TERRAIN_EVAL_MAPS  = 1
-  conf.IMMORTAL = True
+  conf.set("TERRAIN_TRAIN_MAPS", 1)
+  conf.set("TERRAIN_EVAL_MAPS", 1)
+  conf.set("IMMORTAL", True)
 
   return conf
 
 def benchmark_config(benchmark, base, nent, *systems):
   conf = create_config(base, *systems)
-  conf.PLAYER_N = nent
-  conf.PLAYERS = [baselines.Random]
+  conf.set("PLAYER_N", nent)
+  conf.set("PLAYERS", [baselines.Random])
 
   env = nmmo.Env(conf)
   env.reset()
@@ -47,7 +48,7 @@ def test_small_env_creation(benchmark):
 
 def test_small_env_reset(benchmark):
   config = Small()
-  config.PLAYERS = [baselines.Random]
+  config.set("PLAYERS", [baselines.Random])
   env = nmmo.Env(config)
   benchmark(lambda: env.reset(map_id=1))
 
@@ -111,8 +112,8 @@ def test_fps_all_med_100_pop(benchmark):
 def set_seed_test():
   random_seed = 5000
   conf = create_config(Medium, Terrain, Resource, Combat, NPC)
-  conf.PLAYER_N = 10
-  conf.PLAYERS = [baselines.Random]
+  conf.set("PLAYER_N", 10)
+  conf.set("PLAYERS", [baselines.Random])
 
   env = nmmo.Env(conf)
 

@@ -162,8 +162,10 @@ class Resources:
   def packet(self):
     data = {}
     data['health'] = { 'val': self.health.val, 'max': self.config.PLAYER_BASE_HEALTH }
-    data['food'] = { 'val': self.food.val, 'max': self.config.RESOURCE_BASE }
-    data['water'] = { 'val': self.water.val, 'max': self.config.RESOURCE_BASE }
+    data['food'] = data['water'] = { 'val': 0, 'max': 0 }
+    if self.config.RESOURCE_SYSTEM_ENABLED:
+      data['food'] = { 'val': self.food.val, 'max': self.config.RESOURCE_BASE }
+      data['water'] = { 'val': self.water.val, 'max': self.config.RESOURCE_BASE }
     return data
 
 class Status:
