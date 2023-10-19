@@ -71,6 +71,11 @@ def hunt(realm, actions, entity):
   attack(realm, actions, entity)
 
 def attack(realm, actions, entity):
+  config = realm.config
+  if config.NPC_SYSTEM_ENABLED and not config.NPC_ALLOW_ATTACK_OTHER_NPCS and\
+    entity.target.is_npc:
+    return
+
   distance = utils.lInfty(entity.pos, entity.target.pos)
   if distance > entity.skills.style.attack_range(realm.config):
     return

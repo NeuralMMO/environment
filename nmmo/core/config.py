@@ -566,6 +566,9 @@ class NPC:
   NPC_LEVEL_DAMAGE                    = 15
   '''Bonus NPC damage per level'''
 
+  NPC_ALLOW_ATTACK_OTHER_NPCS         = False
+  '''Whether NPCs can attack other NPCs'''
+
 
 class Item:
   '''Inventory Game System'''

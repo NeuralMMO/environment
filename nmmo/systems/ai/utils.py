@@ -11,6 +11,11 @@ from nmmo.lib.utils import in_bounds
 def validTarget(ent, targ, rng):
   if targ is None or not targ.alive or lInfty(ent.pos, targ.pos) > rng:
     return False
+
+  config = ent.config
+  if config.NPC_SYSTEM_ENABLED and not config.NPC_ALLOW_ATTACK_OTHER_NPCS and targ.is_npc:
+    return False
+
   return True
 
 

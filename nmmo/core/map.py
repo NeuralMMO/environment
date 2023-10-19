@@ -93,7 +93,7 @@ class Map:
     if self.config.TERRAIN_SYSTEM_ENABLED:
       # replace the edge stone/water tiles to foilage
       edge = self.l1 == size//2 - border - 1
-      stone = (map_np_array == material.Stone.index) | (map_np_array == material.Grass.index)
+      stone = (map_np_array == material.Stone.index) | (map_np_array == material.Water.index)
       map_np_array[edge & stone] = material.Foilage.index
 
     return map_np_array
