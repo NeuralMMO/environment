@@ -229,7 +229,7 @@ class Config(Template):
   PROVIDE_DEATH_FOG_OBS = False
   '''Provide death fog observation'''
 
-  ALLOW_MOVE_INTO_OCCUPIED_TILE = False
+  ALLOW_MOVE_INTO_OCCUPIED_TILE = True
   '''Whether agents can move into tiles occupied by other agents/npcs
      However, this does not apply to spawning'''
 
