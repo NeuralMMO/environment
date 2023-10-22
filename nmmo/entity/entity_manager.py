@@ -107,7 +107,7 @@ class NPCManager(EntityGroup):
         break
 
       if self.spawn_dangers:
-        danger = self.spawn_dangers[-1]
+        danger = self.spawn_dangers.pop()
         r, c   = combat.spawn(config, danger, self._np_random)
       else:
         center = config.MAP_CENTER
@@ -119,9 +119,6 @@ class NPCManager(EntityGroup):
       if npc:
         super().spawn_entity(npc)
         self.next_id -= 1
-
-    if self.spawn_dangers:
-      self.spawn_dangers.pop()
 
   def cull(self):
     for entity in super().cull().values():
