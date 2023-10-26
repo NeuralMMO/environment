@@ -25,10 +25,11 @@ class TestTeamGame(unittest.TestCase):
     # raise error if PLAYER_N is not equal to the number of agents in TEAMS
     config = TeamConfig()
     config.set("PLAYER_N", 127)
-    self.assertRaises(AssertionError, lambda: TeamTraining(config, self.env.realm))
+    env = nmmo.Env(config)
+    self.assertRaises(AssertionError, lambda: TeamTraining(env))
 
   def test_agent_training_game(self):
-    game = AgentTraining(self.config, self.env.realm)
+    game = AgentTraining(self.env)
     self.env.reset(game=game)
 
     # this should use the DefaultGame setup
@@ -57,7 +58,7 @@ class TestTeamGame(unittest.TestCase):
     self.assertListEqual(self.env.possible_agents,
                          list(team_helper.team_and_position_for_agent.keys()))
 
-    game = TeamTraining(self.config, self.env.realm)
+    game = TeamTraining(self.env)
     self.env.reset(game=game)
 
     for task in self.env.tasks:
@@ -77,7 +78,7 @@ class TestTeamGame(unittest.TestCase):
           self.assertNotEqual(team_locs[team_a], team_locs[team_b])
 
   def test_team_battle_mode(self):
-    game = TeamBattle(self.config, self.env.realm)
+    game = TeamBattle(self.env)
     self.env.reset(game=game)
     env = self.env
 
@@ -97,7 +98,7 @@ class TestTeamGame(unittest.TestCase):
     self.assertEqual(env.game.winners, env.config.TEAMS[winner_team])
 
   def test_competition_winner_task_completed(self):
-    game = TeamBattle(self.config, self.env.realm)
+    game = TeamBattle(self.env)
     self.env.reset(game=game)
 
     # The first two tasks get completed
@@ -109,6 +110,19 @@ class TestTeamGame(unittest.TestCase):
 
     self.env.step({})
     self.assertEqual(self.env.game.winners, winners)
+
+  def test_game_via_config(self):
+    config = TeamConfig()
+    config.set("GAME_PACKS", [(AgentTraining, 1),
+                              (TeamTraining, 1),
+                              (TeamBattle, 1)])
+    env = nmmo.Env(config)
+    env.reset()
+    for _ in range(3):
+      env.step({})
+
+    self.assertTrue(isinstance(env.game, game_cls)
+                    for game_cls in [AgentTraining, TeamTraining, TeamBattle])
 
 if __name__ == '__main__':
   unittest.main()

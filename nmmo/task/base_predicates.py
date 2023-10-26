@@ -65,9 +65,11 @@ def AllMembersWithinRange(gs: GameState, subject: Group, dist: int):
   """True if the max l-inf distance of teammates is
          less than or equal to dist
   """
-  current_dist = max(subject.row.max()-subject.row.min(),
-      subject.col.max()-subject.col.min())
-  if current_dist <= 0:
+  r = subject.row
+  if len(r) == 0 or dist < 0:
+    return 0.0
+  current_dist = max(r.max()-r.min(), subject.col.max()-subject.col.min())
+  if current_dist <= dist:
     return 1.0
   return norm(dist / current_dist)
 

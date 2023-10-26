@@ -62,11 +62,10 @@ class Env(ParallelEnv):
 
     self.game = None
     # NOTE: The default game runs with the full provided config and unmodded realm.reset()
-    self.default_game = game_api.DefaultGame(self.config, self.realm)
-    self.game_packs = None
+    self.default_game = game_api.DefaultGame(self)
+    self.game_packs: List[game_api.Game] = None
     if config.GAME_PACKS:  # assume List[Tuple(class, weight)]
-      self.game_packs = [game_cls(self.config, self.realm, weight)
-                         for game_cls, weight in config.GAME_PACKS]
+      self.game_packs = [game_cls(self, weight) for game_cls, weight in config.GAME_PACKS]
 
   @functools.cached_property
   def _obs_space(self):
@@ -418,6 +417,12 @@ class Env(ParallelEnv):
       for atn_key, args in sorted(atns.items()):
         action_valid = True
         deserialized_action = {}
+
+        # If action/system is not enabled, it's not in self._str_atn_map
+        if isinstance(atn_key, str) and atn_key not in self._str_atn_map:
+          action_valid = False
+          break
+
         atn = self._str_atn_map[atn_key] if isinstance(atn_key, str) else atn_key
         if not atn.enabled(self.config):  # This can change from episode to episode
           action_valid = False

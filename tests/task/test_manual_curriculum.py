@@ -323,4 +323,4 @@ if __name__ == '__main__':
 
   # test if the task spec is pickalable
   with open('sample_curriculum.pkl', 'wb') as f:
-    dill.dump(task_spec, f)
+    dill.dump(task_spec, f, recurse=True)

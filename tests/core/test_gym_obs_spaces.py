@@ -79,7 +79,7 @@ class TestGymObsSpaces(unittest.TestCase):
     org_obs_spec = deepcopy(env.observation_space(1))
 
     # test the custom game
-    game = CustomGame(config, env.realm)
+    game = CustomGame(env)
     env.reset(game=game)
     for _ in range(3):
       env.step({})

@@ -179,6 +179,26 @@ class Config(Template):
     setattr(self, k, v)
     self._attr_to_reset.append(k)
 
+  @property
+  def enabled_systems(self):
+    '''Return a list of the enabled systems from Env.__init__()'''
+    return [k[:-len('_SYSTEM_ENABLED')]
+            for k, v in self._data.items() if k.endswith('_SYSTEM_ENABLED') and v is True]
+
+  def are_systems_enabled(self, systems):  # systems is a list of strings
+    '''Check if all provided systems are enabled'''
+    return all(s.upper() in self.enabled_systems for s in systems)
+
+  def toggle_systems(self, target_systems):  # systems is a list of strings
+    '''Activate only the provided game systems and turn off the others'''
+    target_systems = [s.upper() for s in target_systems]
+    for system in target_systems:
+      assert system in self.enabled_systems, f'Invalid game system: {system}'
+      self.set_for_episode(f'{system}_SYSTEM_ENABLED', True)
+
+    for system in self.enabled_systems:
+      if system not in target_systems:
+        self.set_for_episode(f'{system}_SYSTEM_ENABLED', False)
 
   ############################################################################
   ### Meta-Parameters
@@ -420,11 +440,13 @@ class Resource:
   '''Fraction of health restored per tick when above half food+water'''
 
 
-def original_combat_damage_formula(offense, defense, multiplier, minimum_proportion):
+# NOTE: Included self to be picklable (in torch.save) since lambdas are not picklable
+def original_combat_damage_formula(self, offense, defense, multiplier, minimum_proportion):
   # pylint: disable=unused-argument
   return int(multiplier * (offense * (15 / (15 + defense))))
 
-def alt_combat_damage_formula(offense, defense, multiplier, minimum_proportion):
+def alt_combat_damage_formula(self, offense, defense, multiplier, minimum_proportion):
+  # pylint: disable=unused-argument
   return int(max(multiplier * offense - defense, offense * minimum_proportion))
 
 class Combat:
@@ -449,8 +471,8 @@ class Combat:
   COMBAT_MINIMUM_DAMAGE_PROPORTION   = 0.25
   '''Minimum proportion of damage to inflict on a target'''
 
-  # pylint: disable=unnecessary-lambda-assignment
-  COMBAT_DAMAGE_FORMULA = lambda self, *args: original_combat_damage_formula(*args)
+  # NOTE: When using a custom function, include "self" as the first arg
+  COMBAT_DAMAGE_FORMULA = original_combat_damage_formula
   '''Damage formula'''
 
   COMBAT_MELEE_DAMAGE                = 10
@@ -661,9 +683,10 @@ class Profession:
   PROFESSION_FISH_RESPAWN             = 0.02
   '''Probability that a harvested fish tile will regenerate each tick'''
 
-  # pylint: disable=unnecessary-lambda-assignment
-  PROFESSION_CONSUMABLE_RESTORE       = lambda self, level: 50 + 5*level
-  '''Amount of food/water restored by consuming a consumable item'''
+  def PROFESSION_CONSUMABLE_RESTORE(self, level):
+    '''Amount of food/water restored by consuming a consumable item'''
+    return 50 + 5*level
+
 
 class Exchange:
   '''Exchange Game System'''

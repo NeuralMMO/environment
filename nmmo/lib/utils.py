@@ -2,6 +2,7 @@
 
 import inspect
 from collections import deque
+import hashlib
 
 import numpy as np
 
@@ -85,3 +86,14 @@ def in_bounds(r, c, shape, border=0):
     c < C - border
   )
 
+def get_hash_embedding(func, embed_dim):
+  # NOTE: This is a hacky way to get a hash embedding for a function
+  # TODO: Can we get more meaningful embedding? coding LLMs are good but huge
+  func_src = inspect.getsource(func)
+  hash_object = hashlib.sha256(func_src.encode())
+  hex_digest = hash_object.hexdigest()
+
+  # Convert the hexadecimal hash to a numpy array with float16 data type
+  hash_bytes = bytes.fromhex(hex_digest)
+  hash_array = np.frombuffer(hash_bytes, dtype=np.float16)
+  return np.resize(hash_array, (embed_dim,))

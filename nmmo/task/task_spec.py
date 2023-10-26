@@ -45,6 +45,7 @@ class TaskSpec:
   sampling_weight: float = 1.0
   embedding: np.ndarray = None
   predicate: Predicate = None
+  tags: List[str] = field(default_factory=list)
 
   def __post_init__(self):
     if self.predicate is None:
@@ -101,6 +102,7 @@ def make_task_from_spec(assign_to: Union[Iterable[int], Dict],
     task_kwargs["embedding"] = task_spec[idx].embedding # to pass to task_cls
     task_kwargs["spec_name"] = task_spec[idx].name
     task_kwargs["reward_to"] = task_spec[idx].reward_to
+    task_kwargs["tags"] = task_spec[idx].tags
     predicate = task_spec[idx].predicate
 
     # reserve "target" for relative agent mapping
@@ -148,7 +150,7 @@ def make_task_from_spec(assign_to: Union[Iterable[int], Dict],
   return tasks
 
 # pylint: disable=bare-except,cell-var-from-loop
-def check_task_spec(spec_list: List[TaskSpec]) -> List[Dict]:
+def check_task_spec(spec_list: List[TaskSpec], debug=False) -> List[Dict]:
   teams = {0: [1, 2, 3], 3: [4, 5], 7: [6, 7], 11: [8, 9], 14: [10, 11]}
   config = nmmo.config.Default()
   config.set("PLAYER_N", 11)
@@ -164,6 +166,8 @@ def check_task_spec(spec_list: List[TaskSpec]) -> List[Dict]:
       result["runnable"] = True
     except:
       result["runnable"] = False
+      if debug:
+        raise
 
     results.append(result)
   return results

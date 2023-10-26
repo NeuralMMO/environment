@@ -2,6 +2,7 @@
 from abc import ABC, abstractmethod
 import dill
 import numpy as np
+
 from nmmo.task import task_api, task_spec
 from nmmo.lib import team_helper
 
@@ -11,10 +12,10 @@ GAME_MODE = ["agent_training", "team_training", "team_battle"]
 class Game(ABC):
   game_mode = None
 
-  def __init__(self, config, realm, sampling_weight=None):
-    self.config = config
-    self.realm = realm
-    self.sampling_weight = sampling_weight
+  def __init__(self, env, sampling_weight=None):
+    self.config = env.config
+    self.realm = env.realm
+    self.sampling_weight = sampling_weight or 1.0
     self.tasks = None
     self._agent_stats = {}
     self._winners = None
@@ -47,6 +48,8 @@ class Game(ABC):
   @abstractmethod
   def _define_tasks(self, np_random):
     """Define tasks for the episode."""
+    # NOTE: Task embeddings should be provided somehow, e.g., from curriculum file.
+    # Otherwise, policies cannot be task-conditioned.
     raise NotImplementedError
 
   def update(self, dones, dead_this_tick):
@@ -76,6 +79,17 @@ class Game(ABC):
       'total_agent_steps': total_agent_steps,
       'norm_progress_to_center': float(progress_to_center) / max_progress
     }
+
+  ############################
+  # Helper functions for Game
+  def _who_completed_task(self):
+    # Return all assignees who completed their tasks
+    winners = []
+    for task in self.tasks:
+      if task.completed:
+        winners += task.assignee
+    return winners or None
+
 
 class DefaultGame(Game):
   """The default NMMO game"""
@@ -185,10 +199,4 @@ class TeamBattle(TeamGameTemplate):
 
     # Return all assignees who completed their tasks
     # Assuming the episode gets ended externally
-    winners = []
-    for task in self.tasks:
-      if task.completed:
-        winners += task.assignee
-    if len(winners) == 0:
-      winners = None
-    return winners
+    return self._who_completed_task()
