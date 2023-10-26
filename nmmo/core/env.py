@@ -421,12 +421,12 @@ class Env(ParallelEnv):
         # If action/system is not enabled, it's not in self._str_atn_map
         if isinstance(atn_key, str) and atn_key not in self._str_atn_map:
           action_valid = False
-          break
+          continue
 
         atn = self._str_atn_map[atn_key] if isinstance(atn_key, str) else atn_key
         if not atn.enabled(self.config):  # This can change from episode to episode
           action_valid = False
-          break
+          continue
 
         for arg_key, val in sorted(args.items()):
           arg = self._str_atn_map[arg_key] if isinstance(arg_key, str) else arg_key

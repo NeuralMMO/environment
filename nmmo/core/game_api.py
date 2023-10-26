@@ -64,7 +64,8 @@ class Game(ABC):
     # Determine winners for the default task
     if self.realm.num_players == 1:  # only one survivor
       self._winners = list(self.realm.players.keys())
-    elif all(dones.values()):  # several agents died at the same time
+    elif all(dones.values()) or self.realm.tick >= self.config.HORIZON:
+      # several agents died at the same time or reached the time limit
       self._winners = list(dones.keys())
 
   def get_episode_stats(self):
