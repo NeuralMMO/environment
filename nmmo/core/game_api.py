@@ -153,11 +153,13 @@ class TeamGameTemplate(Game):
     self.realm.npcs.spawn()
     self.realm.players.spawn(team_loader)
 
-  def _get_cand_team_tasks(self, np_random, num_tasks):
+  def _get_cand_team_tasks(self, np_random, num_tasks, tags=None):
     # NOTE: use different file to store different set of tasks?
     with open(self.config.CURRICULUM_FILE_PATH, 'rb') as f:
       curriculum = dill.load(f) # a list of TaskSpec
     cand_specs = [spec for spec in curriculum if spec.reward_to == "team"]
+    if tags:
+      cand_specs = [spec for spec in cand_specs if tags in spec.tags]
     assert len(cand_specs) > 0, "No team task is defined in the curriculum file"
 
     sampling_weights = [spec.sampling_weight for spec in cand_specs]
