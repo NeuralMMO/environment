@@ -86,6 +86,13 @@ def in_bounds(r, c, shape, border=0):
     c < C - border
   )
 
+def l1_map(size):
+  # l1 distance from the center tile (size//2, size//2)
+  x      = np.abs(np.arange(size) - size//2)
+  X, Y   = np.meshgrid(x, x)
+  data   = np.stack((X, Y), -1)
+  return np.max(abs(data), -1)
+
 def get_hash_embedding(func, embed_dim):
   # NOTE: This is a hacky way to get a hash embedding for a function
   # TODO: Can we get more meaningful embedding? coding LLMs are good but huge

@@ -6,7 +6,7 @@ import vec_noise
 from imageio.v2 import imread, imsave
 from scipy import stats
 
-from nmmo import material
+from nmmo.lib import material, seeding, utils
 
 
 def sharp(noise):
@@ -74,10 +74,7 @@ class Terrain:
       val[:, :, idx] = vec_noise.snoise2(seed*size + freq*X, idx*size + freq*Y)
 
     #Compute L1 distance
-    x      = np.abs(np.arange(size) - size//2)
-    X, Y   = np.meshgrid(x, x)
-    data   = np.stack((X, Y), -1)
-    l1     = np.max(abs(data), -1)
+    l1     = utils.l1_map(size)
 
     #Interpolation Weights
     rrange = np.linspace(-1, 1, 2*octaves-1)
@@ -119,37 +116,53 @@ class Terrain:
     val = std * val / np.std(val)
     val = 0.5 + np.clip(val, -1, 1)/2
 
-    #Threshold to materials
-    matl = np.zeros((size, size), dtype=object)
-    for y in range(size):
-      for x in range(size):
-        v = val[y, x]
-        if v <= config.TERRAIN_WATER:
-          mat = Terrain.WATER
-        elif v <= config.TERRAIN_GRASS:
-          mat = Terrain.GRASS
-        elif v <= config.TERRAIN_FOILAGE:
-          mat = Terrain.FOILAGE
-        else:
-          mat = Terrain.STONE
-        matl[y, x] = mat
-
-    # Void and grass border
-    matl[l1 > size/2 - border]   = Terrain.VOID
-    matl[l1 == size//2 - border] = Terrain.GRASS
-
-    edge  = l1 == size//2 - border - 1
-    stone = (matl == Terrain.STONE) | (matl == Terrain.WATER)
-    matl[edge & stone] = Terrain.FOILAGE
+    # Transform fractal noise to terrain
+    matl = fractal_to_material(config, val, l1)
+    matl = process_map_border(config, matl, l1)
 
     return val, matl, interpolaters
 
-def place_fish(tiles, np_random):
+def fractal_to_material(config, fractal, l1=None):
+  size = config.MAP_SIZE
+  if l1 is None:
+    l1 = utils.l1_map(size)
+
+  matl_map = np.zeros((size, size), dtype=object)
+  for y in range(size):
+    for x in range(size):
+      v = fractal[y, x]
+      if v <= config.TERRAIN_WATER:
+        mat = Terrain.WATER
+      elif v <= config.TERRAIN_GRASS:
+        mat = Terrain.GRASS
+      elif v <= config.TERRAIN_FOILAGE:
+        mat = Terrain.FOILAGE
+      else:
+        mat = Terrain.STONE
+      matl_map[y, x] = mat
+  return matl_map
+
+def process_map_border(config, matl_map, l1=None):
+  size = config.MAP_SIZE
+  border = config.MAP_BORDER
+  if l1 is None:
+    l1 = utils.l1_map(size)
+
+  # Void and grass border
+  matl_map[l1 > size/2 - border]   = Terrain.VOID
+  matl_map[l1 == size//2 - border] = Terrain.GRASS
+  edge  = l1 == size//2 - border - 1
+  stone = (matl_map == Terrain.STONE) | (matl_map == Terrain.WATER)
+  matl_map[edge & stone] = Terrain.FOILAGE
+  return matl_map
+
+def place_fish(tiles, mmin, mmax, np_random):
   placed = False
   allow = {Terrain.GRASS}
 
   water_loc = np.where(tiles == Terrain.WATER)
-  water_loc = list(zip(water_loc[0], water_loc[1]))
+  water_loc = [(r, c) for r, c in zip(water_loc[0], water_loc[1])
+               if mmin < r < mmax and mmin < c < mmax]
   np_random.shuffle(water_loc)
 
   for r, c in water_loc:
@@ -207,7 +220,7 @@ def spawn_profession_resources(config, tiles, np_random=None):
 
   for _ in range(config.PROGRESSION_SPAWN_UNIFORMS):
     uniform(config, tiles, Terrain.HERB, mmin, mmax, np_random)
-    place_fish(tiles, np_random)
+    place_fish(tiles, mmin, mmax, np_random)
 
 class MapGenerator:
   '''Procedural map generation'''
@@ -228,12 +241,13 @@ class MapGenerator:
       setattr(Terrain, key.upper(), mat.index)
     self.textures = lookup
 
-  def generate_all_maps(self, np_random=None):
+  def generate_all_maps(self, seed=None):
     '''Generates NMAPS maps according to generate_map
 
     Provides additional utilities for saving to .npy and rendering png previews'''
 
     config = self.config
+    np_random, _ = seeding.np_random(seed)
 
     #Only generate if maps are not cached
     path_maps = os.path.join(config.PATH_CWD, config.PATH_MAPS)

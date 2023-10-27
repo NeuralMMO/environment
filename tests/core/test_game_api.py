@@ -15,7 +15,7 @@ class TeamConfig(nmmo.config.Small, nmmo.config.AllGameSystems):
            for i in range(NUM_TEAMS)}
   CURRICULUM_FILE_PATH = "tests/task/sample_curriculum.pkl"
 
-class TestTeamGame(unittest.TestCase):
+class TestGameApi(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
     cls.config = TeamConfig()
@@ -123,6 +123,20 @@ class TestTeamGame(unittest.TestCase):
 
     self.assertTrue(isinstance(env.game, game_cls)
                     for game_cls in [AgentTraining, TeamTraining, TeamBattle])
+
+  def test_game_set_next_task(self):
+    game = AgentTraining(self.env)
+    tasks = game._define_tasks(self.env._np_random)  # sample tasks for testing
+    game.set_next_tasks(tasks)
+    self.env.reset(game=game)
+
+    # The tasks are successfully fed into the env
+    for a, b in zip(tasks, self.env.tasks):
+      self.assertIs(a, b)
+
+    # The next tasks is empty
+    self.assertIsNone(game._next_tasks)
+
 
 if __name__ == '__main__':
   unittest.main()

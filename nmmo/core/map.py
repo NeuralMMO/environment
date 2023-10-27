@@ -2,7 +2,12 @@ import numpy as np
 from ordered_set import OrderedSet
 
 from nmmo.core.tile import Tile
-from nmmo.lib import material
+from nmmo.lib import material, utils
+from nmmo.core.terrain import (
+  fractal_to_material,
+  process_map_border,
+  spawn_profession_resources,
+)
 
 
 class Map:
@@ -29,10 +34,7 @@ class Map:
     self.center_coord = None
 
     # used to place border
-    x      = np.abs(np.arange(sz) - sz//2)
-    X, Y   = np.meshgrid(x, x)
-    data   = np.stack((X, Y), -1)
-    self.l1 = np.max(abs(data), -1)
+    self.l1 = utils.l1_map(sz)
 
   @property
   def packet(self):
@@ -49,10 +51,10 @@ class Map:
       self._repr = [[t.material.index for t in row] for row in self.tiles]
     return self._repr
 
-  def reset(self, map_np_array, np_random):
+  def reset(self, map_dict, np_random):
     '''Reuse the current tile objects to load a new map'''
     config = self.config
-    assert map_np_array.shape == (config.MAP_SIZE,config.MAP_SIZE),\
+    assert map_dict["map"].shape == (config.MAP_SIZE,config.MAP_SIZE),\
       "Map shape is inconsistent with config.MAP_SIZE"
 
     # NOTE: MAP_CENTER and MAP_BORDER can change from episode to episode
@@ -67,35 +69,34 @@ class Map:
     materials = {mat.index: mat for mat in material.All}
 
     # process map_np_array according to config
-    map_np_array = self._process_map(map_np_array, np_random)
+    matl_map = self._process_map(map_dict, np_random)
 
-    # reset tiles
-    for r, row in enumerate(map_np_array):
+    # reset tiles with new materials
+    for r, row in enumerate(matl_map):
       for c, idx in enumerate(row):
         mat = materials[idx]
         tile = self.tiles[r, c]
         tile.reset(mat, config, np_random)
         self.habitable_tiles[r, c] = tile.habitable
 
-  def _process_map(self, map_np_array, np_random):  # pylint: disable=unused-argument
-    # resources, other configs
+  def _process_map(self, map_dict, np_random):
+    map_np_array = map_dict["map"]
     if not self.config.TERRAIN_SYSTEM_ENABLED:
       map_np_array[:] = material.Grass.index
     else:
+      if self.config.MAP_RESET_FROM_FRACTAL:
+        map_tiles = fractal_to_material(self.config, map_dict["fractal"], self.l1)
+        # Place materials here, before converting map_tiles into an int array
+        if self.config.PROFESSION_SYSTEM_ENABLED:
+          spawn_profession_resources(self.config, map_tiles, np_random)
+        map_np_array = map_tiles.astype(int)
+
+      # Disable materials here
       if self.config.TERRAIN_DISABLE_STONE:
         map_np_array[map_np_array == material.Stone.index] = material.Grass.index
 
-    # border
-    size = self.config.MAP_SIZE
-    border = self.config.MAP_BORDER
-    map_np_array[self.l1 > size/2 - border] = material.Void.index
-    map_np_array[self.l1 == size/2 - border] = material.Grass.index
-    if self.config.TERRAIN_SYSTEM_ENABLED:
-      # replace the edge stone/water tiles to foilage
-      edge = self.l1 == size//2 - border - 1
-      stone = (map_np_array == material.Stone.index) | (map_np_array == material.Water.index)
-      map_np_array[edge & stone] = material.Foilage.index
-
+    # Make the edge tiles habitable, and place the void tiles outside the border
+    map_np_array = process_map_border(self.config, map_np_array, self.l1)
     return map_np_array
 
   def step(self):

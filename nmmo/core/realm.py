@@ -35,11 +35,6 @@ class Realm:
 
     Action.hook(config)
 
-    # Generate maps if they do not exist
-    # NOTE: Map generation interferes with determinism.
-    #   To ensure determinism, provide seed to env.reset()
-    config.MAP_GENERATOR(config).generate_all_maps(self._np_random)
-
     self.datastore = NumpyDatastore()
     for s in [TileState, EntityState, ItemState, EventState]:
       self.datastore.register_object_type(s._name, s.State.num_attributes)
@@ -69,7 +64,7 @@ class Realm:
     # Initialize actions
     nmmo.Action.init(config)
 
-  def reset(self, np_random, map_np_array, custom_spawn=False):
+  def reset(self, np_random, map_dict, custom_spawn=False):
     """Reset the sub-systems and load the provided map"""
     self._np_random = np_random
     self.tick = 0
@@ -81,7 +76,7 @@ class Realm:
       self._replay_helper.reset()
 
     # Load the map np array into the map, tiles and reset
-    self.map.reset(map_np_array, self._np_random)
+    self.map.reset(map_dict, self._np_random)
 
     # EntityState and ItemState tables must be empty after players/npcs.reset()
     self.players.reset(self._np_random)

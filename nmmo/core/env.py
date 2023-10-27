@@ -35,6 +35,9 @@ class Env(ParallelEnv):
 
     self.config = config
     self.config.env_initialized = True
+
+    # Generate maps if they do not exist
+    config.MAP_GENERATOR(config).generate_all_maps(self._np_seed)
     self.realm = realm.Realm(config, self._np_random)
 
     self.possible_agents = self.config.POSSIBLE_AGENTS
@@ -189,18 +192,18 @@ class Env(ParallelEnv):
         5000+ timesteps for large maps
     '''
     self.seed(seed)
-    map_np_array = self._load_map_file(map_id)
+    map_dict = self._load_map_file(map_id)
 
     # Choose and reset the game, realm, and tasks
     if make_task_fn is not None:
       # Use the provided tasks with the default game (full config, unmodded realm)
       self.tasks = make_task_fn()
       self.game = self.default_game
-      self.game.reset(self._np_random, map_np_array, self.tasks)  # also does realm.reset()
+      self.game.reset(self._np_random, map_dict, self.tasks)  # also does realm.reset()
     elif game is not None:
       # Use the provided game, which comes with its own tasks
       self.game = game
-      self.game.reset(self._np_random, map_np_array)
+      self.game.reset(self._np_random, map_dict)
       self.tasks = self.game.tasks
     elif self.curriculum_file_path is not None:
       # Assume training -- pick a random game from the game packs
@@ -208,13 +211,13 @@ class Env(ParallelEnv):
       if self.game_packs:
         weights = [game.sampling_weight for game in self.game_packs]
         self.game = self._np_random.choice(self.game_packs, p=weights/np.sum(weights))
-      self.game.reset(self._np_random, map_np_array)
+      self.game.reset(self._np_random, map_dict)
       # use the sampled tasks from self.game
       self.tasks = self.game.tasks
     else:
       # Just reset the same game and tasks as before
       self.game = self.default_game  # full config, unmodded realm
-      self.game.reset(self._np_random, map_np_array, self.tasks)  # use existing tasks
+      self.game.reset(self._np_random, map_dict, self.tasks)  # use existing tasks
       if self.tasks is None:
         self.tasks = self.game.tasks
       else:
@@ -245,12 +248,19 @@ class Env(ParallelEnv):
 
     return {a: o.to_gym() for a,o in self.obs.items()}
 
-  def _load_map_file(self, map_id: int=None) -> np.ndarray:
+  def _load_map_file(self, map_id: int=None):
     '''Loads a map file, which is a 2D numpy array'''
+    map_dict= {}
     map_id = map_id or self._np_random.integers(self.config.MAP_N) + 1
-    path_map_suffix = self.config.PATH_MAP_SUFFIX.format(map_id)
-    map_file_path = os.path.join(self.config.PATH_CWD, self.config.PATH_MAPS, path_map_suffix)
-    return np.load(map_file_path)
+    map_file_path = os.path.join(self.config.PATH_CWD, self.config.PATH_MAPS,
+                                 self.config.PATH_MAP_SUFFIX.format(map_id))
+    map_dict["map"] = np.load(map_file_path)
+    if self.config.MAP_RESET_FROM_FRACTAL:
+      fractal_file_path = os.path.join(self.config.PATH_CWD, self.config.PATH_MAPS,
+                                       self.config.PATH_FRACTAL_SUFFIX.format(map_id))
+      # When saving, fractal was converted into uint8 by *256, so dividing it by 256
+      map_dict["fractal"] = np.load(fractal_file_path).astype(float) / 256
+    return map_dict
 
   def _map_task_to_agent(self):
     self.agent_task_map.clear()

@@ -328,6 +328,9 @@ class Config(Template):
   MAP_FORCE_GENERATION         = True
   '''Whether to regenerate and overwrite existing maps'''
 
+  MAP_RESET_FROM_FRACTAL       = True
+  '''Whether to regenerate the map from the fractal source'''
+
   MAP_GENERATE_PREVIEWS        = False
   '''Whether map generation should also save .png previews (slow + large file size)'''
 
@@ -354,6 +357,9 @@ class Config(Template):
 
   PATH_MAP_SUFFIX          = 'map{}/map.npy'
   '''Map file name'''
+
+  PATH_FRACTAL_SUFFIX      = 'map{}/fractal.npy'
+  '''Fractal file name'''
 
 
 ############################################################################

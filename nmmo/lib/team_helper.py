@@ -1,9 +1,10 @@
 from typing import Any, Dict, List
+import numpy.random
 from nmmo.lib import spawn
 
 
 class TeamHelper:
-  def __init__(self, teams: Dict[Any, List[int]]):
+  def __init__(self, teams: Dict[Any, List[int]], np_random=None):
     self.teams = teams
     self.num_teams = len(teams)
     self.team_list = list(teams.keys())
@@ -16,6 +17,11 @@ class TeamHelper:
       for position, agent_id in enumerate(team):
         self.team_and_position_for_agent[agent_id] = (team_id, position)
         self.agent_for_team_and_position[team_id, position] = agent_id
+
+    # Left/right team order is determined by team_list, so shuffling it
+    # TODO: check if this is correct
+    np_random = np_random or numpy.random
+    # np_random.shuffle(self.team_list)
 
   def agent_position(self, agent_id: int) -> int:
     return self.team_and_position_for_agent[agent_id][1]
@@ -31,25 +37,24 @@ class TeamHelper:
     return self.team_list.index(team_id)
 
   def get_target_agent(self, team_id: Any, target: str):
-    team_ids = list(self.teams.keys())
-    idx = team_ids.index(team_id)
+    idx = self.team_list.index(team_id)
     if target == "left_team":
-      target_id = team_ids[(idx+1) % self.num_teams]
+      target_id = self.team_list[(idx+1) % self.num_teams]
       return self.teams[target_id]
     if target == "left_team_leader":
-      target_id = team_ids[(idx+1) % self.num_teams]
+      target_id = self.team_list[(idx+1) % self.num_teams]
       return self.teams[target_id][0]
     if target == "right_team":
-      target_id = team_ids[(idx-1) % self.num_teams]
+      target_id = self.team_list[(idx-1) % self.num_teams]
       return self.teams[target_id]
     if target == "right_team_leader":
-      target_id = team_ids[(idx-1) % self.num_teams]
+      target_id = self.team_list[(idx-1) % self.num_teams]
       return self.teams[target_id][0]
     if target == "my_team_leader":
       return self.teams[team_id][0]
     if target == "all_foes":
       all_foes = []
-      for foe_team_id in team_ids:
+      for foe_team_id in self.team_list:
         if foe_team_id != team_id:
           all_foes += self.teams[foe_team_id]
       return all_foes
@@ -59,7 +64,7 @@ class TeamLoader(spawn.SequentialLoader):
   def __init__(self, config, np_random,
                candidate_spawn_pos=None):
     assert config.TEAMS is not None, "config.TEAMS must be specified"
-    self.team_helper = TeamHelper(config.TEAMS)
+    self.team_helper = TeamHelper(config.TEAMS, np_random)
     # Check if the team specification is valid for spawning
     assert len(self.team_helper.team_and_position_for_agent.keys()) == config.PLAYER_N,\
       "Number of agents in config.TEAMS must be equal to config.PLAYER_N"
@@ -72,13 +77,13 @@ class TeamLoader(spawn.SequentialLoader):
       self.candidate_spawn_pos = candidate_spawn_pos
     else:
       self.candidate_spawn_pos = \
-        spawn_team_together(config, self.team_helper.num_teams, np_random)
+        spawn_team_together(config, self.team_helper.num_teams)
 
   def get_spawn_position(self, agent_id):
     idx = self.team_helper.get_team_idx(agent_id)
     return self.candidate_spawn_pos[idx]
 
-def spawn_team_together(config, num_teams, np_random):
+def spawn_team_together(config, num_teams):
   '''Generates spawn positions for new teams
   Agents in the same team spawn together in the same tile
   Evenly spaces teams around the square map borders
@@ -98,5 +103,4 @@ def spawn_team_together(config, num_teams, np_random):
       idx = int(len(side)*(i+1)/(teams_per_sides + 1))
       team_spawn_positions.append(side[idx])
 
-  np_random.shuffle(team_spawn_positions)
   return team_spawn_positions

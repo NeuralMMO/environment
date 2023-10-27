@@ -17,6 +17,7 @@ class Game(ABC):
     self.realm = env.realm
     self.sampling_weight = sampling_weight or 1.0
     self.tasks = None
+    self._next_tasks = None
     self._agent_stats = {}
     self._winners = None
     assert self.is_compatible(), "Game is not compatible with the config"
@@ -30,10 +31,19 @@ class Game(ABC):
   def winners(self):
     return self._winners
 
-  def reset(self, np_random, map_np_array, tasks=None):
+  def reset(self, np_random, map_dict, tasks=None):
     self._set_config()
-    self._set_realm(np_random, map_np_array)
-    self.tasks = tasks if tasks else self._define_tasks(np_random)
+    self._set_realm(np_random, map_dict)
+    if tasks:
+      # tasks comes from env.reset()
+      self.tasks = tasks
+    elif self._next_tasks:
+      # env.reset() cannot take both game and tasks
+      # so set next_tasks in the game first
+      self.tasks = self._next_tasks
+      self._next_tasks = None
+    else:
+      self.tasks = self._define_tasks(np_random)
     self._agent_stats.clear()
     self._winners = None
 
@@ -41,9 +51,9 @@ class Game(ABC):
     """Set config for the episode. Can customize config using config.set_for_episode()"""
     self.config.reset()
 
-  def _set_realm(self, np_random, map_np_array):
+  def _set_realm(self, np_random, map_dict):
     """Set up the realm for the episode. Can customize map and spawn"""
-    self.realm.reset(np_random, map_np_array, custom_spawn=False)
+    self.realm.reset(np_random, map_dict, custom_spawn=False)
 
   @abstractmethod
   def _define_tasks(self, np_random):
@@ -51,6 +61,10 @@ class Game(ABC):
     # NOTE: Task embeddings should be provided somehow, e.g., from curriculum file.
     # Otherwise, policies cannot be task-conditioned.
     raise NotImplementedError
+
+  def set_next_tasks(self, tasks):
+    """Set the next task to be completed"""
+    self._next_tasks = tasks
 
   def update(self, dones, dead_this_tick):
     """Update the game stats, e.g. agent stats, scores, winners, etc."""
@@ -146,8 +160,8 @@ class TeamGameTemplate(Game):
 
     return True
 
-  def _set_realm(self, np_random, map_np_array):
-    self.realm.reset(np_random, map_np_array, custom_spawn=True)
+  def _set_realm(self, np_random, map_dict):
+    self.realm.reset(np_random, map_dict, custom_spawn=True)
     # Custom spawning
     team_loader = team_helper.TeamLoader(self.config, np_random)
     self.realm.npcs.spawn()
