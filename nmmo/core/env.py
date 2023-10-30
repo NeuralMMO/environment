@@ -258,8 +258,7 @@ class Env(ParallelEnv):
     if self.config.MAP_RESET_FROM_FRACTAL:
       fractal_file_path = os.path.join(self.config.PATH_CWD, self.config.PATH_MAPS,
                                        self.config.PATH_FRACTAL_SUFFIX.format(map_id))
-      # When saving, fractal was converted into uint8 by *256, so dividing it by 256
-      map_dict["fractal"] = np.load(fractal_file_path).astype(float) / 256
+      map_dict["fractal"] = np.load(fractal_file_path).astype(float)
     return map_dict
 
   def _map_task_to_agent(self):

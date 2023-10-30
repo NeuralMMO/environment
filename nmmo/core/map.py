@@ -7,6 +7,7 @@ from nmmo.core.terrain import (
   fractal_to_material,
   process_map_border,
   spawn_profession_resources,
+  scatter_extra_resources,
 )
 
 
@@ -81,6 +82,7 @@ class Map:
 
   def _process_map(self, map_dict, np_random):
     map_np_array = map_dict["map"]
+    mark_center = None
     if not self.config.TERRAIN_SYSTEM_ENABLED:
       map_np_array[:] = material.Grass.index
     else:
@@ -89,14 +91,19 @@ class Map:
         # Place materials here, before converting map_tiles into an int array
         if self.config.PROFESSION_SYSTEM_ENABLED:
           spawn_profession_resources(self.config, map_tiles, np_random)
+        if self.config.TERRAIN_SCATTER_EXTRA_RESOURCES:
+          scatter_extra_resources(self.config, map_tiles, np_random)
         map_np_array = map_tiles.astype(int)
 
       # Disable materials here
       if self.config.TERRAIN_DISABLE_STONE:
         map_np_array[map_np_array == material.Stone.index] = material.Grass.index
 
+      # Mark the center tile with Herb, only when MAP_RESET_FROM_FRACTAL is True
+      mark_center = 2  # clear the 2 tiles around the center and plant a herb
+
     # Make the edge tiles habitable, and place the void tiles outside the border
-    map_np_array = process_map_border(self.config, map_np_array, self.l1)
+    map_np_array = process_map_border(self.config, map_np_array, self.l1, mark_center)
     return map_np_array
 
   def step(self):
@@ -108,12 +115,25 @@ class Map:
 
   def harvest(self, r, c, deplete=True):
     '''Called by actions that harvest a resource tile'''
-
     if deplete:
       self.update_list.add(self.tiles[r, c])
-
     return self.tiles[r, c].harvest(deplete)
 
   def is_valid_pos(self, row, col):
     '''Check if a position is valid'''
     return 0 <= row < self.config.MAP_SIZE and 0 <= col < self.config.MAP_SIZE
+
+  def make_spawnable(self, row, col, radius=2):
+    '''Make the area centered around row, col spawnable'''
+    assert self._repr is None, "Cannot make spawnable after map is generated"
+    assert radius > 0, "Radius must be positive"
+    assert self.config.MAP_BORDER < row-radius and self.config.MAP_BORDER < col-radius \
+           and row+radius < self.config.MAP_SIZE-self.config.MAP_BORDER \
+           and col+radius < self.config.MAP_SIZE-self.config.MAP_BORDER,\
+            "Cannot make spawnable near the border"
+    for r in range(row-radius, row+radius+1):
+      for c in range(col-radius, col+radius+1):
+        tile = self.tiles[r, c]
+        # pylint: disable=protected-access
+        tile.reset(material.Grass, self.config, self.realm._np_random)
+        self.habitable_tiles[r, c] = tile.habitable  # must be true

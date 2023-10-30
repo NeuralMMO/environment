@@ -403,6 +403,8 @@ class Terrain:
   TERRAIN_DISABLE_STONE        = False
   '''Disable stone (obstacle) tiles'''
 
+  TERRAIN_SCATTER_EXTRA_RESOURCES = False
+  '''Whether to scatter extra food, water on the map'''
 
 class Resource:
   '''Resource Game System'''

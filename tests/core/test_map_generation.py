@@ -98,7 +98,8 @@ class TestMapGeneration(unittest.TestCase):
                      np.sum(map_array == material.Grass.index)+\
                      np.sum(map_array == material.Water.index)+\
                      np.sum(map_array == material.Stone.index)+\
-                     np.sum(map_array == material.Foilage.index), map_size*map_size)
+                     np.sum(map_array == material.Foilage.index),
+                     map_size*map_size - 1)  # -1 for the center tile, marked with Herb
 
     # Use the saved map, but disable stone
     config.reset()
@@ -110,6 +111,14 @@ class TestMapGeneration(unittest.TestCase):
     map_array = test_env.realm.map._process_map(map_dict, np_random)
     self.assertTrue(np.sum(org_map == material.Stone.index) > 0)
     self.assertTrue(np.sum(map_array == material.Stone.index) == 0)
+
+    # Generate from fractal, test add-on functions
+    config.reset()
+    config.set_for_episode("MAP_RESET_FROM_FRACTAL", True)
+    config.set_for_episode("PROFESSION_SYSTEM_ENABLED", True)
+    config.set_for_episode("TERRAIN_SCATTER_EXTRA_RESOURCES", True)
+    map_dict = test_env._load_map_file()
+    map_array = test_env.realm.map._process_map(map_dict, np_random)
 
     # this should finish without error
 

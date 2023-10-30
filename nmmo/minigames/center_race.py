@@ -38,6 +38,12 @@ class RacetoCenter(Game):
     self.config.toggle_systems(self.required_systems)
     self.config.set_for_episode("ALLOW_MOVE_INTO_OCCUPIED_TILE", False)
 
+    # Regenerate the map from fractal to have less obstacles
+    self.config.set_for_episode("MAP_RESET_FROM_FRACTAL", True)
+    self.config.set_for_episode("TERRAIN_WATER", 0.05)
+    self.config.set_for_episode("TERRAIN_FOILAGE", 0.95)  # prop of stone tiles: 0.05
+    self.config.set_for_episode("TERRAIN_SCATTER_EXTRA_RESOURCES", True)
+
     # Activate death fog
     self.config.set_for_episode("PLAYER_DEATH_FOG", 32)
     self.config.set_for_episode("PLAYER_DEATH_FOG_SPEED", 1/4)

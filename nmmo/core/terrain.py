@@ -24,10 +24,9 @@ class Save:
 
   @staticmethod
   def fractal(terrain, path):
-    '''Render raw noise fractal to both png and npy'''
-    frac = (256*terrain).astype(np.uint8)
-    imsave(path, frac)
-    np.save(path.replace('.png', '.npy'), frac)
+    '''Save fractal to both png and npy'''
+    imsave(os.path.join(path, 'fractal.png'), (256*terrain).astype(np.uint8))
+    np.save(os.path.join(path, 'fractal.npy'), terrain.astype(np.float16))
 
   @staticmethod
   def as_numpy(mats, path):
@@ -142,16 +141,22 @@ def fractal_to_material(config, fractal, l1=None):
       matl_map[y, x] = mat
   return matl_map
 
-def process_map_border(config, matl_map, l1=None):
+def process_map_border(config, matl_map, l1=None, mark_center=None):
   size = config.MAP_SIZE
   border = config.MAP_BORDER
   if l1 is None:
     l1 = utils.l1_map(size)
 
+  # Make the center area habitable
+  # TODO: Add something to occupy at the center
+  if mark_center:
+    matl_map[l1 <= mark_center] = Terrain.GRASS
+    matl_map[l1 == 0] = Terrain.HERB
+
   # Void and grass border
-  matl_map[l1 > size/2 - border]   = Terrain.VOID
+  matl_map[l1 > size/2 - border] = Terrain.VOID
   matl_map[l1 == size//2 - border] = Terrain.GRASS
-  edge  = l1 == size//2 - border - 1
+  edge = l1 == size//2 - border - 1
   stone = (matl_map == Terrain.STONE) | (matl_map == Terrain.WATER)
   matl_map[edge & stone] = Terrain.FOILAGE
   return matl_map
@@ -222,6 +227,32 @@ def spawn_profession_resources(config, tiles, np_random=None):
     uniform(config, tiles, Terrain.HERB, mmin, mmax, np_random)
     place_fish(tiles, mmin, mmax, np_random)
 
+def try_add_tile(map_tiles, row, col, tile_to_add):
+  if map_tiles[row, col] == Terrain.GRASS:
+    map_tiles[row, col] = tile_to_add
+    return True
+  return False
+
+def scatter_extra_resources(config, tiles, np_random=None,
+                            density_factor=6):
+  if np_random is None:
+    np_random = np.random
+  center = config.MAP_CENTER
+  mmin = config.MAP_BORDER + 1
+  mmax = config.MAP_SIZE - config.MAP_BORDER - 1
+
+  water_to_add, water_added = (center//density_factor)**2, 0
+  food_to_add, food_added  = (center//density_factor)**2, 0
+  while True:
+    if water_added >= water_to_add and food_added >= food_to_add:
+      break
+    r, c = tuple(np_random.integers(mmin, mmax, size=(2,)))
+    if water_added < water_to_add:
+      water_added += 1 if try_add_tile(tiles, r, c, Terrain.WATER) else 0
+    if food_added < food_to_add:
+      food_added += 1 if try_add_tile(tiles, r, c, Terrain.FOILAGE) else 0
+
+
 class MapGenerator:
   '''Procedural map generation'''
   def __init__(self, config):
@@ -273,7 +304,7 @@ class MapGenerator:
 
       #Save/render
       Save.as_numpy(tiles, path)
-      Save.fractal(terrain, path+'/fractal.png')
+      Save.fractal(terrain, path)
       if config.MAP_GENERATE_PREVIEWS:
         b = config.MAP_BORDER
         tiles = [e[b:-b+1] for e in tiles][b:-b+1]
