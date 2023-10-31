@@ -1,3 +1,4 @@
+from typing import Dict, List
 from nmmo.core.game_api import Game
 from nmmo.task import task_api
 from nmmo.lib import utils
@@ -25,6 +26,12 @@ class RacetoCenter(Game):
   def __init__(self, env, sampling_weight=None):
     super().__init__(env, sampling_weight)
 
+    self.map_center = 32  # determines the difficulty
+    self.num_game_lookup = 10  # to look back when determining the difficulty
+    self.num_game_won = 3  # threshold to increase the difficulty
+    self.step_size = 2
+    self.game_results: List[Dict] = []
+
     # NOTE: This is a hacky way to get a hash embedding for a function
     # TODO: Can we get more meaningful embedding? coding LLMs are good but huge
     self.task_embedding = utils.get_hash_embedding(ProgressTowardCenter,
@@ -32,6 +39,14 @@ class RacetoCenter(Game):
 
   def is_compatible(self):
     return self.config.are_systems_enabled(self.required_systems)
+
+  def reset(self, np_random, map_dict, tasks=None):
+    assert self.map_center >= self.config.PLAYER_N//4,\
+      f"self.map_center({self.map_center}) must be >= {self.config.PLAYER_N//4}"
+    super().reset(np_random, map_dict)
+    # result = False means the game ended without a winner
+    self.game_results.append({"result": False, "winners": None,
+                              "map_center": self.map_center})
 
   def _set_config(self):
     self.config.reset()
@@ -46,9 +61,20 @@ class RacetoCenter(Game):
 
     # Activate death fog
     self.config.set_for_episode("PLAYER_DEATH_FOG", 32)
-    self.config.set_for_episode("PLAYER_DEATH_FOG_SPEED", 1/4)
+    self.config.set_for_episode("PLAYER_DEATH_FOG_SPEED", 1/6)
     # Only the center tile is safe
     self.config.set_for_episode("PLAYER_DEATH_FOG_FINAL_SIZE", 0)
+
+    self._determine_difficulty()  # sets the map_center
+    self.config.set_for_episode("MAP_CENTER", self.map_center)
+
+  def _determine_difficulty(self):
+    # Determine the difficulty (the map center) based on the previous results
+    if self.game_results and self.game_results[-1]["result"]:  # the last game was won
+      last_results = [r["result"] for r in self.game_results[-self.num_game_lookup:]]
+      if sum(last_results) >= self.num_game_won \
+        and self.map_center <= self.config.original["MAP_CENTER"] - self.step_size:
+        self.map_center += self.step_size
 
   def _define_tasks(self, np_random):
     return task_api.make_same_task(ProgressTowardCenter, self.config.POSSIBLE_AGENTS,
@@ -57,6 +83,10 @@ class RacetoCenter(Game):
   def update(self, dones, dead_this_tick):
     super().update(dones, dead_this_tick)
     self._winners = self._who_completed_task()
+    if self._winners:
+      self.game_results[-1]["result"] = True
+      self.game_results[-1]["winners"] = self._winners
+      self.game_results[-1].update(self.get_episode_stats())
 
 
 if __name__ == "__main__":
@@ -76,3 +106,9 @@ if __name__ == "__main__":
 
   for _ in range(30):
     test_env.step({})
+
+  # Test if the difficulty increases
+  for result in [False]*7 + [True]*3:
+    game.game_results.append({"result": result})
+    game._determine_difficulty()  # pylint: disable=protected-access
+  assert game.map_center == 34

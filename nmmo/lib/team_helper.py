@@ -60,9 +60,24 @@ class TeamHelper:
       return all_foes
     return None
 
+class RefillPopper:
+  def __init__(self, original_list, np_random=None):
+    assert isinstance(original_list, list), "original_list must be a list of (row, col) tuples"
+    self._original_list = original_list
+    self._np_random = np_random or numpy.random
+    self._refill_list = list(original_list)  # copy
+
+  def pop(self):
+    if len(self._original_list) == 1:
+      return self._original_list[0]
+    if not self._refill_list:
+      self._refill_list = list(self._original_list)
+    pop_idx = self._np_random.integers(len(self._refill_list))
+    return self._refill_list.pop(pop_idx)
+
 class TeamLoader(spawn.SequentialLoader):
   def __init__(self, config, np_random,
-               candidate_spawn_pos=None):
+               candidate_spawn_pos: List[List] = None):
     assert config.TEAMS is not None, "config.TEAMS must be specified"
     self.team_helper = TeamHelper(config.TEAMS, np_random)
     # Check if the team specification is valid for spawning
@@ -71,17 +86,17 @@ class TeamLoader(spawn.SequentialLoader):
     for agent_id in range(1, config.PLAYER_N + 1):
       assert agent_id in self.team_helper.team_and_position_for_agent,\
         f"Agent id {agent_id} is not specified in config.TEAMS"
-
     super().__init__(config, np_random)
-    if candidate_spawn_pos:
-      self.candidate_spawn_pos = candidate_spawn_pos
-    else:
-      self.candidate_spawn_pos = \
-        spawn_team_together(config, self.team_helper.num_teams)
+
+    # candidate_spawn_pos for teams should be List[List]
+    candidate_spawn_pos = candidate_spawn_pos or \
+                          spawn_team_together(config, self.team_helper.num_teams)
+    self.candidate_spawn_pos = [RefillPopper(pos_list, np_random)
+                                for pos_list in candidate_spawn_pos]
 
   def get_spawn_position(self, agent_id):
     idx = self.team_helper.get_team_idx(agent_id)
-    return self.candidate_spawn_pos[idx]
+    return self.candidate_spawn_pos[idx].pop()
 
 def spawn_team_together(config, num_teams):
   '''Generates spawn positions for new teams
@@ -101,6 +116,6 @@ def spawn_team_together(config, num_teams):
   for side in sides:
     for i in range(teams_per_sides):
       idx = int(len(side)*(i+1)/(teams_per_sides + 1))
-      team_spawn_positions.append(side[idx])
+      team_spawn_positions.append([side[idx]])
 
   return team_spawn_positions
