@@ -121,35 +121,39 @@ class UnfairFight(TeamBattle):
     # No one reached the center
     return 0.0
 
+  @staticmethod
+  def test(env, horizon=30):
+    game = UnfairFight(env)
+    env.reset(game=game)
+
+    # Check configs
+    config = env.config
+    assert config.are_systems_enabled(game.required_systems)
+    assert config.COMBAT_SYSTEM_ENABLED is True
+    assert config.TERRAIN_SYSTEM_ENABLED is False
+    assert config.ALLOW_MOVE_INTO_OCCUPIED_TILE is False
+    assert config.PLAYER_DEATH_FOG == 32
+
+    for _ in range(horizon):
+      env.step({})
+
+    # Check the tasks
+    for eid in game.teams["defense"]:
+      assert "TickGE" in env.agent_task_map[eid][0].name,\
+        "TickGE must be assigned to the defense team"
+    for eid in game.teams["offense"]:
+      assert "CheckAgentStatus" in env.agent_task_map[eid][0].name,\
+        "CheckAgentStatus must be assigned to the offense team"
+
+    # Test if the difficulty increases
+    org_def_size = game.defense_size
+    for result in [False]*7 + [True]*game.num_game_won:
+      game.history.append({"result": result, "defense_size": game.defense_size})
+      game._determine_difficulty()  # pylint: disable=protected-access
+    assert game.defense_size == (org_def_size + game.step_size)
+
 if __name__ == "__main__":
   import nmmo
-  config = nmmo.config.Default()  # Medium, AllGameSystems
-  test_env = nmmo.Env(config)
-
-  game = UnfairFight(test_env)
-  test_env.reset(game=game)
-
-  # Check configs
-  assert config.are_systems_enabled(game.required_systems)
-  assert config.COMBAT_SYSTEM_ENABLED is True
-  assert config.TERRAIN_SYSTEM_ENABLED is False
-  assert config.ALLOW_MOVE_INTO_OCCUPIED_TILE is False
-  assert config.PLAYER_DEATH_FOG == 32
-
-  for _ in range(30):
-    test_env.step({})
-
-  # Check the tasks
-  for eid in game.teams["defense"]:
-    assert "TickGE" in test_env.agent_task_map[eid][0].name,\
-      "TickGE must be assigned to the defense team"
-  for eid in game.teams["offense"]:
-    assert "CheckAgentStatus" in test_env.agent_task_map[eid][0].name,\
-      "CheckAgentStatus must be assigned to the offense team"
-
-  # Test if the difficulty increases
-  org_def_size = game.defense_size
-  for result in [False]*7 + [True]*game.num_game_won:
-    game.history.append({"result": result, "defense_size": game.defense_size})
-    game._determine_difficulty()  # pylint: disable=protected-access
-  assert game.defense_size == (org_def_size + game.step_size)
+  test_config = nmmo.config.Default()  # Medium, AllGameSystems
+  test_env = nmmo.Env(test_config)
+  UnfairFight.test(test_env)

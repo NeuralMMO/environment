@@ -88,27 +88,31 @@ class RacetoCenter(Game):
   def _check_winners(self, dones):
     return self._who_completed_task()
 
+  @staticmethod
+  def test(env, horizon=30):
+    game = RacetoCenter(env)
+    env.reset(game=game)
+
+    # Check configs
+    config = env.config
+    assert config.are_systems_enabled(game.required_systems)
+    assert config.COMBAT_SYSTEM_ENABLED is False
+    assert config.ITEM_SYSTEM_ENABLED is False
+    assert config.ALLOW_MOVE_INTO_OCCUPIED_TILE is False
+    assert config.PLAYER_DEATH_FOG == 32
+
+    for _ in range(horizon):
+      env.step({})
+
+    # Test if the difficulty increases
+    org_map_center = game.map_center
+    for result in [False]*7 + [True]*game.num_game_won:
+      game.history.append({"result": result, "map_center": game.map_center})
+      game._determine_difficulty()  # pylint: disable=protected-access
+    assert game.map_center == (org_map_center + game.step_size)
+
 if __name__ == "__main__":
   import nmmo
-  config = nmmo.config.Default()  # Medium, AllGameSystems
-  test_env = nmmo.Env(config)
-
-  game = RacetoCenter(test_env)
-  test_env.reset(game=game)
-
-  # Check configs
-  assert config.are_systems_enabled(game.required_systems)
-  assert config.COMBAT_SYSTEM_ENABLED is False
-  assert config.ITEM_SYSTEM_ENABLED is False
-  assert config.ALLOW_MOVE_INTO_OCCUPIED_TILE is False
-  assert config.PLAYER_DEATH_FOG == 32
-
-  for _ in range(30):
-    test_env.step({})
-
-  # Test if the difficulty increases
-  org_map_center = game.map_center
-  for result in [False]*7 + [True]*game.num_game_won:
-    game.history.append({"result": result, "map_center": game.map_center})
-    game._determine_difficulty()  # pylint: disable=protected-access
-  assert game.map_center == (org_map_center + game.step_size)
+  test_config = nmmo.config.Default()  # Medium, AllGameSystems
+  test_env = nmmo.Env(test_config)
+  RacetoCenter.test(test_env)
