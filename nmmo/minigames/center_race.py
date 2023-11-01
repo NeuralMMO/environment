@@ -1,4 +1,3 @@
-from typing import Dict, List
 from nmmo.core.game_api import Game
 from nmmo.task import task_api
 from nmmo.lib import utils
@@ -27,10 +26,10 @@ class RacetoCenter(Game):
     super().__init__(env, sampling_weight)
 
     self.map_center = 32  # determines the difficulty
-    self.num_game_lookup = 10  # to look back when determining the difficulty
-    self.num_game_won = 3  # threshold to increase the difficulty
-    self.step_size = 2
-    self.game_results: List[Dict] = []
+    self.score_scaler = 1.3
+    self.adaptive_difficulty = True
+    self.num_game_won = 3  # at the same map size, threshold to increase the difficulty
+    self.step_size = 4
 
     # NOTE: This is a hacky way to get a hash embedding for a function
     # TODO: Can we get more meaningful embedding? coding LLMs are good but huge
@@ -44,9 +43,7 @@ class RacetoCenter(Game):
     assert self.map_center >= self.config.PLAYER_N//4,\
       f"self.map_center({self.map_center}) must be >= {self.config.PLAYER_N//4}"
     super().reset(np_random, map_dict)
-    # result = False means the game ended without a winner
-    self.game_results.append({"result": False, "winners": None,
-                              "map_center": self.map_center})
+    self.history[-1]["map_center"] = self.map_center
 
   def _set_config(self):
     self.config.reset()
@@ -70,8 +67,9 @@ class RacetoCenter(Game):
 
   def _determine_difficulty(self):
     # Determine the difficulty (the map center) based on the previous results
-    if self.game_results and self.game_results[-1]["result"]:  # the last game was won
-      last_results = [r["result"] for r in self.game_results[-self.num_game_lookup:]]
+    if self.adaptive_difficulty and self.history \
+       and self.history[-1]["result"]:  # the last game was won
+      last_results = [r["result"] for r in self.history if r["map_center"] == self.map_center]
       if sum(last_results) >= self.num_game_won \
         and self.map_center <= self.config.original["MAP_CENTER"] - self.step_size:
         self.map_center += self.step_size
@@ -80,14 +78,15 @@ class RacetoCenter(Game):
     return task_api.make_same_task(ProgressTowardCenter, self.config.POSSIBLE_AGENTS,
                                    task_kwargs={"embedding": self.task_embedding})
 
-  def update(self, dones, dead_this_tick):
-    super().update(dones, dead_this_tick)
-    self._winners = self._who_completed_task()
+  @property
+  def winning_score(self):
     if self._winners:
-      self.game_results[-1]["result"] = True
-      self.game_results[-1]["winners"] = self._winners
-      self.game_results[-1].update(self.get_episode_stats())
+      return (self.map_center**self.score_scaler)/max(self.realm.tick, 1)
+    # No one reached the center
+    return 0.0
 
+  def _check_winners(self, dones):
+    return self._who_completed_task()
 
 if __name__ == "__main__":
   import nmmo
@@ -108,7 +107,8 @@ if __name__ == "__main__":
     test_env.step({})
 
   # Test if the difficulty increases
-  for result in [False]*7 + [True]*3:
-    game.game_results.append({"result": result})
+  org_map_center = game.map_center
+  for result in [False]*7 + [True]*game.num_game_won:
+    game.history.append({"result": result, "map_center": game.map_center})
     game._determine_difficulty()  # pylint: disable=protected-access
-  assert game.map_center == 34
+  assert game.map_center == (org_map_center + game.step_size)

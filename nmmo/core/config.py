@@ -14,7 +14,7 @@ from nmmo.lib import utils, material, spawn
 CONFIG_ATTR_PATTERN = r"^[A-Z_]+$"
 
 # These attributes are critical for trainer and must not change from the initial values
-OBS_ATTRS = set(["HORIZON", "PLAYER_N", "MAP_N_OBS", "PLAYER_N_OBS", "TASK_EMBED_DIM",
+OBS_ATTRS = set(["MAX_HORIZON", "PLAYER_N", "MAP_N_OBS", "PLAYER_N_OBS", "TASK_EMBED_DIM",
                  "INVENTORY_N_OBS", "MARKET_N_OBS", "PRICE_N_OBS", "COMMUNICATION_NUM_TOKENS",
                  "PROVIDE_ACTION_TARGETS", "PROVIDE_DEATH_FOG_OBS",
                  "PROVIDE_NOOP_ACTION_TARGET"])
@@ -73,6 +73,7 @@ class Template(metaclass=utils.StaticIterable):
 def validate(config):
   err = 'config.Config is a base class. Use config.{Small, Medium Large}'''
   assert isinstance(config, Config), err
+  assert config.HORIZON < config.MAX_HORIZON, 'HORIZON must be <= MAX_HORIZON'
 
   if not config.TERRAIN_SYSTEM_ENABLED:
     err = 'Invalid Config: {} requires Terrain'
@@ -224,6 +225,9 @@ class Config(Template):
   # TODO: CHECK if there could be 100+ entities within one's vision
   PLAYER_N_OBS                 = 100
   '''Number of distinct agent observations'''
+
+  MAX_HORIZON = 2**16  # this is arbitrary
+  '''Maximum number of steps the environment can run for'''
 
   HORIZON = 1024
   '''Number of steps before the environment resets'''

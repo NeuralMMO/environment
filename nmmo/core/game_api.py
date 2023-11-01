@@ -1,5 +1,6 @@
 # pylint: disable=no-member,bare-except
 from abc import ABC, abstractmethod
+from typing import Dict, List
 import dill
 import numpy as np
 
@@ -20,6 +21,8 @@ class Game(ABC):
     self._next_tasks = None
     self._agent_stats = {}
     self._winners = None
+    self._game_done = False
+    self.history: List[Dict] = []
     assert self.is_compatible(), "Game is not compatible with the config"
 
   @abstractmethod
@@ -30,6 +33,13 @@ class Game(ABC):
   @property
   def winners(self):
     return self._winners
+
+  @property
+  def winning_score(self):
+    if self._winners:
+      # CHECK ME: should we return the winners" tasks" reward multiplier?
+      return 1.0  # default score for task completion
+    return 0.0
 
   def reset(self, np_random, map_dict, tasks=None):
     self._set_config()
@@ -46,6 +56,9 @@ class Game(ABC):
       self.tasks = self._define_tasks(np_random)
     self._agent_stats.clear()
     self._winners = None
+    self._game_done = False
+    # result = False means the game ended without a winner
+    self.history.append({"result": False, "winners": None, "winning_score": None})
 
   def _set_config(self):
     """Set config for the episode. Can customize config using config.set_for_episode()"""
@@ -75,12 +88,23 @@ class Game(ABC):
         self._agent_stats[agent_id] = {"time_alive": self.realm.tick,
                                        "progress_to_center": agent.history.exploration}
 
+    self._winners = self._check_winners(dones)
+
+    if self._winners and not self._game_done:
+      self._game_done = self.history[-1]["result"] = True
+      self.history[-1]["winners"] = self._winners
+      self.history[-1]["winning_score"] = self.winning_score
+      self.history[-1]["winning_tick"] = self.realm.tick
+      self.history[-1].update(self.get_episode_stats())
+
+  def _check_winners(self, dones):
     # Determine winners for the default task
     if self.realm.num_players == 1:  # only one survivor
-      self._winners = list(self.realm.players.keys())
-    elif all(dones.values()) or self.realm.tick >= self.config.HORIZON:
+      return list(self.realm.players.keys())
+    if all(dones.values()) or self.realm.tick >= self.config.HORIZON:
       # several agents died at the same time or reached the time limit
-      self._winners = list(dones.keys())
+      return list(dones.keys())
+    return None
 
   def get_episode_stats(self):
     """A helper function for trainers"""
@@ -88,11 +112,11 @@ class Game(ABC):
     progress_to_center = 0
     max_progress = self.config.PLAYER_N * self.config.MAP_SIZE // 2
     for stat in self._agent_stats.values():
-      total_agent_steps += stat['time_alive']
-      progress_to_center += stat['progress_to_center']
+      total_agent_steps += stat["time_alive"]
+      progress_to_center += stat["progress_to_center"]
     return {
-      'total_agent_steps': total_agent_steps,
-      'norm_progress_to_center': float(progress_to_center) / max_progress
+      "total_agent_steps": total_agent_steps,
+      "norm_progress_to_center": float(progress_to_center) / max_progress
     }
 
   ############################
@@ -124,15 +148,14 @@ class AgentTraining(Game):
     try:
       assert self.config.COMBAT_SYSTEM_ENABLED, "Combat system must be enabled"
       # Check is the curriculum file exists and opens
-      with open(self.config.CURRICULUM_FILE_PATH, 'rb') as f:
+      with open(self.config.CURRICULUM_FILE_PATH, "rb") as f:
         dill.load(f) # a list of TaskSpec
     except:
       return False
-
     return True
 
   def _define_tasks(self, np_random):
-    with open(self.config.CURRICULUM_FILE_PATH, 'rb') as f:
+    with open(self.config.CURRICULUM_FILE_PATH, "rb") as f:
       # curriculum file may have been changed, so read the file when sampling
       curriculum = dill.load(f) # a list of TaskSpec
     cand_specs = [spec for spec in curriculum if spec.reward_to == "agent"]
@@ -153,11 +176,10 @@ class TeamGameTemplate(Game):
       assert self.config.PLAYER_N == num_agents,\
         "PLAYER_N must match the number of agents in TEAMS"
       # Check is the curriculum file exists and opens
-      with open(self.config.CURRICULUM_FILE_PATH, 'rb') as f:
+      with open(self.config.CURRICULUM_FILE_PATH, "rb") as f:
         dill.load(f) # a list of TaskSpec
     except:
       return False
-
     return True
 
   def _set_realm(self, np_random, map_dict):
@@ -169,7 +191,7 @@ class TeamGameTemplate(Game):
 
   def _get_cand_team_tasks(self, np_random, num_tasks, tags=None):
     # NOTE: use different file to store different set of tasks?
-    with open(self.config.CURRICULUM_FILE_PATH, 'rb') as f:
+    with open(self.config.CURRICULUM_FILE_PATH, "rb") as f:
       curriculum = dill.load(f) # a list of TaskSpec
     cand_specs = [spec for spec in curriculum if spec.reward_to == "team"]
     if tags:
@@ -198,11 +220,7 @@ class TeamBattle(TeamGameTemplate):
     return task_spec.make_task_from_spec(self.config.TEAMS,
                                          [sampled_spec] * len(self.config.TEAMS))
 
-  def update(self, dones, dead_this_tick):
-    super().update(dones, dead_this_tick)
-    self._winners = self._check_battle_winners()
-
-  def _check_battle_winners(self):
+  def _check_winners(self, dones):
     # A team is won, when their task is completed first or only one team remains
     assert self.config.TEAMS is not None, "Team battle mode requires TEAMS to be defined"
     current_teams = {}

@@ -84,7 +84,7 @@ class Env(ParallelEnv):
     num_tile_attributes = len(Tile.State.attr_name_to_col)
     num_tile_attributes += 1 if self.config.original["PROVIDE_DEATH_FOG_OBS"] else 0
     obs_space = {
-      "CurrentTick": gym.spaces.Discrete(self.config.HORIZON+1),
+      "CurrentTick": gym.spaces.Discrete(self.config.MAX_HORIZON),
       "AgentId": gym.spaces.Discrete(self.config.PLAYER_N+1),
       "Tile": box(self.config.MAP_N_OBS, num_tile_attributes),
       "Entity": box(self.config.PLAYER_N_OBS, Entity.State.num_attributes),
