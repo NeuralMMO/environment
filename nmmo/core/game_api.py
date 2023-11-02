@@ -54,11 +54,8 @@ class Game(ABC):
       self._next_tasks = None
     else:
       self.tasks = self._define_tasks(np_random)
-    self._agent_stats.clear()
-    self._winners = None
-    self._game_done = False
-    # result = False means the game ended without a winner
-    self.history.append({"result": False, "winners": None, "winning_score": None})
+    self._post_setup()
+    self._reset_stats()
 
   def _set_config(self):
     """Set config for the episode. Can customize config using config.set_for_episode()"""
@@ -67,6 +64,17 @@ class Game(ABC):
   def _set_realm(self, np_random, map_dict):
     """Set up the realm for the episode. Can customize map and spawn"""
     self.realm.reset(np_random, map_dict, custom_spawn=False)
+
+  def _post_setup(self):
+    """Post-setup processes, e.g., attach team tags, etc."""
+
+  def _reset_stats(self):
+    """Reset stats for the episode"""
+    self._agent_stats.clear()
+    self._winners = None
+    self._game_done = False
+    # result = False means the game ended without a winner
+    self.history.append({"result": False, "winners": None, "winning_score": None})
 
   @abstractmethod
   def _define_tasks(self, np_random):
@@ -188,6 +196,17 @@ class TeamGameTemplate(Game):
     team_loader = team_helper.TeamLoader(self.config, np_random)
     self.realm.npcs.spawn()
     self.realm.players.spawn(team_loader)
+
+  def _post_setup(self):
+    self._attach_team_tag()
+
+  def _attach_team_tag(self):
+    # setup team names
+    for team_id, members in self.config.TEAMS.items():
+      for idx, agent_id in enumerate(members):
+        self.realm.players[agent_id].name = f"{team_id}_{agent_id}"
+        if idx == 0:
+          self.realm.players[agent_id].name = f"{team_id}_leader"
 
   def _get_cand_team_tasks(self, np_random, num_tasks, tags=None):
     # NOTE: use different file to store different set of tasks?

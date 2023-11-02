@@ -19,7 +19,7 @@ elimination_task = task_spec.TaskSpec(
 
 
 class UnfairFight(TeamBattle):
-  required_systems = ["COMBAT"]
+  required_systems = ["TERRAIN", "COMBAT"]
 
   def __init__(self, env, sampling_weight=None):
     super().__init__(env, sampling_weight)
@@ -45,11 +45,6 @@ class UnfairFight(TeamBattle):
     self.history[-1]["defense_size"] = self.defense_size
     self.history[-1]["def_over_off_ratio"] = self.def_over_off_ratio
 
-    # setup team names
-    for team_id, members in self.teams.items():
-      for agent_id in members:
-        self.realm.players[agent_id].name = f"{team_id}_{agent_id}"
-
   @property
   def teams(self):
     return {"defense": list(range(1, self.defense_size+1)),
@@ -66,6 +61,11 @@ class UnfairFight(TeamBattle):
 
     # Make the map small
     self.config.set_for_episode("MAP_CENTER", 24)
+
+    # Regenerate the map from fractal to have less obstacles
+    self.config.set_for_episode("MAP_RESET_FROM_FRACTAL", True)
+    self.config.set_for_episode("TERRAIN_WATER", 0.1)
+    self.config.set_for_episode("TERRAIN_FOILAGE", 0.9)  # prop of stone tiles: 0.05
 
     # Activate death fog
     self.config.set_for_episode("PLAYER_DEATH_FOG", 32)
@@ -103,6 +103,10 @@ class UnfairFight(TeamBattle):
     candidate_locs = [[(center-r_offset, center-c_offset)],
                       [(center+r_offset, center+c_offset)]]
     np_random.shuffle(candidate_locs)
+    # Also, one should make sure these locations are spawnable
+    for loc_list in candidate_locs:
+      for loc in loc_list:
+        self.realm.map.make_spawnable(*loc)
     team_loader = team_helper.TeamLoader(self.config, np_random, candidate_locs)
     self.realm.players.spawn(team_loader)
 
@@ -130,7 +134,7 @@ class UnfairFight(TeamBattle):
     config = env.config
     assert config.are_systems_enabled(game.required_systems)
     assert config.COMBAT_SYSTEM_ENABLED is True
-    assert config.TERRAIN_SYSTEM_ENABLED is False
+    assert config.ITEM_SYSTEM_ENABLED is False
     assert config.ALLOW_MOVE_INTO_OCCUPIED_TILE is False
     assert config.PLAYER_DEATH_FOG == 32
 
