@@ -1,9 +1,9 @@
+# pylint: disable=invalid-name, duplicate-code
 from nmmo.core.game_api import Game
 from nmmo.task import task_api
 from nmmo.lib import utils
 
 
-# pylint: disable=invalid-name
 def ProgressTowardCenter(gs, subject):
   if not any(subject.health > 0):  # subject should be alive
     return 0.0

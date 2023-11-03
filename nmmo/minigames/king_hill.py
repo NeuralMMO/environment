@@ -1,10 +1,10 @@
+# pylint: disable=invalid-name, duplicate-code
 from nmmo.core.game_api import TeamBattle
 from nmmo.task import task_spec
 from nmmo.lib import utils, team_helper
 
 SEIZE_DURATION = 30  # ticks to win
 
-# pylint: disable=invalid-name
 def SeizeCenter(gs, subject, num_ticks):
   if not any(subject.health > 0):  # subject should be alive
     return 0.0

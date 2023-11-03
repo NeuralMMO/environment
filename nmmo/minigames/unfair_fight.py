@@ -1,3 +1,4 @@
+# pylint: disable=duplicate-code
 from nmmo.core.game_api import TeamBattle
 from nmmo.task import task_spec, base_predicates
 from nmmo.lib import utils, team_helper
