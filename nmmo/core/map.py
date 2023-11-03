@@ -87,7 +87,8 @@ class Map:
       map_np_array[:] = material.Grass.index
     else:
       if self.config.MAP_RESET_FROM_FRACTAL:
-        map_tiles = fractal_to_material(self.config, map_dict["fractal"], self.l1)
+        map_tiles = fractal_to_material(self.config, map_dict["fractal"],
+                                        self.config.TERRAIN_RESET_TO_GRASS)
         # Place materials here, before converting map_tiles into an int array
         if self.config.PROFESSION_SYSTEM_ENABLED:
           spawn_profession_resources(self.config, map_tiles, np_random)

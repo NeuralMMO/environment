@@ -89,6 +89,18 @@ class TestMapGeneration(unittest.TestCase):
     # NOTE: +1 to make the center tile, really the center
     self.assertEqual((config.MAP_CENTER+1)**2, np.sum(map_array == material.Grass.index))
 
+    # Another way to make the grass map (which can place other tiles, if want to)
+    config.set_for_episode("MAP_RESET_FROM_FRACTAL", True)
+    config.set_for_episode("TERRAIN_RESET_TO_GRASS", True)
+    config.set_for_episode("PROFESSION_SYSTEM_ENABLED", False)  # harvestalbe tiles
+    config.set_for_episode("TERRAIN_SCATTER_EXTRA_RESOURCES", False)
+    map_dict = test_env._load_map_file()
+    map_array = test_env.realm.map._process_map(map_dict, np_random)
+    self.assertEqual(np.sum(map_array == material.Void.index)+\
+                     np.sum(map_array == material.Grass.index), map_size*map_size)
+    # NOTE: +1 to make the center tile, really the center
+    self.assertEqual((config.MAP_CENTER+1)**2, np.sum(map_array == material.Grass.index))
+
     # Generate from fractal, but not spawn profession tiles
     config.reset()
     config.set_for_episode("PROFESSION_SYSTEM_ENABLED", False)

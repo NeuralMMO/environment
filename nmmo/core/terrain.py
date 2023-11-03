@@ -116,19 +116,20 @@ class Terrain:
     val = 0.5 + np.clip(val, -1, 1)/2
 
     # Transform fractal noise to terrain
-    matl = fractal_to_material(config, val, l1)
+    matl = fractal_to_material(config, val)
     matl = process_map_border(config, matl, l1)
 
     return val, matl, interpolaters
 
-def fractal_to_material(config, fractal, l1=None):
+def fractal_to_material(config, fractal, all_grass=False):
   size = config.MAP_SIZE
-  if l1 is None:
-    l1 = utils.l1_map(size)
-
   matl_map = np.zeros((size, size), dtype=object)
   for y in range(size):
     for x in range(size):
+      if all_grass:
+        matl_map[y, x] = Terrain.GRASS
+        continue
+
       v = fractal[y, x]
       if v <= config.TERRAIN_WATER:
         mat = Terrain.WATER

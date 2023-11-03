@@ -404,11 +404,16 @@ class Terrain:
   TERRAIN_FOILAGE              = 0.85
   '''Noise threshold for foilage (food tile)'''
 
+  TERRAIN_RESET_TO_GRASS       = False
+  '''Whether to make all tiles grass.
+     Only works when MAP_RESET_FROM_FRACTAL is True'''
+
   TERRAIN_DISABLE_STONE        = False
   '''Disable stone (obstacle) tiles'''
 
   TERRAIN_SCATTER_EXTRA_RESOURCES = False
-  '''Whether to scatter extra food, water on the map'''
+  '''Whether to scatter extra food, water on the map.
+     Only works when MAP_RESET_FROM_FRACTAL is True'''
 
 class Resource:
   '''Resource Game System'''

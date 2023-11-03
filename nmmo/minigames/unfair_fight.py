@@ -80,13 +80,15 @@ class UnfairFight(TeamBattle):
     self.config.set_for_episode("TEAMS", self.teams)
 
   def _determine_difficulty(self):
-    # Determine the difficulty (the map center) based on the previous results
-    if self.adaptive_difficulty and self.history \
-       and self.history[-1]["result"]:  # the last game was won
-      last_results = [r["result"] for r in self.history if r["defense_size"] == self.defense_size]
-      if sum(last_results) >= self.num_game_won \
-        and self.defense_size <= self.config.PLAYER_N//2 - self.step_size:
-        self.defense_size += self.step_size
+    # Determine the difficulty (the defense size) based on the previous results: 1 up - 1 down
+    if self.adaptive_difficulty and self.history and self.history[-1]["result"]:
+      # agent 1 always play the defense team
+      if 1 in self.history[-1]["winners"]:
+        # if the defense won, decrease the defense size
+        self.defense_size = max(self.defense_size - self.step_size, self.step_size)
+      else:
+        # if the offense won, increase the defense size
+        self.defense_size = min(self.step_size + self.defense_size, self.config.PLAYER_N//2)
 
   def _define_tasks(self, np_random):
     return task_spec.make_task_from_spec(
@@ -149,12 +151,16 @@ class UnfairFight(TeamBattle):
       assert "CheckAgentStatus" in env.agent_task_map[eid][0].name,\
         "CheckAgentStatus must be assigned to the offense team"
 
+    # pylint: disable=protected-access
     # Test if the difficulty increases
     org_def_size = game.defense_size
-    for result in [False]*7 + [True]*game.num_game_won:
-      game.history.append({"result": result, "defense_size": game.defense_size})
-      game._determine_difficulty()  # pylint: disable=protected-access
+    game.history.append({"result": True, "winners": [60]})  # the offense won
+    game._determine_difficulty()
     assert game.defense_size == (org_def_size + game.step_size)
+
+    game.history.append({"result": True, "winners": [1]})  # the defense won
+    game._determine_difficulty()
+    assert game.defense_size == org_def_size
 
 if __name__ == "__main__":
   import nmmo

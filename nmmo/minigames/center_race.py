@@ -29,7 +29,7 @@ class RacetoCenter(Game):
     self.score_scaler = 1.3
     self.adaptive_difficulty = True
     self.num_game_won = 3  # at the same map size, threshold to increase the difficulty
-    self.step_size = 4
+    self.step_size = 8
 
     # NOTE: This is a hacky way to get a hash embedding for a function
     # TODO: Can we get more meaningful embedding? coding LLMs are good but huge
@@ -97,9 +97,8 @@ class RacetoCenter(Game):
     config = env.config
     assert config.are_systems_enabled(game.required_systems)
     assert config.COMBAT_SYSTEM_ENABLED is False
-    assert config.ITEM_SYSTEM_ENABLED is False
-    assert config.ALLOW_MOVE_INTO_OCCUPIED_TILE is False
     assert config.PLAYER_DEATH_FOG == 32
+    assert config.ALLOW_MOVE_INTO_OCCUPIED_TILE is False
 
     for _ in range(horizon):
       env.step({})
