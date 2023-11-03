@@ -151,15 +151,15 @@ def process_map_border(config, matl_map, l1=None, mark_center=None):
   # Make the center area habitable
   # TODO: Add something to occupy at the center
   if mark_center:
-    matl_map[l1 <= mark_center] = Terrain.GRASS
-    matl_map[l1 == 0] = Terrain.HERB
+    matl_map[l1 <= mark_center] = material.Grass.index
+    matl_map[l1 == 0] = material.Herb.index
 
   # Void and grass border
-  matl_map[l1 > size/2 - border] = Terrain.VOID
-  matl_map[l1 == size//2 - border] = Terrain.GRASS
+  matl_map[l1 > size/2 - border] = material.Void.index
+  matl_map[l1 == size//2 - border] = material.Grass.index
   edge = l1 == size//2 - border - 1
-  stone = (matl_map == Terrain.STONE) | (matl_map == Terrain.WATER)
-  matl_map[edge & stone] = Terrain.FOILAGE
+  stone = (matl_map == material.Stone.index) | (matl_map == material.Water.index)
+  matl_map[edge & stone] = material.Foilage.index
   return matl_map
 
 def place_fish(tiles, mmin, mmax, np_random):

@@ -3,6 +3,14 @@ import numpy.random
 from nmmo.lib import spawn
 
 
+def make_teams(config, num_teams):
+  num_per_team = config.PLAYER_N // num_teams
+  teams = {}
+  for team_id in range(num_teams):
+    range_max = (team_id+1)*num_per_team+1 if team_id < num_teams-1 else config.PLAYER_N+1
+    teams[team_id] = list(range(team_id*num_per_team+1, range_max))
+  return teams
+
 class TeamHelper:
   def __init__(self, teams: Dict[Any, List[int]], np_random=None):
     self.teams = teams

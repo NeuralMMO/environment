@@ -1,3 +1,4 @@
+from typing import List, Tuple
 import numpy as np
 from ordered_set import OrderedSet
 
@@ -33,6 +34,7 @@ class Map:
 
     self.dist_border_center = None
     self.center_coord = None
+    self.seize_targets: List[Tuple] = None  # a list of (r, c) coords
 
     # used to place border
     self.l1 = utils.l1_map(sz)
@@ -52,7 +54,7 @@ class Map:
       self._repr = [[t.material.index for t in row] for row in self.tiles]
     return self._repr
 
-  def reset(self, map_dict, np_random):
+  def reset(self, map_dict, np_random, seize_targets=None):
     '''Reuse the current tile objects to load a new map'''
     config = self.config
     assert map_dict["map"].shape == (config.MAP_SIZE,config.MAP_SIZE),\
@@ -67,12 +69,15 @@ class Map:
 
     self._repr = None
     self.update_list = OrderedSet() # critical for determinism
-    materials = {mat.index: mat for mat in material.All}
+    if seize_targets:
+      assert isinstance(seize_targets, list), "seize_targets must be a list of coord tuples"
+    self.seize_targets = seize_targets
 
     # process map_np_array according to config
     matl_map = self._process_map(map_dict, np_random)
 
     # reset tiles with new materials
+    materials = {mat.index: mat for mat in material.All}
     for r, row in enumerate(matl_map):
       for c, idx in enumerate(row):
         mat = materials[idx]
@@ -113,6 +118,9 @@ class Map:
       if not tile.depleted:
         self.update_list.remove(tile)
       tile.step()
+    if self.seize_targets:
+      for r, c in self.seize_targets:
+        self.tiles[r, c].update_seize()
 
   def harvest(self, r, c, deplete=True):
     '''Called by actions that harvest a resource tile'''
@@ -138,3 +146,13 @@ class Map:
         # pylint: disable=protected-access
         tile.reset(material.Grass, self.config, self.realm._np_random)
         self.habitable_tiles[r, c] = tile.habitable  # must be true
+
+  @property
+  def seize_status(self):
+    if self.seize_targets is None:
+      return {}
+    return {
+      (r, c): self.tiles[r, c].seize_history[-1]
+      for r, c in self.seize_targets
+      if self.tiles[r, c].seize_history
+    }

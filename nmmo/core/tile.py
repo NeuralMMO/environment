@@ -41,6 +41,7 @@ class Tile(TileState):
     self.material = None
     self.depleted = False
     self.entities = {}
+    self.seize_history = []
 
   @property
   def repr(self):
@@ -73,6 +74,7 @@ class Tile(TileState):
   def reset(self, mat, config, np_random):
     self._np_random = np_random # reset the RNG
     self.entities = {}
+    self.seize_history.clear()
     self.material = mat(config)
     self._respawn()
 
@@ -106,3 +108,10 @@ class Tile(TileState):
     if deplete:
       self.set_depleted()
     return self.material.harvest()
+
+  def update_seize(self):
+    if len(self.entities) != 1:  # only one entity can seize a tile
+      return
+    agent_id = list(self.entities.keys())[0]
+    if agent_id > 0:
+      self.seize_history.append((agent_id, self.realm.tick))

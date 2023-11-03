@@ -123,7 +123,7 @@ class UnfairFight(TeamBattle):
       # NOTE: speed bonus is only for the offense team
       speed_bonus = (self.time_limit - self.realm.tick) / self.time_limit\
                       if self._winners[0] in self.teams["offense"] else 0.0
-      return alive_members + difficulty + speed_bonus
+      return difficulty + 3*speed_bonus + 0.5*alive_members  # prioritize speed
     # No one reached the center
     return 0.0
 

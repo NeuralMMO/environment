@@ -200,9 +200,13 @@ class TeamGameTemplate(Game):
   def _post_setup(self):
     self._attach_team_tag()
 
+  @property
+  def teams(self):
+    return self.config.TEAMS
+
   def _attach_team_tag(self):
     # setup team names
-    for team_id, members in self.config.TEAMS.items():
+    for team_id, members in self.teams.items():
       for idx, agent_id in enumerate(members):
         self.realm.players[agent_id].name = f"{team_id}_{agent_id}"
         if idx == 0:

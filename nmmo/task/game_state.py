@@ -44,6 +44,9 @@ class GameState:
   event_data: np.ndarray # a copied, whole Event log table
   event_index: Dict[int, Iterable]
 
+  # status of the seize target tiles (row, col) -> (ent_id, tick)
+  seize_status: Dict[Tuple[int, int], Tuple[int, int]]
+
   cache_result: MutableMapping # cache for general memoization
   _group_view: List[GroupView] = field(default_factory=list) # cache for GroupView
 
@@ -275,6 +278,7 @@ class GameStateGenerator:
       item_index = precompute_index(item_data, ItemAttr["owner_id"]),
       event_data = event_data,
       event_index = precompute_index(event_data, EventAttr['ent_id']),
+      seize_status = realm.map.seize_status,
       cache_result = {}
     )
 

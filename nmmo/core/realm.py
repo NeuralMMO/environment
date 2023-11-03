@@ -64,7 +64,9 @@ class Realm:
     # Initialize actions
     nmmo.Action.init(config)
 
-  def reset(self, np_random, map_dict, custom_spawn=False):
+  def reset(self, np_random, map_dict,
+            custom_spawn=False,
+            seize_targets=None):
     """Reset the sub-systems and load the provided map"""
     self._np_random = np_random
     self.tick = 0
@@ -76,7 +78,7 @@ class Realm:
       self._replay_helper.reset()
 
     # Load the map np array into the map, tiles and reset
-    self.map.reset(map_dict, self._np_random)
+    self.map.reset(map_dict, self._np_random, seize_targets)
 
     # EntityState and ItemState tables must be empty after players/npcs.reset()
     self.players.reset(self._np_random)
