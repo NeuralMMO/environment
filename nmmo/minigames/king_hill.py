@@ -3,8 +3,6 @@ from nmmo.core.game_api import TeamBattle
 from nmmo.task import task_spec
 from nmmo.lib import utils, team_helper
 
-SEIZE_DURATION = 30  # ticks to win
-
 def SeizeCenter(gs, subject, num_ticks):
   if not any(subject.health > 0):  # subject should be alive
     return 0.0
@@ -42,8 +40,9 @@ class KingoftheHill(TeamBattle):
     self.score_scaler = 1.3
     self.adaptive_difficulty = True
     self.num_game_won = 3  # at the same map size, threshold to increase the difficulty
-    self.step_size = 8
-    self._seize_duration = SEIZE_DURATION
+    self.map_step_size = 8
+    self._seize_duration = 3
+    self.dur_step_size = 3
 
     # NOTE: This is a hacky way to get a hash embedding for a function
     # TODO: Can we get more meaningful embedding? coding LLMs are good but huge
@@ -82,8 +81,9 @@ class KingoftheHill(TeamBattle):
        and self.history[-1]["result"]:  # the last game was won
       last_results = [r["result"] for r in self.history if r["map_center"] == self.map_center]
       if sum(last_results) >= self.num_game_won \
-        and self.map_center <= self.config.original["MAP_CENTER"] - self.step_size:
-        self.map_center += self.step_size
+        and self.map_center <= self.config.original["MAP_CENTER"] - self.map_step_size:
+        self.map_center += self.map_step_size
+        self._seize_duration += self.dur_step_size
 
   def _define_tasks(self, np_random):
     spec_list = [seize_task(self.seize_duration)] * len(self.teams)
@@ -128,10 +128,12 @@ class KingoftheHill(TeamBattle):
 
     # Test if the difficulty increases
     org_map_center = game.map_center
+    org_seize_dur = game.seize_duration
     for result in [False]*7 + [True]*game.num_game_won:
       game.history.append({"result": result, "map_center": game.map_center})
       game._determine_difficulty()  # pylint: disable=protected-access
-    assert game.map_center == (org_map_center + game.step_size)
+    assert game.map_center == (org_map_center + game.map_step_size)
+    assert game.seize_duration == (org_seize_dur + game.dur_step_size)
 
 if __name__ == "__main__":
   import nmmo
