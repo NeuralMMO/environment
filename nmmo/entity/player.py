@@ -10,6 +10,7 @@ class Player(entity.Entity):
     self.agent    = agent
     self.immortal = realm.config.IMMORTAL
     self.resources.resilient = resilient
+    self.my_tasks = None
 
     # Scripted hooks
     self.target = None

@@ -263,6 +263,8 @@ class Env(ParallelEnv):
 
   def _map_task_to_agent(self):
     self.agent_task_map.clear()
+    for agent_id in self.agents:
+      self.realm.players[agent_id].my_tasks = None
     for task in self.tasks:
       if task.embedding is None:
         task.set_embedding(self._dummy_task_embedding)
@@ -275,8 +277,9 @@ class Env(ParallelEnv):
 
     # for now we only support one task per agent
     if self.config.ALLOW_MULTI_TASKS_PER_AGENT is False:
-      for agent_tasks in self.agent_task_map.values():
+      for agent_id, agent_tasks in self.agent_task_map.items():
         assert len(agent_tasks) == 1, "Only one task per agent is supported"
+        self.realm.players[agent_id].my_tasks = agent_tasks
 
   def step(self, actions: Dict[int, Dict[str, Dict[str, Any]]]):
     '''Simulates one game tick or timestep

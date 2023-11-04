@@ -112,6 +112,10 @@ class Tile(TileState):
   def update_seize(self):
     if len(self.entities) != 1:  # only one entity can seize a tile
       return
-    agent_id = list(self.entities.keys())[0]
-    if agent_id > 0:
-      self.seize_history.append((agent_id, self.realm.tick))
+    ent_id, entity = list(self.entities.items())[0]
+    if ent_id < 0:  # not counting npcs
+      return
+    team_members = entity.my_tasks[0].assignee  # NOTE: only one task per player
+    if self.seize_history and self.seize_history[-1][0] in team_members:
+      return
+    self.seize_history.append((ent_id, self.realm.tick))

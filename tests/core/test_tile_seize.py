@@ -16,9 +16,16 @@ class MockRealm:
     self._np_random = np.random
     self.tick = 0
 
-class MockEntity():
+class MockTask:
+  def __init__(self, ent_id):
+    self.assignee = (ent_id,)
+
+class MockEntity:
   def __init__(self, ent_id):
     self.ent_id = ent_id
+    self.my_tasks = None
+    if ent_id > 0:  # only for players
+      self.my_tasks = [MockTask(ent_id)]
 
 class TestTileSeize(unittest.TestCase):
   # pylint: disable=no-member
@@ -39,6 +46,12 @@ class TestTileSeize(unittest.TestCase):
     tile.update_seize()
     self.assertEqual(tile.seize_history[-1], (1, 1))
 
+    # Agent 1 stayed, so no change
+    mock_realm.tick = 2
+    tile.update_seize()
+    self.assertEqual(tile.seize_history[-1], (1, 1))
+
+    # Two agents occupy the tile, so no change
     mock_realm.tick = 3
     tile.add_entity(MockEntity(2))
     self.assertCountEqual(tile.entities.keys(), [1, 2])
@@ -49,19 +62,20 @@ class TestTileSeize(unittest.TestCase):
     tile.remove_entity(1)
     self.assertCountEqual(tile.entities.keys(), [2])
     tile.update_seize()
-    self.assertEqual(tile.seize_history[-1], (2, 5))
+    self.assertEqual(tile.seize_history[-1], (2, 5))  # new seize history
 
+    # Two agents occupy the tile, so no change
     mock_realm.tick = 7
     tile.add_entity(MockEntity(-10))
     self.assertListEqual(list(tile.entities.keys()), [2, -10])
     tile.update_seize()
     self.assertEqual(tile.seize_history[-1], (2, 5))
 
+    # Should not change when occupied by an npc
     mock_realm.tick = 9
     tile.remove_entity(2)
     self.assertListEqual(list(tile.entities.keys()), [-10])
     tile.update_seize()
-    # should not change when occupied by an npc
     self.assertEqual(tile.seize_history[-1], (2, 5))
 
     tile.harvest(True)

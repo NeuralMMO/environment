@@ -85,6 +85,10 @@ class KingoftheHill(TeamBattle):
         self.map_center += self.map_step_size
         self._seize_duration += self.dur_step_size
 
+  def _set_realm(self, np_random, map_dict):
+    self.realm.reset(np_random, map_dict,
+                     seize_targets=[(self.config.MAP_SIZE//2,self.config.MAP_SIZE//2)])
+
   def _define_tasks(self, np_random):
     spec_list = [seize_task(self.seize_duration)] * len(self.teams)
     return task_spec.make_task_from_spec(self.teams, spec_list)
@@ -122,6 +126,7 @@ class KingoftheHill(TeamBattle):
     assert config.COMBAT_SYSTEM_ENABLED is True
     assert config.ALLOW_MOVE_INTO_OCCUPIED_TILE is False
     assert config.PLAYER_DEATH_FOG == 32
+    assert env.realm.map.seize_targets == [(config.MAP_SIZE//2, config.MAP_SIZE//2)]
 
     for _ in range(horizon):
       env.step({})
