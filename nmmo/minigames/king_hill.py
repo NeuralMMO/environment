@@ -67,6 +67,7 @@ class KingoftheHill(TeamBattle):
   def _set_config(self):
     self.config.reset()
     self.config.toggle_systems(self.required_systems)
+    self.config.set_for_episode("MAP_CENTER", self.map_size)
     self.config.set_for_episode("ALLOW_MOVE_INTO_OCCUPIED_TILE", False)
 
     # Regenerate the map from fractal to have less obstacles
@@ -82,10 +83,9 @@ class KingoftheHill(TeamBattle):
     self.config.set_for_episode("PLAYER_DEATH_FOG_FINAL_SIZE", 12)
 
     self._determine_difficulty()  # sets the seize duration
-    self.config.set_for_episode("MAP_CENTER", self.map_size)
 
   def _determine_difficulty(self):
-    # Determine the difficulty (the map center) based on the previous results
+    # Determine the difficulty (the seize duration) based on the previous results
     if self.adaptive_difficulty and self.history \
        and self.history[-1]["result"]:  # the last game was won
       last_results = [r["result"] for r in self.history

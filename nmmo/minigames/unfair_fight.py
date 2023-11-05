@@ -24,13 +24,31 @@ class UnfairFight(TeamBattle):
 
   def __init__(self, env, sampling_weight=None):
     super().__init__(env, sampling_weight)
+
+    self._time_limit = 200  # determines the difficulty
+    self.max_time_limit = 300
+    self.step_size = 10
+    self.num_cont_win = 4  # at the same duration, then change the difficulty
+    self.adaptive_difficulty = True
+
     # NOTE: This is a hacky way to get a hash embedding for a function
     # TODO: Can we get more meaningful embedding? coding LLMs are good but heavy
     self.task_embedding = utils.get_hash_embedding(lambda: [elimination_task]*2,
                                                    self.config.TASK_EMBED_DIM)
 
+  @property
+  def time_limit(self):
+    return self._time_limit
+
+  def set_time_limit(self, time_limit):
+    self._time_limit = time_limit
+
   def is_compatible(self):
     return self.config.are_systems_enabled(self.required_systems)
+
+  def reset(self, np_random, map_dict, tasks=None):
+    super().reset(np_random, map_dict)
+    self.history[-1]["time_limit"] = self.time_limit
 
   @property
   def teams(self):
@@ -41,7 +59,6 @@ class UnfairFight(TeamBattle):
   def _set_config(self):
     self.config.reset()
     self.config.toggle_systems(self.required_systems)
-    self.config.set_for_episode("HORIZON", TIME_LIMIT)
     self.config.set_for_episode("TEAMS", self.teams)
     self.config.set_for_episode("ALLOW_MOVE_INTO_OCCUPIED_TILE", False)
 
@@ -61,6 +78,18 @@ class UnfairFight(TeamBattle):
 
     # Disable +1 hp per tick
     self.config.set_for_episode("PLAYER_HEALTH_INCREMENT", False)
+
+    self._determine_difficulty()  # sets the time limit
+    self.config.set_for_episode("HORIZON", self.time_limit)
+
+  def _determine_difficulty(self):
+    # Determine the difficulty (the seize duration) based on the previous results
+    if self.adaptive_difficulty and len(self.history) > self.num_cont_win:
+      prev_results = [1 in r["winners"] for r in self.history[-self.num_cont_win:]]
+      if sum(prev_results) >= self.num_cont_win:  # small won all
+        self._time_limit = min(self.time_limit + self.step_size, self.max_time_limit)
+      if sum(prev_results) == 0:  # large won all
+        self._time_limit = max(self.time_limit - self.step_size, 60)
 
   def _define_tasks(self, np_random):
     return task_spec.make_task_from_spec(self.teams, [elimination_task]*2)
@@ -84,17 +113,15 @@ class UnfairFight(TeamBattle):
 
   def _check_winners(self, dones):
     # If the time is up, the small team wins
-    if self.realm.tick >= TIME_LIMIT:
+    if self.realm.tick >= self.time_limit:
       return self.teams["small"]
     return super()._check_winners(dones)
 
   @property
   def winning_score(self):
     if self._winners:
-      # alive_members = sum(1.0 for agent_id in self._winners if agent_id in self.realm.players)\
-      #                 / len(self._winners)
-      speed_bonus = (TIME_LIMIT - self.realm.tick) / TIME_LIMIT
-      # This will results in no bonus when the small team wins
+      speed_bonus = (self.time_limit - self.realm.tick) / self.time_limit
+      # This will results in no bonus when the small team wins by time limit
       return speed_bonus
     return 0.0
 
@@ -112,6 +139,21 @@ class UnfairFight(TeamBattle):
 
     for _ in range(horizon):
       env.step({})
+
+    # pylint: disable=protected-access
+    # Test if the difficulty increases
+    org_time_limit = game.time_limit
+    for _ in range(game.num_cont_win):
+      # the small won all
+      game.history.append({"result": True, "winners": [1], "time_limit": game.time_limit})
+      game._determine_difficulty()
+    assert game.time_limit == (org_time_limit + game.step_size)
+
+    for _ in range(game.num_cont_win):
+      # the large won all
+      game.history.append({"result": True, "winners": [60], "time_limit": game.time_limit})
+      game._determine_difficulty()
+    assert game.time_limit == org_time_limit
 
 if __name__ == "__main__":
   import nmmo
