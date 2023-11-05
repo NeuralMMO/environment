@@ -36,24 +36,33 @@ class KingoftheHill(TeamBattle):
   def __init__(self, env, sampling_weight=None):
     super().__init__(env, sampling_weight)
 
-    self.map_center = 32  # determines the difficulty
-    self.score_scaler = 1.3
+    self._seize_duration = 10  # determines the difficulty
+    self.dur_step_size = 10
+    self.max_seize_duration = 100
     self.adaptive_difficulty = True
-    self.num_game_won = 3  # at the same map size, threshold to increase the difficulty
-    self.map_step_size = 8
-    self._seize_duration = 3
-    self.dur_step_size = 3
+    self.num_game_won = 1  # at the same duration, threshold to increase the difficulty
+    self.map_size = 40
+    self.score_scaler = .5
 
     # NOTE: This is a hacky way to get a hash embedding for a function
     # TODO: Can we get more meaningful embedding? coding LLMs are good but huge
     self.task_embedding = utils.get_hash_embedding(SeizeCenter,
                                                    self.config.TASK_EMBED_DIM)
+
+  @property
+  def seize_duration(self):
+    return self._seize_duration
+
+  def set_seize_duration(self, seize_duration):
+    self._seize_duration = seize_duration
+
   def is_compatible(self):
     return self.config.are_systems_enabled(self.required_systems)
 
   def reset(self, np_random, map_dict, tasks=None):
     super().reset(np_random, map_dict)
-    self.history[-1]["map_center"] = self.map_center
+    self.history[-1]["map_size"] = self.map_size
+    self.history[-1]["seize_duration"] = self.seize_duration
 
   def _set_config(self):
     self.config.reset()
@@ -70,40 +79,37 @@ class KingoftheHill(TeamBattle):
     self.config.set_for_episode("PLAYER_DEATH_FOG", 32)
     self.config.set_for_episode("PLAYER_DEATH_FOG_SPEED", 1/6)
     # Only the center tile is safe
-    self.config.set_for_episode("PLAYER_DEATH_FOG_FINAL_SIZE", 0)
+    self.config.set_for_episode("PLAYER_DEATH_FOG_FINAL_SIZE", 12)
 
-    self._determine_difficulty()  # sets the map_center
-    self.config.set_for_episode("MAP_CENTER", self.map_center)
+    self._determine_difficulty()  # sets the seize duration
+    self.config.set_for_episode("MAP_CENTER", self.map_size)
 
   def _determine_difficulty(self):
     # Determine the difficulty (the map center) based on the previous results
     if self.adaptive_difficulty and self.history \
        and self.history[-1]["result"]:  # the last game was won
-      last_results = [r["result"] for r in self.history if r["map_center"] == self.map_center]
-      if sum(last_results) >= self.num_game_won \
-        and self.map_center <= self.config.original["MAP_CENTER"] - self.map_step_size:
-        self.map_center += self.map_step_size
-        self._seize_duration += self.dur_step_size
+      last_results = [r["result"] for r in self.history
+                      if r["seize_duration"] == self.seize_duration]
+      if sum(last_results) >= self.num_game_won:
+        self._seize_duration = min(self.seize_duration + self.dur_step_size,
+                                   self.max_seize_duration)
 
   def _set_realm(self, np_random, map_dict):
-    self.realm.reset(np_random, map_dict,
+    self.realm.reset(np_random, map_dict, custom_spawn=True,
                      seize_targets=[(self.config.MAP_SIZE//2,self.config.MAP_SIZE//2)])
+    # team spawn requires custom spawning
+    team_loader = team_helper.TeamLoader(self.config, np_random)
+    self.realm.players.spawn(team_loader)
 
   def _define_tasks(self, np_random):
     spec_list = [seize_task(self.seize_duration)] * len(self.teams)
     return task_spec.make_task_from_spec(self.teams, spec_list)
 
   @property
-  def seize_duration(self):
-    return self._seize_duration
-
-  def set_seize_duration(self, seize_duration):
-    self._seize_duration = seize_duration
-
-  @property
   def winning_score(self):
     if self._winners:
-      speed_score = (self.map_center**self.score_scaler)/max(self.realm.tick, 1)
+      speed_score = (self.map_size * (self.seize_duration**self.score_scaler))\
+                    / max(self.realm.tick, 1)
       alive_bonus = sum(1.0 for agent_id in self._winners if agent_id in self.realm.players)\
                     / len(self._winners)
       return speed_score + alive_bonus
@@ -132,12 +138,10 @@ class KingoftheHill(TeamBattle):
       env.step({})
 
     # Test if the difficulty increases
-    org_map_center = game.map_center
     org_seize_dur = game.seize_duration
     for result in [False]*7 + [True]*game.num_game_won:
-      game.history.append({"result": result, "map_center": game.map_center})
+      game.history.append({"result": result, "seize_duration": game.seize_duration})
       game._determine_difficulty()  # pylint: disable=protected-access
-    assert game.map_center == (org_map_center + game.map_step_size)
     assert game.seize_duration == (org_seize_dur + game.dur_step_size)
 
 if __name__ == "__main__":

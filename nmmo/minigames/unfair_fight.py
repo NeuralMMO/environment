@@ -21,20 +21,27 @@ elimination_task = task_spec.TaskSpec(
 
 class UnfairFight(TeamBattle):
   required_systems = ["TERRAIN", "COMBAT"]
+  enable_death_fog = True
+  time_limit = TIME_LIMIT
 
   def __init__(self, env, sampling_weight=None):
     super().__init__(env, sampling_weight)
 
-    self.defense_size = 4  # determines the difficulty
+    self._defense_size = 4  # determines the difficulty
     self.adaptive_difficulty = True
-    self.num_game_won = 3  # at the same team size, threshold to increase the difficulty
     self.step_size = 4
-    self.time_limit = TIME_LIMIT
 
     # NOTE: This is a hacky way to get a hash embedding for a function
     # TODO: Can we get more meaningful embedding? coding LLMs are good but huge
     self.task_embedding = utils.get_hash_embedding(lambda: [survival_task, elimination_task],
                                                    self.config.TASK_EMBED_DIM)
+
+  @property
+  def defense_size(self):
+    return self._defense_size
+
+  def set_defense_size(self, defense_size):
+    self._defense_size = defense_size
 
   def is_compatible(self):
     return self.config.are_systems_enabled(self.required_systems)
@@ -69,7 +76,7 @@ class UnfairFight(TeamBattle):
     self.config.set_for_episode("TERRAIN_FOILAGE", 0.9)  # prop of stone tiles: 0.05
 
     # Activate death fog
-    self.config.set_for_episode("PLAYER_DEATH_FOG", 32)
+    self.config.set_for_episode("PLAYER_DEATH_FOG", 32 if self.enable_death_fog else None)
     self.config.set_for_episode("PLAYER_DEATH_FOG_SPEED", 1/6)
     # Only the center tile is safe
     self.config.set_for_episode("PLAYER_DEATH_FOG_FINAL_SIZE", 8)
@@ -86,10 +93,10 @@ class UnfairFight(TeamBattle):
       # agent 1 always play the defense team
       if 1 in self.history[-1]["winners"]:
         # if the defense won, decrease the defense size
-        self.defense_size = max(self.defense_size - self.step_size, self.step_size)
+        self._defense_size = max(self.defense_size - self.step_size, self.step_size)
       else:
         # if the offense won, increase the defense size
-        self.defense_size = min(self.step_size + self.defense_size, self.config.PLAYER_N//2)
+        self._defense_size = min(self.defense_size + self.step_size, self.config.PLAYER_N//2)
 
   def _define_tasks(self, np_random):
     return task_spec.make_task_from_spec(
@@ -139,7 +146,6 @@ class UnfairFight(TeamBattle):
     assert config.COMBAT_SYSTEM_ENABLED is True
     assert config.ITEM_SYSTEM_ENABLED is False
     assert config.ALLOW_MOVE_INTO_OCCUPIED_TILE is False
-    assert config.PLAYER_DEATH_FOG == 32
 
     for _ in range(horizon):
       env.step({})

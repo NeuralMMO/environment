@@ -117,5 +117,6 @@ class Tile(TileState):
       return
     team_members = entity.my_tasks[0].assignee  # NOTE: only one task per player
     if self.seize_history and self.seize_history[-1][0] in team_members:
+      # no need to add another entry if the last entry is from the same team (incl. self)
       return
     self.seize_history.append((ent_id, self.realm.tick))

@@ -207,6 +207,8 @@ class TeamGameTemplate(Game):
   def _attach_team_tag(self):
     # setup team names
     for team_id, members in self.teams.items():
+      if isinstance(team_id, int):
+        team_id = f"Team{team_id:02d}"
       for idx, agent_id in enumerate(members):
         self.realm.players[agent_id].name = f"{team_id}_{agent_id}"
         if idx == 0:

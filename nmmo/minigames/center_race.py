@@ -25,10 +25,10 @@ class RacetoCenter(Game):
   def __init__(self, env, sampling_weight=None):
     super().__init__(env, sampling_weight)
 
-    self.map_center = 32  # determines the difficulty
+    self._map_size = 32  # determines the difficulty
     self.score_scaler = 1.3
     self.adaptive_difficulty = True
-    self.num_game_won = 3  # at the same map size, threshold to increase the difficulty
+    self.num_game_won = 1  # at the same map size, threshold to increase the difficulty
     self.step_size = 8
 
     # NOTE: This is a hacky way to get a hash embedding for a function
@@ -36,14 +36,21 @@ class RacetoCenter(Game):
     self.task_embedding = utils.get_hash_embedding(ProgressTowardCenter,
                                                    self.config.TASK_EMBED_DIM)
 
+  @property
+  def map_size(self):
+    return self._map_size
+
+  def set_map_size(self, map_size):
+    self._map_size = map_size
+
   def is_compatible(self):
     return self.config.are_systems_enabled(self.required_systems)
 
   def reset(self, np_random, map_dict, tasks=None):
-    assert self.map_center >= self.config.PLAYER_N//4,\
-      f"self.map_center({self.map_center}) must be >= {self.config.PLAYER_N//4}"
+    assert self.map_size >= self.config.PLAYER_N//4,\
+      f"self.map_size({self.map_size}) must be >= {self.config.PLAYER_N//4}"
     super().reset(np_random, map_dict)
-    self.history[-1]["map_center"] = self.map_center
+    self.history[-1]["map_size"] = self.map_size
 
   def _set_config(self):
     self.config.reset()
@@ -62,17 +69,17 @@ class RacetoCenter(Game):
     # Only the center tile is safe
     self.config.set_for_episode("PLAYER_DEATH_FOG_FINAL_SIZE", 0)
 
-    self._determine_difficulty()  # sets the map_center
-    self.config.set_for_episode("MAP_CENTER", self.map_center)
+    self._determine_difficulty()  # sets the map_size
+    self.config.set_for_episode("MAP_CENTER", self.map_size)
 
   def _determine_difficulty(self):
-    # Determine the difficulty (the map center) based on the previous results
+    # Determine the difficulty (the map size) based on the previous results
     if self.adaptive_difficulty and self.history \
        and self.history[-1]["result"]:  # the last game was won
-      last_results = [r["result"] for r in self.history if r["map_center"] == self.map_center]
+      last_results = [r["result"] for r in self.history if r["map_size"] == self.map_size]
       if sum(last_results) >= self.num_game_won \
-        and self.map_center <= self.config.original["MAP_CENTER"] - self.step_size:
-        self.map_center += self.step_size
+        and self.map_size <= self.config.original["MAP_CENTER"] - self.step_size:
+        self._map_size += self.step_size
 
   def _define_tasks(self, np_random):
     return task_api.make_same_task(ProgressTowardCenter, self.config.POSSIBLE_AGENTS,
@@ -81,7 +88,7 @@ class RacetoCenter(Game):
   @property
   def winning_score(self):
     if self._winners:
-      return (self.map_center**self.score_scaler)/max(self.realm.tick, 1)
+      return (self.map_size**self.score_scaler)/max(self.realm.tick, 1)
     # No one reached the center
     return 0.0
 
@@ -104,11 +111,11 @@ class RacetoCenter(Game):
       env.step({})
 
     # Test if the difficulty increases
-    org_map_center = game.map_center
+    org_map_size = game.map_size
     for result in [False]*7 + [True]*game.num_game_won:
-      game.history.append({"result": result, "map_center": game.map_center})
+      game.history.append({"result": result, "map_size": game.map_size})
       game._determine_difficulty()  # pylint: disable=protected-access
-    assert game.map_center == (org_map_center + game.step_size)
+    assert game.map_size == (org_map_size + game.step_size)
 
 if __name__ == "__main__":
   import nmmo
