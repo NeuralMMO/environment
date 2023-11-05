@@ -21,50 +21,28 @@ elimination_task = task_spec.TaskSpec(
 
 class UnfairFight(TeamBattle):
   required_systems = ["TERRAIN", "COMBAT"]
-  enable_death_fog = True
-  time_limit = TIME_LIMIT
 
   def __init__(self, env, sampling_weight=None):
     super().__init__(env, sampling_weight)
-
-    self._defense_size = 4  # determines the difficulty
-    self.adaptive_difficulty = True
-    self.step_size = 4
-
     # NOTE: This is a hacky way to get a hash embedding for a function
-    # TODO: Can we get more meaningful embedding? coding LLMs are good but huge
-    self.task_embedding = utils.get_hash_embedding(lambda: [survival_task, elimination_task],
+    # TODO: Can we get more meaningful embedding? coding LLMs are good but heavy
+    self.task_embedding = utils.get_hash_embedding(lambda: [elimination_task]*2,
                                                    self.config.TASK_EMBED_DIM)
-
-  @property
-  def defense_size(self):
-    return self._defense_size
-
-  def set_defense_size(self, defense_size):
-    self._defense_size = defense_size
 
   def is_compatible(self):
     return self.config.are_systems_enabled(self.required_systems)
 
-  def reset(self, np_random, map_dict, tasks=None):
-    assert self.defense_size <= self.config.PLAYER_N//2, \
-      f"self.defense_size({self.defense_size}) must be <= {self.config.PLAYER_N//2}"
-    super().reset(np_random, map_dict)
-    self.history[-1]["defense_size"] = self.defense_size
-    self.history[-1]["def_over_off_ratio"] = self.def_over_off_ratio
-
   @property
   def teams(self):
-    return {"defense": list(range(1, self.defense_size+1)),
-            "offense": list(range(self.defense_size+1, self.config.PLAYER_N+1)),}
-
-  @property
-  def def_over_off_ratio(self):
-    return self.defense_size / (self.config.PLAYER_N-self.defense_size)
+    half = (self.config.PLAYER_N+1)//2
+    return {"small": list(range(1, half)),
+            "large": list(range(half, self.config.PLAYER_N+1)),}
 
   def _set_config(self):
     self.config.reset()
     self.config.toggle_systems(self.required_systems)
+    self.config.set_for_episode("HORIZON", TIME_LIMIT)
+    self.config.set_for_episode("TEAMS", self.teams)
     self.config.set_for_episode("ALLOW_MOVE_INTO_OCCUPIED_TILE", False)
 
     # Make the map small
@@ -76,7 +54,7 @@ class UnfairFight(TeamBattle):
     self.config.set_for_episode("TERRAIN_FOILAGE", 0.9)  # prop of stone tiles: 0.05
 
     # Activate death fog
-    self.config.set_for_episode("PLAYER_DEATH_FOG", 32 if self.enable_death_fog else None)
+    self.config.set_for_episode("PLAYER_DEATH_FOG", 32)
     self.config.set_for_episode("PLAYER_DEATH_FOG_SPEED", 1/6)
     # Only the center tile is safe
     self.config.set_for_episode("PLAYER_DEATH_FOG_FINAL_SIZE", 8)
@@ -84,24 +62,8 @@ class UnfairFight(TeamBattle):
     # Disable +1 hp per tick
     self.config.set_for_episode("PLAYER_HEALTH_INCREMENT", False)
 
-    self._determine_difficulty()  # sets the map_center
-    self.config.set_for_episode("TEAMS", self.teams)
-
-  def _determine_difficulty(self):
-    # Determine the difficulty (the defense size) based on the previous results: 1 up - 1 down
-    if self.adaptive_difficulty and self.history and self.history[-1]["result"]:
-      # agent 1 always play the defense team
-      if 1 in self.history[-1]["winners"]:
-        # if the defense won, decrease the defense size
-        self._defense_size = max(self.defense_size - self.step_size, self.step_size)
-      else:
-        # if the offense won, increase the defense size
-        self._defense_size = min(self.defense_size + self.step_size, self.config.PLAYER_N//2)
-
   def _define_tasks(self, np_random):
-    return task_spec.make_task_from_spec(
-      self.teams,  # in the order of defense, offense
-      [survival_task(self.def_over_off_ratio), elimination_task])
+    return task_spec.make_task_from_spec(self.teams, [elimination_task]*2)
 
   def _set_realm(self, np_random, map_dict):
     self.realm.reset(np_random, map_dict, custom_spawn=True)
@@ -120,19 +82,20 @@ class UnfairFight(TeamBattle):
     team_loader = team_helper.TeamLoader(self.config, np_random, candidate_locs)
     self.realm.players.spawn(team_loader)
 
+  def _check_winners(self, dones):
+    # If the time is up, the small team wins
+    if self.realm.tick >= TIME_LIMIT:
+      return self.teams["small"]
+    return super()._check_winners(dones)
+
   @property
   def winning_score(self):
-    # sum of the difficulty, the speed
     if self._winners:
       alive_members = sum(1.0 for agent_id in self._winners if agent_id in self.realm.players)\
                       / len(self._winners)
-      difficulty = 1 / self.def_over_off_ratio if self._winners[0] in self.teams["defense"]\
-                    else self.def_over_off_ratio
-      # NOTE: speed bonus is only for the offense team
-      speed_bonus = (self.time_limit - self.realm.tick) / self.time_limit\
-                      if self._winners[0] in self.teams["offense"] else 0.0
-      return difficulty + 3*speed_bonus + 0.5*alive_members  # prioritize speed
-    # No one reached the center
+      speed_bonus = (TIME_LIMIT - self.realm.tick) / TIME_LIMIT
+      # This will results in smaller bonus when the small team wins
+      return speed_bonus + alive_members
     return 0.0
 
   @staticmethod
@@ -149,25 +112,6 @@ class UnfairFight(TeamBattle):
 
     for _ in range(horizon):
       env.step({})
-
-    # Check the tasks
-    for eid in game.teams["defense"]:
-      assert "TickGE" in env.agent_task_map[eid][0].name,\
-        "TickGE must be assigned to the defense team"
-    for eid in game.teams["offense"]:
-      assert "CheckAgentStatus" in env.agent_task_map[eid][0].name,\
-        "CheckAgentStatus must be assigned to the offense team"
-
-    # pylint: disable=protected-access
-    # Test if the difficulty increases
-    org_def_size = game.defense_size
-    game.history.append({"result": True, "winners": [60]})  # the offense won
-    game._determine_difficulty()
-    assert game.defense_size == (org_def_size + game.step_size)
-
-    game.history.append({"result": True, "winners": [1]})  # the defense won
-    game._determine_difficulty()
-    assert game.defense_size == org_def_size
 
 if __name__ == "__main__":
   import nmmo
