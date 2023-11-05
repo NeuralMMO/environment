@@ -175,11 +175,10 @@ class Realm:
     dead = self.players.cull()
     self.npcs.cull()
 
-    # Update map
-    self.map.step()
-
     self.tick += 1
 
+    # These require the updated tick
+    self.map.step()
     self.update_fog_map()
     self.exchange.step()
     self.event_log.update()

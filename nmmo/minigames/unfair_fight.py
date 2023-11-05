@@ -1,21 +1,18 @@
 # pylint: disable=duplicate-code
+import numpy as np
 from nmmo.core.game_api import TeamBattle
-from nmmo.task import task_spec, base_predicates
+from nmmo.task import task_spec
 from nmmo.lib import utils, team_helper
 
-TIME_LIMIT = 160  # ticks, arbitrary
-
-def survival_task(def_over_off_ratio):
-  multiplier = min(4.0, 1.0/def_over_off_ratio)  # smaller team gets higher reward
-  return task_spec.TaskSpec(
-    eval_fn=base_predicates.TickGE,
-    eval_fn_kwargs={"num_tick": TIME_LIMIT},
-    task_kwargs={"reward_multiplier": multiplier},
-    reward_to="team")
+# pylint: disable=invalid-name,unused-argument
+def DestoryAllTargets(gs, subject, target):
+  # Only counting the kills by the subject
+  destroy_count = sum(np.in1d(subject.event.PLAYER_KILL.target_ent, target))
+  return float(destroy_count)/len(target)
 
 elimination_task = task_spec.TaskSpec(
-  eval_fn=base_predicates.CheckAgentStatus,
-  eval_fn_kwargs={"target": "all_foes", "status": "dead"},
+  eval_fn=DestoryAllTargets,
+  eval_fn_kwargs={"target": "all_foes"},
   reward_to="team")
 
 
@@ -25,10 +22,10 @@ class UnfairFight(TeamBattle):
   def __init__(self, env, sampling_weight=None):
     super().__init__(env, sampling_weight)
 
-    self._time_limit = 200  # determines the difficulty
+    self._time_limit = 150  # determines the difficulty
     self.max_time_limit = 300
     self.step_size = 10
-    self.num_cont_win = 4  # at the same duration, then change the difficulty
+    self.num_cont_win = 3  # at the same duration, then change the difficulty
     self.adaptive_difficulty = True
 
     # NOTE: This is a hacky way to get a hash embedding for a function
@@ -52,9 +49,10 @@ class UnfairFight(TeamBattle):
 
   @property
   def teams(self):
-    half = (self.config.PLAYER_N+1)//2
-    return {"small": list(range(1, half)),
-            "large": list(range(half, self.config.PLAYER_N+1)),}
+    #half = (self.config.PLAYER_N+1)//2
+    third = (self.config.PLAYER_N)//3
+    return {"small": list(range(1, third)),
+            "large": list(range(third, self.config.PLAYER_N+1)),}
 
   def _set_config(self):
     self.config.reset()
@@ -89,7 +87,7 @@ class UnfairFight(TeamBattle):
       if sum(prev_results) >= self.num_cont_win:  # small won all
         self._time_limit = min(self.time_limit + self.step_size, self.max_time_limit)
       if sum(prev_results) == 0:  # large won all
-        self._time_limit = max(self.time_limit - self.step_size, 60)
+        self._time_limit = max(self.time_limit - self.step_size, 50)
 
   def _define_tasks(self, np_random):
     return task_spec.make_task_from_spec(self.teams, [elimination_task]*2)
@@ -115,6 +113,7 @@ class UnfairFight(TeamBattle):
     # If the time is up, the small team wins
     if self.realm.tick >= self.time_limit:
       return self.teams["small"]
+    # TeamBattle._check_winners() also checks if a team is eliminated
     return super()._check_winners(dones)
 
   @property
