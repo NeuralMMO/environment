@@ -91,11 +91,11 @@ class UnfairFight(TeamBattle):
   @property
   def winning_score(self):
     if self._winners:
-      alive_members = sum(1.0 for agent_id in self._winners if agent_id in self.realm.players)\
-                      / len(self._winners)
+      # alive_members = sum(1.0 for agent_id in self._winners if agent_id in self.realm.players)\
+      #                 / len(self._winners)
       speed_bonus = (TIME_LIMIT - self.realm.tick) / TIME_LIMIT
-      # This will results in smaller bonus when the small team wins
-      return speed_bonus + alive_members
+      # This will results in no bonus when the small team wins
+      return speed_bonus
     return 0.0
 
   @staticmethod
