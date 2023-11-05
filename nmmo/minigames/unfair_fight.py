@@ -2,7 +2,7 @@
 import numpy as np
 from nmmo.core.game_api import TeamBattle
 from nmmo.task import task_spec
-from nmmo.lib import utils, team_helper
+from nmmo.lib import utils, team_helper, event_code
 
 # pylint: disable=invalid-name,unused-argument
 def DestoryAllTargets(gs, subject, target):
@@ -22,9 +22,9 @@ class UnfairFight(TeamBattle):
   def __init__(self, env, sampling_weight=None):
     super().__init__(env, sampling_weight)
 
-    self._time_limit = 150  # determines the difficulty
+    self._time_limit = 160  # determines the difficulty
     self.max_time_limit = 300
-    self.step_size = 10
+    self.step_size = 20
     self.num_cont_win = 3  # at the same duration, then change the difficulty
     self.adaptive_difficulty = True
 
@@ -49,10 +49,10 @@ class UnfairFight(TeamBattle):
 
   @property
   def teams(self):
-    #half = (self.config.PLAYER_N+1)//2
-    third = (self.config.PLAYER_N)//3
-    return {"small": list(range(1, third)),
-            "large": list(range(third, self.config.PLAYER_N+1)),}
+    half = (self.config.PLAYER_N+1)//2
+    #third = (self.config.PLAYER_N)//3
+    return {"small": list(range(1, half)),
+            "large": list(range(half, self.config.PLAYER_N+1)),}
 
   def _set_config(self):
     self.config.reset()
@@ -69,10 +69,10 @@ class UnfairFight(TeamBattle):
     self.config.set_for_episode("TERRAIN_FOILAGE", 0.9)  # prop of stone tiles: 0.05
 
     # Activate death fog
-    self.config.set_for_episode("PLAYER_DEATH_FOG", 32)
+    self.config.set_for_episode("PLAYER_DEATH_FOG", 16)
     self.config.set_for_episode("PLAYER_DEATH_FOG_SPEED", 1/6)
-    # Only the center tile is safe
-    self.config.set_for_episode("PLAYER_DEATH_FOG_FINAL_SIZE", 8)
+    # Very small area is safe: 3 x 3
+    self.config.set_for_episode("PLAYER_DEATH_FOG_FINAL_SIZE", 1)
 
     # Disable +1 hp per tick
     self.config.set_for_episode("PLAYER_HEALTH_INCREMENT", False)
@@ -87,7 +87,7 @@ class UnfairFight(TeamBattle):
       if sum(prev_results) >= self.num_cont_win:  # small won all
         self._time_limit = min(self.time_limit + self.step_size, self.max_time_limit)
       if sum(prev_results) == 0:  # large won all
-        self._time_limit = max(self.time_limit - self.step_size, 50)
+        self._time_limit = max(self.time_limit - self.step_size, 60)
 
   def _define_tasks(self, np_random):
     return task_spec.make_task_from_spec(self.teams, [elimination_task]*2)
@@ -119,9 +119,12 @@ class UnfairFight(TeamBattle):
   @property
   def winning_score(self):
     if self._winners:
+      kill_log = self.realm.event_log.get_data(
+        agents=self._winners, event_code=event_code.EventCode.PLAYER_KILL)
+      kill_bonus = kill_log.shape[0] / (self.config.PLAYER_N - len(self._winners))  # hacky
       speed_bonus = (self.time_limit - self.realm.tick) / self.time_limit
       # This will results in no bonus when the small team wins by time limit
-      return speed_bonus
+      return kill_bonus + speed_bonus
     return 0.0
 
   @staticmethod
