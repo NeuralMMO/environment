@@ -27,6 +27,8 @@ class UnfairFight(TeamBattle):
     self.step_size = 20
     self.num_cont_win = 3  # at the same duration, then change the difficulty
     self.adaptive_difficulty = True
+    self._team_split = (self.config.PLAYER_N+1)//2
+    self.safe_zone = 1
 
     # NOTE: This is a hacky way to get a hash embedding for a function
     # TODO: Can we get more meaningful embedding? coding LLMs are good but heavy
@@ -40,6 +42,13 @@ class UnfairFight(TeamBattle):
   def set_time_limit(self, time_limit):
     self._time_limit = time_limit
 
+  @property
+  def team_split(self):
+    return self._team_split
+
+  def set_team_split(self, team_split):
+    self._team_split = team_split
+
   def is_compatible(self):
     return self.config.are_systems_enabled(self.required_systems)
 
@@ -49,10 +58,8 @@ class UnfairFight(TeamBattle):
 
   @property
   def teams(self):
-    half = (self.config.PLAYER_N+1)//2
-    #third = (self.config.PLAYER_N)//3
-    return {"small": list(range(1, half)),
-            "large": list(range(half, self.config.PLAYER_N+1)),}
+    return {"small": list(range(1, self.team_split)),
+            "large": list(range(self.team_split, self.config.PLAYER_N+1)),}
 
   def _set_config(self):
     self.config.reset()
@@ -72,7 +79,7 @@ class UnfairFight(TeamBattle):
     self.config.set_for_episode("PLAYER_DEATH_FOG", 16)
     self.config.set_for_episode("PLAYER_DEATH_FOG_SPEED", 1/6)
     # Very small area is safe: 3 x 3
-    self.config.set_for_episode("PLAYER_DEATH_FOG_FINAL_SIZE", 1)
+    self.config.set_for_episode("PLAYER_DEATH_FOG_FINAL_SIZE", self.safe_zone)
 
     # Disable +1 hp per tick
     self.config.set_for_episode("PLAYER_HEALTH_INCREMENT", False)
