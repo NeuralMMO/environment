@@ -121,7 +121,8 @@ class NPCManager(EntityGroup):
         self.next_id -= 1
 
   def cull(self):
-    for entity in super().cull().values():
+    dead_this_tick = super().cull()
+    for entity in dead_this_tick.values():
       self.spawn_dangers.append(entity.spawn_danger)
 
     # refill npcs to target config.NPC_N, within config.NPC_SPAWN_ATTEMPTS

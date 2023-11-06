@@ -247,8 +247,8 @@ class Attack(Node):
       target.history.time_alive < immunity:
       return None
 
-    #Check if self targeted
-    if entity.ent_id == target.ent_id:
+    #Check if self targeted or target already dead
+    if entity.ent_id == target.ent_id or not target.alive:
       return None
 
     #Can"t attack out of range

@@ -180,7 +180,7 @@ class TestObservationTile(unittest.TestCase):
       number=1000, globals=globals()))
 
   def test_habitable(self):
-    from nmmo.systems.ai.move import habitable as habitable_impl
+    from nmmo.systems.npc_policy import get_habitable_dir as habitable_impl
     realm_map = self.env.realm.map
     realm_tiles= self.env.realm.map.tiles
     ent = self.env.realm.npcs[-1]

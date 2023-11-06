@@ -1,11 +1,11 @@
 from nmmo.entity import entity
 from nmmo.core import action as Action
 from nmmo.systems import combat, droptable
-from nmmo.systems.ai import policy
 from nmmo.systems import item as Item
 from nmmo.systems import skill
 from nmmo.systems.inventory import EquipmentSlot
 from nmmo.lib.event_code import EventCode
+from nmmo.systems import npc_policy
 
 class Equipment:
   def __init__(self, total,
@@ -62,6 +62,14 @@ class NPC(entity.Entity):
 
     self.resources.health.increment(1)
     self.last_action = actions
+
+    '''Update validity of tracked entities'''
+    if not npc_policy.is_valid_target(self, self.attacker, self.vision):
+      self.attacker = None
+    if not npc_policy.is_valid_target(self, self.target, self.vision):
+      self.target = None
+    if not npc_policy.is_valid_target(self, self.closest, self.vision):
+      self.closest = None
 
   # Returns True if the entity is alive
   def receive_damage(self, source, dmg):
@@ -179,18 +187,28 @@ class Passive(NPC):
     super().__init__(realm, pos, iden, 'Passive', 1)
 
   def decide(self, realm):
-    return policy.passive(realm, self)
+    return npc_policy.meander(realm, self)
 
 class PassiveAggressive(NPC):
   def __init__(self, realm, pos, iden):
     super().__init__(realm, pos, iden, 'Neutral', 2)
 
   def decide(self, realm):
-    return policy.neutral(realm, self)
+    if self.attacker and self.target is None:
+      self.target = self.attacker
+    if self.target:
+      return npc_policy.charge_toward_target(realm, self, self.target)
+    return npc_policy.meander(realm, self)
 
 class Aggressive(NPC):
   def __init__(self, realm, pos, iden):
     super().__init__(realm, pos, iden, 'Hostile', 3)
 
   def decide(self, realm):
-    return policy.hostile(realm, self)
+    if self.attacker and self.target is None:
+      self.target = self.attacker
+    if not self.target:
+      self.target = npc_policy.identify_closest_target(realm, self)
+    if self.target:
+      return npc_policy.charge_toward_target(realm, self, self.target)
+    return npc_policy.meander(realm, self)

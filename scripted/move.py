@@ -4,8 +4,7 @@ import numpy as np
 
 from nmmo.core import action
 from nmmo.core.observation import Observation
-from nmmo.lib import material
-from nmmo.systems.ai import utils
+from nmmo.lib import material, astar
 
 
 def inSight(dr, dc, vision):
@@ -87,7 +86,7 @@ def forageDijkstra(config, ob: Observation, actions,
       break
 
     cur = queue.pop(0)
-    for nxt in utils.adjacentPos(cur):
+    for nxt in astar.adjacentPos(cur):
       if nxt in backtrace:
         continue
 
@@ -106,7 +105,7 @@ def forageDijkstra(config, ob: Observation, actions,
       if matl == material.Foilage.index:
         food = min(food+food_max//2, food_max)
 
-      for pos in utils.adjacentPos(nxt):
+      for pos in astar.adjacentPos(nxt):
         if not inSight(*pos, vision):
           continue
 
@@ -171,7 +170,7 @@ def gatherBFS(config, ob: Observation, actions, resource, np_random, cutoff=100)
       return False
 
     cur = queue.pop(0)
-    for nxt in utils.adjacentPos(cur):
+    for nxt in astar.adjacentPos(cur):
       if found:
         break
 
@@ -197,7 +196,7 @@ def gatherBFS(config, ob: Observation, actions, resource, np_random, cutoff=100)
         backtrace[nxt] = cur
         break
 
-      for pos in utils.adjacentPos(nxt):
+      for pos in astar.adjacentPos(nxt):
         if not inSight(*pos, vision):
           continue
 
@@ -238,7 +237,7 @@ def aStar(config, ob: Observation, actions, rr, cc, cutoff=100):
   cost = {start: 0}
 
   closestPos = start
-  closestHeuristic = utils.l1(start, goal)
+  closestHeuristic = astar.l1(start, goal)
   closestCost = closestHeuristic
 
   while pq:
@@ -254,7 +253,7 @@ def aStar(config, ob: Observation, actions, rr, cc, cutoff=100):
     if cur == goal:
       break
 
-    for nxt in utils.adjacentPos(cur):
+    for nxt in astar.adjacentPos(cur):
       if not inSight(*nxt, vision):
         continue
 
@@ -271,7 +270,7 @@ def aStar(config, ob: Observation, actions, rr, cc, cutoff=100):
       newCost = cost[cur] + 1
       if nxt not in cost or newCost < cost[nxt]:
         cost[nxt] = newCost
-        heuristic = utils.lInfty(goal, nxt)
+        heuristic = astar.l1(goal, nxt)
         priority = newCost + heuristic
 
         # Compute approximate solution
