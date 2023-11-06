@@ -83,7 +83,8 @@ class UnfairFight(TeamBattle):
   def _determine_difficulty(self):
     # Determine the difficulty (the seize duration) based on the previous results
     if self.adaptive_difficulty and len(self.history) > self.num_cont_win:
-      prev_results = [1 in r["winners"] for r in self.history[-self.num_cont_win:]]
+      prev_results = [1 in r["winners"] for r in self.history[-self.num_cont_win:]
+                      if r["result"] is True and r["winners"]]
       if sum(prev_results) >= self.num_cont_win:  # small won all
         self._time_limit = min(self.time_limit + self.step_size, self.max_time_limit)
       if sum(prev_results) == 0:  # large won all
@@ -110,8 +111,8 @@ class UnfairFight(TeamBattle):
     self.realm.players.spawn(team_loader)
 
   def _check_winners(self, dones):
-    # If the time is up, the small team wins
-    if self.realm.tick >= self.time_limit:
+    # If the time is up or all died at the same time, the small team wins
+    if self.realm.tick >= self.time_limit or self.realm.num_players == 0:
       return self.teams["small"]
     # TeamBattle._check_winners() also checks if a team is eliminated
     return super()._check_winners(dones)
@@ -143,6 +144,13 @@ class UnfairFight(TeamBattle):
       env.step({})
 
     # pylint: disable=protected-access
+
+    # These should run without errors
+    game.history.append({"result": False, "time_limit": game.time_limit})
+    game._determine_difficulty()
+    game.history.append({"result": True, "winners": None, "time_limit": game.time_limit})
+    game._determine_difficulty()
+
     # Test if the difficulty increases
     org_time_limit = game.time_limit
     for _ in range(game.num_cont_win):
