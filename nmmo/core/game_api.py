@@ -114,6 +114,9 @@ class Game(ABC):
       return list(dones.keys())
     return None
 
+  def get_reward_for_dead(self, reward):  # pylint: disable=unused-argument
+    return -1.0
+
   def get_episode_stats(self):
     """A helper function for trainers"""
     total_agent_steps = 0
@@ -227,6 +230,10 @@ class TeamGameTemplate(Game):
     sampled_spec = np_random.choice(cand_specs, size=num_tasks,
                                     p=sampling_weights/np.sum(sampling_weights))
     return sampled_spec
+
+  def get_reward_for_dead(self, reward):
+    # Dead agents in team games are not always penalized
+    return reward
 
 class TeamTraining(TeamGameTemplate):
   """Game setting for team training tasks"""

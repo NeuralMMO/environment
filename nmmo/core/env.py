@@ -408,6 +408,10 @@ class Env(ParallelEnv):
     # NOTE: all obs, rewards, dones, infos have data for each agent in self.agents
     return gym_obs, rewards, dones, infos
 
+  @property
+  def dead_this_tick(self):
+    return self._dead_this_tick
+
   def _validate_actions(self, actions: Dict[int, Dict[str, Dict[str, Any]]]):
     '''Deserialize action arg values and validate actions
        For now, it does a basic validation (e.g., value is not none).
@@ -571,9 +575,9 @@ class Env(ParallelEnv):
       else:
         task.close()  # To prevent memory leak
 
-    # Make sure the dead agents return the rewards of -1
+    # Reward for dead agents is defined by the game
     for agent_id in self._dead_this_tick:
-      rewards[agent_id] = -1
+      rewards[agent_id] = self.game.get_reward_for_dead(rewards[agent_id])
 
     return rewards, infos
 
