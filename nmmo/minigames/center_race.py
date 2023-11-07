@@ -49,6 +49,7 @@ class RacetoCenter(Game):
   def reset(self, np_random, map_dict, tasks=None):
     assert self.map_size >= self.config.PLAYER_N//4,\
       f"self.map_size({self.map_size}) must be >= {self.config.PLAYER_N//4}"
+    map_dict["mark_center"] = True  # mark the center tile
     super().reset(np_random, map_dict)
     self.history[-1]["map_size"] = self.map_size
 

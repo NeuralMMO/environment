@@ -77,12 +77,21 @@ class Map:
 
     self._repr = None
     self.update_list = OrderedSet() # critical for determinism
+    self.seize_targets = []
     if seize_targets:
-      assert isinstance(seize_targets, list), "seize_targets must be a list of coord tuples"
-    self.seize_targets = seize_targets
+      assert isinstance(seize_targets, list), "seize_targets must be a list of reserved words"
+      for target in seize_targets:
+        # pylint: disable=consider-iterating-dictionary
+        assert target in list(self.quad_centers.keys()) + ["center"], "Invalid seize target"
+        self.seize_targets.append(self.center_coord if target == "center"
+                                  else self.quad_centers[target])
 
     # process map_np_array according to config
     matl_map = self._process_map(map_dict, np_random)
+    if "mark_center" in map_dict and map_dict["mark_center"]:
+      self._mark_tile(matl_map, *self.center_coord)
+    for r, c in self.seize_targets:
+      self._mark_tile(matl_map, r, c)
 
     # reset tiles with new materials
     materials = {mat.index: mat for mat in material.All}
@@ -95,7 +104,6 @@ class Map:
 
   def _process_map(self, map_dict, np_random):
     map_np_array = map_dict["map"]
-    mark_center = None
     if not self.config.TERRAIN_SYSTEM_ENABLED:
       map_np_array[:] = material.Grass.index
     else:
@@ -113,12 +121,14 @@ class Map:
       if self.config.TERRAIN_DISABLE_STONE:
         map_np_array[map_np_array == material.Stone.index] = material.Grass.index
 
-      # Mark the center tile with Herb, only when MAP_RESET_FROM_FRACTAL is True
-      mark_center = 2  # clear the 2 tiles around the center and plant a herb
-
     # Make the edge tiles habitable, and place the void tiles outside the border
-    map_np_array = process_map_border(self.config, map_np_array, self.l1, mark_center)
+    map_np_array = process_map_border(self.config, map_np_array, self.l1)
     return map_np_array
+
+  @staticmethod
+  def _mark_tile(map_np_array, row, col, dist=2):
+    map_np_array[row-dist:row+dist+1,col-dist:col+dist+1] = material.Grass.index
+    map_np_array[row,col] = material.Herb.index
 
   def step(self):
     '''Evaluate updatable tiles'''

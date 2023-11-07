@@ -142,17 +142,11 @@ def fractal_to_material(config, fractal, all_grass=False):
       matl_map[y, x] = mat
   return matl_map
 
-def process_map_border(config, matl_map, l1=None, mark_center=None):
+def process_map_border(config, matl_map, l1=None):
   size = config.MAP_SIZE
   border = config.MAP_BORDER
   if l1 is None:
     l1 = utils.l1_map(size)
-
-  # Make the center area habitable
-  # TODO: Add something to occupy at the center
-  if mark_center:
-    matl_map[l1 <= mark_center] = material.Grass.index
-    matl_map[l1 == 0] = material.Herb.index
 
   # Void and grass border
   matl_map[l1 > size/2 - border] = material.Void.index

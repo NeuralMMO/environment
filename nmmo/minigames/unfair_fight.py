@@ -61,6 +61,7 @@ class UnfairFight(TeamBattle):
   def _set_config(self):
     self.config.reset()
     self.config.toggle_systems(self.required_systems)
+    self.config.set_for_episode("HORIZON", 256)
     self.config.set_for_episode("ALLOW_MOVE_INTO_OCCUPIED_TILE", False)
 
     # Make the map small
@@ -94,12 +95,12 @@ class UnfairFight(TeamBattle):
                                     self.config.PLAYER_N//2)
 
   def _set_realm(self, np_random, map_dict):
-    self.realm.reset(np_random, map_dict, custom_spawn=True)
-    spawn_keys = np_random.choice(list(self.realm.map.quad_centers.keys()), 2, replace=False)
-    spawn_locs = [self.realm.map.quad_centers[key] for key in spawn_keys]
+    spawn_keys = np_random.choice(["first", "second", "third", "fourth"], 2, replace=False)
     # Set the seize targets
-    self.realm.map.seize_targets = spawn_locs
+    self.realm.reset(np_random, map_dict, custom_spawn=True,
+                     seize_targets=list(spawn_keys))
     # Also, one should make sure these locations are spawnable
+    spawn_locs = [self.realm.map.quad_centers[key] for key in spawn_keys]
     for loc in spawn_locs:
       self.realm.map.make_spawnable(*loc)
     team_loader = team_helper.TeamLoader(self.config, np_random, spawn_locs)

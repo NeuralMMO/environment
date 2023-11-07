@@ -90,7 +90,7 @@ class TestTileSeize(unittest.TestCase):
     center_tile = (config.MAP_SIZE//2, config.MAP_SIZE//2)
 
     test_map = nmmo.core.map.Map(config, mock_realm, np_random)
-    test_map.reset(map_dict, np_random, seize_targets=[center_tile])
+    test_map.reset(map_dict, np_random, seize_targets=["center"])
     self.assertListEqual(test_map.seize_targets, [center_tile])
     self.assertDictEqual(test_map.seize_status, {})
 

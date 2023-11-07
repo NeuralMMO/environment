@@ -75,8 +75,7 @@ class KingoftheHill(TeamBattle):
                                    self.max_seize_duration)
 
   def _set_realm(self, np_random, map_dict):
-    self.realm.reset(np_random, map_dict, custom_spawn=True,
-                     seize_targets=[(self.config.MAP_SIZE//2,self.config.MAP_SIZE//2)])
+    self.realm.reset(np_random, map_dict, custom_spawn=True, seize_targets=["center"])
     # team spawn requires custom spawning
     team_loader = team_helper.TeamLoader(self.config, np_random)
     self.realm.players.spawn(team_loader)

@@ -111,7 +111,7 @@ class TestMapGeneration(unittest.TestCase):
                      np.sum(map_array == material.Water.index)+\
                      np.sum(map_array == material.Stone.index)+\
                      np.sum(map_array == material.Foilage.index),
-                     map_size*map_size - 1)  # -1 for the center tile, marked with Herb
+                     map_size*map_size)
 
     # Use the saved map, but disable stone
     config.reset()
