@@ -1,34 +1,14 @@
 # pylint: disable=invalid-name, duplicate-code
 from nmmo.core.game_api import TeamBattle
-from nmmo.task import task_spec
+from nmmo.task import task_spec, base_predicates
 from nmmo.lib import utils, team_helper
 
-def SeizeCenter(gs, subject, num_ticks):
-  if not any(subject.health > 0):  # subject should be alive
-    return 0.0
-  progress_bonus = 0.3
-  center_tile = (gs.config.MAP_SIZE//2, gs.config.MAP_SIZE//2)
-
-  # if subject seized the center tile, start counting ticks
-  if center_tile in gs.seize_status and gs.seize_status[center_tile][0] in subject.agents:
-    seize_duration = gs.current_tick - gs.seize_status[center_tile][1]
-    return progress_bonus + (1.0 - progress_bonus) * seize_duration/num_ticks
-
-  # motivate agents to seize the center tile
-  max_dist = center_tile[0] - gs.config.MAP_BORDER
-  r = subject.row
-  c = subject.col
-  # distance to the center tile, so dist = 0 when subject is on the center tile
-  # NOTE: subject can be multiple agents (e.g., team), so taking the minimum
-  dists = min(utils.linf(list(zip(r,c)), center_tile))
-  return progress_bonus * (1.0 - dists/max_dist)
 
 def seize_task(dur_to_win):
   return task_spec.TaskSpec(
-    eval_fn=SeizeCenter,
+    eval_fn=base_predicates.SeizeCenter,
     eval_fn_kwargs={"num_ticks": dur_to_win},
     reward_to="team")
-
 
 class KingoftheHill(TeamBattle):
   required_systems = ["TERRAIN", "COMBAT", "RESOURCE"]
@@ -46,7 +26,7 @@ class KingoftheHill(TeamBattle):
 
     # NOTE: This is a hacky way to get a hash embedding for a function
     # TODO: Can we get more meaningful embedding? coding LLMs are good but huge
-    self.task_embedding = utils.get_hash_embedding(SeizeCenter,
+    self.task_embedding = utils.get_hash_embedding(seize_task,
                                                    self.config.TASK_EMBED_DIM)
 
   @property

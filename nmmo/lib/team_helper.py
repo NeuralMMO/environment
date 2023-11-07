@@ -96,9 +96,11 @@ class TeamLoader(spawn.SequentialLoader):
         f"Agent id {agent_id} is not specified in config.TEAMS"
     super().__init__(config, np_random)
 
-    # candidate_spawn_pos for teams should be List[List]
-    candidate_spawn_pos = candidate_spawn_pos or \
-                          spawn_team_together(config, self.team_helper.num_teams)
+    if candidate_spawn_pos is None:
+      candidate_spawn_pos = spawn_team_together(config, self.team_helper.num_teams)
+    elif not isinstance(candidate_spawn_pos[0], list):
+      # candidate_spawn_pos for teams should be List[List]
+      candidate_spawn_pos = [[pos] for pos in candidate_spawn_pos]
     self.candidate_spawn_pos = [RefillPopper(pos_list, np_random)
                                 for pos_list in candidate_spawn_pos]
 

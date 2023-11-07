@@ -61,6 +61,46 @@ def OccupyTile(gs: GameState, subject: Group, row: int, col: int):
   """
   return np.any((subject.row == row) & (subject.col == col))
 
+def SeizeTile(gs: GameState, subject: Group, row: int, col: int, num_ticks: int,
+              progress_bonus = 0.3):
+  if not any(subject.health > 0):  # subject should be alive
+    return 0.0
+  target_tile = (row, col)
+
+  # if subject seized the center tile, start counting ticks
+  if target_tile in gs.seize_status and gs.seize_status[target_tile][0] in subject.agents:
+    seize_duration = gs.current_tick - gs.seize_status[target_tile][1]
+    return norm(progress_bonus + (1.0-progress_bonus)*seize_duration/num_ticks)
+
+  # motivate agents to seize the target tile
+  max_dist = utils.linf_single(target_tile, gs.spawn_pos[subject.agents[0]])
+  r = subject.row
+  c = subject.col
+  # NOTE: subject can be multiple agents (e.g., team), so taking the minimum
+  dists = min(utils.linf(list(zip(r,c)), target_tile))
+  return norm(progress_bonus*(1.0-dists/max_dist)) if max_dist > 0 else 0.0
+
+def SeizeCenter(gs: GameState, subject: Group, num_ticks: int,
+                progress_bonus = 0.3):
+  row = col = gs.config.MAP_SIZE//2  # center tile
+  return SeizeTile(gs, subject, row, col, num_ticks, progress_bonus)
+
+def SeizeQuadCenter(gs: GameState, subject: Group, num_ticks: int, quadrant: str,
+                    progress_bonus = 0.3):
+  center = gs.config.MAP_SIZE//2
+  half_dist = gs.config.MAP_CENTER//4
+  if quadrant == "first":
+    row = col = center + half_dist
+  elif quadrant == "second":
+    row, col = center - half_dist, center + half_dist
+  elif quadrant == "third":
+    row = col = center - half_dist
+  elif quadrant == "fourth":
+    row, col = center + half_dist, center - half_dist
+  else:
+    raise ValueError(f"Invalid quadrant {quadrant}")
+  return SeizeTile(gs, subject, row, col, num_ticks, progress_bonus)
+
 def AllMembersWithinRange(gs: GameState, subject: Group, dist: int):
   """True if the max l-inf distance of teammates is
          less than or equal to dist

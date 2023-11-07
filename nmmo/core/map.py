@@ -32,8 +32,10 @@ class Map:
       for c in range(sz):
         self.tiles[r, c] = Tile(realm, r, c, np_random)
 
+    # the map center, and the centers in each quadrant are important targets
     self.dist_border_center = None
     self.center_coord = None
+    self.quad_centers = None
     self.seize_targets: List[Tuple] = None  # a list of (r, c) coords
 
     # used to place border
@@ -61,9 +63,15 @@ class Map:
       "Map shape is inconsistent with config.MAP_SIZE"
 
     # NOTE: MAP_CENTER and MAP_BORDER can change from episode to episode
+    self.center_coord = (config.MAP_SIZE//2, config.MAP_SIZE//2)
     self.dist_border_center = config.MAP_CENTER // 2
-    self.center_coord = (config.MAP_BORDER + self.dist_border_center,
-                         config.MAP_BORDER + self.dist_border_center)
+    half_dist = self.dist_border_center // 2
+    self.quad_centers = {
+      "first": (self.center_coord[0] + half_dist, self.center_coord[1] + half_dist),
+      "second": (self.center_coord[0] - half_dist, self.center_coord[1] + half_dist),
+      "third": (self.center_coord[0] - half_dist, self.center_coord[1] - half_dist),
+      "fourth": (self.center_coord[0] + half_dist, self.center_coord[1] - half_dist),
+    }
     assert config.MAP_BORDER > config.PLAYER_VISION_RADIUS,\
       "MAP_BORDER must be greater than PLAYER_VISION_RADIUS"
 
