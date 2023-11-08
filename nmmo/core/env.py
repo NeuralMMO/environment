@@ -382,7 +382,7 @@ class Env(ParallelEnv):
     #   we don't need _deserialize_scripted_actions() anymore
     actions = self._validate_actions(actions)
     # Execute actions
-    self._dead_this_tick = self.realm.step(actions)
+    self._dead_this_tick, dead_npcs = self.realm.step(actions)
     # the list of "current" agents, both alive and dead_this_tick
     self._agents = list(set(list(self.realm.players.keys()) + list(self._dead_this_tick.keys())))
 
@@ -397,7 +397,7 @@ class Env(ParallelEnv):
         dones[agent_id] = False
 
     # Update the game stats, determine winners, if any
-    self.game.update(dones, self._dead_this_tick)
+    self.game.update(dones, self._dead_this_tick, dead_npcs)
 
     # Store the observations, since actions reference them
     self.obs = self._compute_observations()
@@ -576,8 +576,9 @@ class Env(ParallelEnv):
         task.close()  # To prevent memory leak
 
     # Reward for dead agents is defined by the game
-    for agent_id in self._dead_this_tick:
-      rewards[agent_id] = self.game.get_reward_for_dead(rewards[agent_id])
+    if self.game.assign_dead_reward:
+      for agent_id in self._dead_this_tick:
+        rewards[agent_id] = -1
 
     return rewards, infos
 

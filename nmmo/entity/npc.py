@@ -95,10 +95,8 @@ class NPC(entity.Entity):
 
     return False
 
-  # NOTE: passing np_random here is a hack
-  #   Ideally, it should be passed to __init__ and also used in action generation
   @staticmethod
-  def spawn(realm, pos, iden, np_random):
+  def default_spawn(realm, pos, iden, np_random):
     config = realm.config
 
     # check the position

@@ -18,6 +18,7 @@ class Game(ABC):
     self.realm = env.realm
     self.sampling_weight = sampling_weight or 1.0
     self.tasks = None
+    self.assign_dead_reward = True
     self._next_tasks = None
     self._agent_stats = {}
     self._winners = None
@@ -87,23 +88,31 @@ class Game(ABC):
     """Set the next task to be completed"""
     self._next_tasks = tasks
 
-  def update(self, dones, dead_this_tick):
-    """Update the game stats, e.g. agent stats, scores, winners, etc."""
-    for agent_id in dones:
-      if dones[agent_id]:
-        agent = dead_this_tick[agent_id] if agent_id in dead_this_tick\
-                                          else self.realm.players[agent_id]
-        self._agent_stats[agent_id] = {"time_alive": self.realm.tick,
-                                       "progress_to_center": agent.history.exploration}
-
+  def update(self, dones, dead_players, dead_npcs):
+    """Process dead players/npcs, update the game stats, winners, etc."""
+    self._process_dead_players(dones, dead_players)
+    self._process_dead_npcs(dead_npcs)
     self._winners = self._check_winners(dones)
-
     if self._winners and not self._game_done:
       self._game_done = self.history[-1]["result"] = True
       self.history[-1]["winners"] = self._winners
       self.history[-1]["winning_score"] = self.winning_score
       self.history[-1]["winning_tick"] = self.realm.tick
       self.history[-1].update(self.get_episode_stats())
+
+  def _process_dead_players(self, dones, dead_players):
+    for agent_id in dones:
+      if dones[agent_id]:
+        agent = dead_players[agent_id] if agent_id in dead_players\
+                                       else self.realm.players[agent_id]
+        self._agent_stats[agent_id] = {"time_alive": self.realm.tick,
+                                       "progress_to_center": agent.history.exploration}
+
+  def _process_dead_npcs(self, dead_npcs):
+    for npc in dead_npcs.values():
+      self.realm.npcs.spawn_dangers.append(npc.spawn_danger)
+    # refill npcs to target config.NPC_N, within config.NPC_SPAWN_ATTEMPTS
+    self.realm.npcs.default_spawn()
 
   def _check_winners(self, dones):
     # Determine winners for the default task
@@ -113,9 +122,6 @@ class Game(ABC):
       # several agents died at the same time or reached the time limit
       return list(dones.keys())
     return None
-
-  def get_reward_for_dead(self, reward):  # pylint: disable=unused-argument
-    return -1.0
 
   def get_episode_stats(self):
     """A helper function for trainers"""
@@ -179,6 +185,8 @@ class AgentTraining(Game):
 
 class TeamGameTemplate(Game):
   """A helper class with common utils for team games"""
+  assign_dead_reward = False  # Do NOT always assign -1 to dead agents
+
   def is_compatible(self):
     try:
       assert self.config.COMBAT_SYSTEM_ENABLED, "Combat system must be enabled"
@@ -197,8 +205,8 @@ class TeamGameTemplate(Game):
     self.realm.reset(np_random, map_dict, custom_spawn=True)
     # Custom spawning
     team_loader = team_helper.TeamLoader(self.config, np_random)
-    self.realm.npcs.spawn()
     self.realm.players.spawn(team_loader)
+    self.realm.npcs.default_spawn()
 
   def _post_setup(self):
     self._attach_team_tag()
@@ -230,10 +238,6 @@ class TeamGameTemplate(Game):
     sampled_spec = np_random.choice(cand_specs, size=num_tasks,
                                     p=sampling_weights/np.sum(sampling_weights))
     return sampled_spec
-
-  def get_reward_for_dead(self, reward):
-    # Dead agents in team games are not always penalized
-    return reward
 
 class TeamTraining(TeamGameTemplate):
   """Game setting for team training tasks"""

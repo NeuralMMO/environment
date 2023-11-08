@@ -96,7 +96,7 @@ class NPCManager(EntityGroup):
     self.next_id = -1
     self.spawn_dangers.clear()
 
-  def spawn(self):
+  def default_spawn(self):
     config = self.config
 
     if not config.NPC_SYSTEM_ENABLED:
@@ -115,18 +115,10 @@ class NPCManager(EntityGroup):
         # pylint: disable=unbalanced-tuple-unpacking
         r, c   = self._np_random.integers(border, center+border, 2).tolist()
 
-      npc = NPC.spawn(self.realm, (r, c), self.next_id, self._np_random)
+      npc = NPC.default_spawn(self.realm, (r, c), self.next_id, self._np_random)
       if npc:
         super().spawn_entity(npc)
         self.next_id -= 1
-
-  def cull(self):
-    dead_this_tick = super().cull()
-    for entity in dead_this_tick.values():
-      self.spawn_dangers.append(entity.spawn_danger)
-
-    # refill npcs to target config.NPC_N, within config.NPC_SPAWN_ATTEMPTS
-    self.spawn()
 
   def actions(self, realm):
     actions = {}

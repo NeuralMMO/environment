@@ -96,7 +96,7 @@ class Realm:
 
     if custom_spawn is False:
       # NOTE: custom spawning npcs and agents can be done outside, after reset()
-      self.npcs.spawn()
+      self.npcs.default_spawn()
       self.players.spawn()
 
   def packet(self):
@@ -172,8 +172,8 @@ class Realm:
         ent = self.entity(ent_id)
         if ent.alive:
           atn.call(self, ent, *args)
-    dead = self.players.cull()
-    self.npcs.cull()
+    dead_players = self.players.cull()
+    dead_npcs = self.npcs.cull()
 
     self.tick += 1
 
@@ -185,7 +185,7 @@ class Realm:
     if self._replay_helper is not None:
       self._replay_helper.update()
 
-    return dead
+    return dead_players, dead_npcs
 
   def update_fog_map(self, reset=False):
     fog_start_tick = self.config.PLAYER_DEATH_FOG
@@ -217,5 +217,4 @@ class Realm:
   def record_replay(self, replay_helper: ReplayHelper) -> ReplayHelper:
     self._replay_helper = replay_helper
     self._replay_helper.set_realm(self)
-
     return replay_helper
