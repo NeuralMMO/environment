@@ -21,8 +21,8 @@ class Sandwich(TeamBattle):
     super().__init__(env, sampling_weight)
 
     self.map_size = 60
-    self._inner_npc_num = 8  # determines the difficulty
-    self._outer_npc_num = 32  # these npcs rally to the center
+    self._inner_npc_num = 2  # determines the difficulty
+    self._outer_npc_num = 8  # these npcs rally to the center
     self.npc_step_size = 2
     self.adaptive_difficulty = True
     self.num_game_won = 1  # at the same duration, threshold to increase the difficulty
