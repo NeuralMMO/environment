@@ -124,7 +124,8 @@ class Move(Node):
        realm.map.tiles[r_new, c_new].impassible:
       return
 
-    if not realm.config.ALLOW_MOVE_INTO_OCCUPIED_TILE and \
+    # ALLOW_MOVE_INTO_OCCUPIED_TILE only applies to players, NOT npcs
+    if entity.is_player and not realm.config.ALLOW_MOVE_INTO_OCCUPIED_TILE and \
        realm.map.tiles[r_new, c_new].occupied:
       return
 

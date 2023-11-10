@@ -1,10 +1,7 @@
-
 import math
 from types import SimpleNamespace
-
 import numpy as np
 
-from nmmo.core.config import Config
 from nmmo.datastore.serialized import SerializedState
 from nmmo.systems import inventory
 from nmmo.lib.event_code import EventCode
@@ -247,7 +244,7 @@ class Entity(EntityState):
     super().__init__(realm.datastore, EntityState.Limits(realm.config))
 
     self.realm = realm
-    self.config: Config = realm.config
+    self.config = realm.config
     # TODO: do not access realm._np_random directly
     #   related to the whole NPC, scripted logic
     # pylint: disable=protected-access
@@ -291,9 +288,7 @@ class Entity(EntityState):
       'c': self.col.val,
       'name': self.name,
       'level': self.attack_level,
-      'item_level': self.item_level.val,
-    }
-
+      'item_level': self.item_level.val,}
     return data
 
   def update(self, realm, actions):
@@ -349,7 +344,6 @@ class Entity(EntityState):
   def alive(self):
     if self.resources.health.empty:
       return False
-
     return True
 
   @property
@@ -365,7 +359,6 @@ class Entity(EntityState):
     melee = self.skills.melee.level.val
     ranged = self.skills.range.level.val
     mage = self.skills.mage.level.val
-
     return int(max(melee, ranged, mage))
 
   @property
@@ -373,5 +366,4 @@ class Entity(EntityState):
     # NOTE: the initial latest_combat_tick is 0, and valid values are greater than 0
     if not self.config.COMBAT_SYSTEM_ENABLED or self.latest_combat_tick.val == 0:
       return False
-
     return (self.realm.tick - self.latest_combat_tick.val) < self.config.COMBAT_STATUS_DURATION

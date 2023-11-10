@@ -179,37 +179,6 @@ class TestObservationTile(unittest.TestCase):
       lambda: where_in_1d_with_index(event_data, [1, 2, 3], event_index),
       number=1000, globals=globals()))
 
-  def test_habitable(self):
-    from nmmo.systems.npc_policy import get_habitable_dir as habitable_impl
-    realm_map = self.env.realm.map
-    realm_tiles= self.env.realm.map.tiles
-    ent = self.env.realm.npcs[-1]
-    np_random = self.env._np_random
-
-    def habitable_ref(tiles, ent, np_random):
-      r, c  = ent.pos
-      cands = []
-      if tiles[r-1, c].habitable:
-        cands.append(Action.North)
-      if tiles[r+1, c].habitable:
-        cands.append(Action.South)
-      if tiles[r, c-1].habitable:
-        cands.append(Action.West)
-      if tiles[r, c+1].habitable:
-        cands.append(Action.East)
-
-      if len(cands) == 0:
-        return Action.North
-
-      return np_random.choice(cands)
-
-    print('---test_habitable---')
-    print('reference:', timeit(
-      lambda: habitable_ref(realm_tiles, ent, np_random),
-      number=1000, globals=globals()))
-    print('habitable_impl:', timeit(
-      lambda: habitable_impl(realm_map, ent, np_random),
-      number=1000, globals=globals()))
 
 if __name__ == '__main__':
   unittest.main()

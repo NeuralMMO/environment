@@ -13,8 +13,7 @@ def adjacentPos(pos):
   r, c = pos
   return [(r - 1, c), (r, c - 1), (r + 1, c), (r, c + 1)]
 
-def aStar(realm_map, start, goal):
-  cutoff = CUTOFF
+def aStar(realm_map, start, goal, cutoff = CUTOFF):
   tiles = realm_map.tiles
   if start == goal:
     return (0, 0)
@@ -44,7 +43,7 @@ def aStar(realm_map, start, goal):
       break
 
     for nxt in adjacentPos(cur):
-      if not in_bounds(*nxt, tiles.shape):
+      if not in_bounds(*nxt, tiles.shape) or realm_map.habitable_tiles[nxt] == 0:
         continue
 
       newCost = cost[cur] + 1

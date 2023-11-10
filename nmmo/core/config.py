@@ -575,6 +575,9 @@ class NPC:
   NPC_N                               = None
   '''Maximum number of NPCs spawnable in the environment'''
 
+  NPC_DEFAULT_REFILL_DEAD_NPCS        = True
+  '''Whether to refill dead NPCs'''
+
   NPC_SPAWN_ATTEMPTS                  = 25
   '''Number of NPC spawn attempts per tick'''
 

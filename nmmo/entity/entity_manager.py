@@ -2,10 +2,8 @@ from collections.abc import Mapping
 from typing import Dict
 
 from nmmo.entity.entity import Entity
-from nmmo.entity.npc import NPC
 from nmmo.entity.player import Player
 from nmmo.lib import spawn
-from nmmo.systems import combat
 
 
 class EntityGroup(Mapping):
@@ -76,55 +74,13 @@ class EntityGroup(Mapping):
             item.destroy()
 
         self.entities[ent_id].datastore_record.delete()
-        del self.entities[ent_id]
+        self.entities.pop(ent_id)
 
     return self.dead_this_tick
 
   def update(self, actions):
     for entity in self.entities.values():
       entity.update(self.realm, actions)
-
-
-class NPCManager(EntityGroup):
-  def __init__(self, realm, np_random):
-    super().__init__(realm, np_random)
-    self.next_id = -1
-    self.spawn_dangers = []
-
-  def reset(self, np_random):
-    super().reset(np_random)
-    self.next_id = -1
-    self.spawn_dangers.clear()
-
-  def default_spawn(self):
-    config = self.config
-
-    if not config.NPC_SYSTEM_ENABLED:
-      return
-
-    for _ in range(config.NPC_SPAWN_ATTEMPTS):
-      if len(self.entities) >= config.NPC_N:
-        break
-
-      if self.spawn_dangers:
-        danger = self.spawn_dangers.pop()
-        r, c   = combat.spawn(config, danger, self._np_random)
-      else:
-        center = config.MAP_CENTER
-        border = self.config.MAP_BORDER
-        # pylint: disable=unbalanced-tuple-unpacking
-        r, c   = self._np_random.integers(border, center+border, 2).tolist()
-
-      npc = NPC.default_spawn(self.realm, (r, c), self.next_id, self._np_random)
-      if npc:
-        super().spawn_entity(npc)
-        self.next_id -= 1
-
-  def actions(self, realm):
-    actions = {}
-    for idx, entity in self.entities.items():
-      actions[idx] = entity.decide(realm)
-    return actions
 
 class PlayerManager(EntityGroup):
   def spawn(self, agent_loader: spawn.SequentialLoader = None):

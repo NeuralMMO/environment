@@ -69,7 +69,13 @@ def attack(realm, attacker, target, skill_fn):
   multiplier        = damage_multiplier(config, skill, target)
 
   # NOTE: skill offense and defense are only for agents, NOT npcs
-  skill_offense = base_damage + level_damage * skill.level.val if attacker.is_player else 0
+  skill_offense = base_damage
+  if attacker.is_player:
+    skill_offense += level_damage * skill.level.val
+  if attacker.is_npc and config.EQUIPMENT_SYSTEM_ENABLED:
+    # NOTE: In this case, npc off/def is set only with equipment. Revisit this.
+    skill_offense = 0
+
   if config.PROGRESSION_SYSTEM_ENABLED and target.is_player:
     skill_defense = config.PROGRESSION_BASE_DEFENSE  + \
       config.PROGRESSION_LEVEL_DEFENSE*level(target.skills)

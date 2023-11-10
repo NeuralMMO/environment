@@ -8,7 +8,8 @@ from nmmo.core.map import Map
 from nmmo.core.tile import TileState
 from nmmo.core.action import Action, Buy
 from nmmo.entity.entity import EntityState
-from nmmo.entity.entity_manager import NPCManager, PlayerManager
+from nmmo.entity.entity_manager import PlayerManager
+from nmmo.entity.npc_manager import NPCManager
 from nmmo.datastore.numpy_datastore import NumpyDatastore
 from nmmo.systems.exchange import Exchange
 from nmmo.systems.item import ItemState
@@ -141,7 +142,7 @@ class Realm:
         dead: List of dead agents
     """
     # Prioritize actions
-    npc_actions = self.npcs.actions(self)
+    npc_actions = self.npcs.actions()
     merged = defaultdict(list)
     prioritized(actions, merged)
     prioritized(npc_actions, merged)

@@ -109,10 +109,12 @@ class Game(ABC):
                                        "progress_to_center": agent.history.exploration}
 
   def _process_dead_npcs(self, dead_npcs):
-    for npc in dead_npcs.values():
-      self.realm.npcs.spawn_dangers.append(npc.spawn_danger)
-    # refill npcs to target config.NPC_N, within config.NPC_SPAWN_ATTEMPTS
-    self.realm.npcs.default_spawn()
+    if self.config.NPC_SYSTEM_ENABLED and self.config.NPC_DEFAULT_REFILL_DEAD_NPCS:
+      for npc in dead_npcs.values():
+        if npc.spawn_danger:
+          self.realm.npcs.spawn_dangers.append(npc.spawn_danger)
+      # refill npcs to target config.NPC_N, within config.NPC_SPAWN_ATTEMPTS
+      self.realm.npcs.default_spawn()
 
   def _check_winners(self, dones):
     # Determine winners for the default task

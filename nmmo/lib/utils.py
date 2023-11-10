@@ -1,11 +1,11 @@
 # pylint: disable=all
-
 import inspect
 from collections import deque
 import hashlib
-
 import numpy as np
+from nmmo.entity.entity import Entity, EntityState
 
+EntityAttr = EntityState.State.attr_name_to_col
 
 class staticproperty(property):
   def __get__(self, cls, owner):
@@ -104,3 +104,24 @@ def get_hash_embedding(func, embed_dim):
   hash_bytes = bytes.fromhex(hex_digest)
   hash_array = np.frombuffer(hash_bytes, dtype=np.float16)
   return np.resize(hash_array, (embed_dim,))
+
+def identify_closest_target(entity):
+  realm = entity.realm
+  radius = realm.config.PLAYER_VISION_RADIUS
+  visible_entities = Entity.Query.window(
+    realm.datastore, entity.pos[0], entity.pos[1], radius)
+  dist = linf(visible_entities[:,EntityAttr["row"]:EntityAttr["col"]+1], entity.pos)
+  entity_ids = visible_entities[:,EntityAttr["id"]]
+
+  if entity.config.NPC_SYSTEM_ENABLED and not entity.config.NPC_ALLOW_ATTACK_OTHER_NPCS:
+    flt_idx = entity_ids > 0
+    dist = dist[flt_idx]
+    entity_ids = entity_ids[flt_idx]
+
+  # TODO: this could be made smarter/faster, or perhaps consider health
+  if len(dist) > 1:
+    closest_idx = np.argmin(dist)
+    return realm.entity(entity_ids[closest_idx])
+  if len(dist) == 1:
+    return realm.entity(entity_ids[0])
+  return None
