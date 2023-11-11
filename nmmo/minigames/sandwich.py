@@ -27,6 +27,7 @@ class Sandwich(TeamBattle):
     self.adaptive_difficulty = True
     self.num_game_won = 1  # at the same duration, threshold to increase the difficulty
     self.seize_duration = 30
+    self._grass_map = False
 
   @property
   def teams(self):
@@ -51,6 +52,9 @@ class Sandwich(TeamBattle):
   def set_outer_npc_num(self, outer_npc_num):
     self._outer_npc_num = outer_npc_num
 
+  def set_grass_map(self, grass_map):
+    self._grass_map = grass_map
+
   def is_compatible(self):
     return self.config.are_systems_enabled(self.required_systems)
 
@@ -58,6 +62,7 @@ class Sandwich(TeamBattle):
     super().reset(np_random, map_dict)
     self.history[-1]["inner_npc_num"] = self.inner_npc_num
     self.history[-1]["outer_npc_num"] = self.outer_npc_num
+    self._grass_map = False  # reset to default
 
   def _set_config(self):
     self.config.reset()
@@ -71,8 +76,11 @@ class Sandwich(TeamBattle):
     self.config.set_for_episode("MAP_RESET_FROM_FRACTAL", True)
     self.config.set_for_episode("TERRAIN_WATER", 0.1)
     self.config.set_for_episode("TERRAIN_FOILAGE", 0.9)  # prop of stone tiles: 0.05
-    # NO death fog
-    self.config.set_for_episode("PLAYER_DEATH_FOG", None)
+    self.config.set_for_episode("TERRAIN_RESET_TO_GRASS", self._grass_map)
+    # Activate death fog from the onset
+    self.config.set_for_episode("PLAYER_DEATH_FOG", 1)
+    self.config.set_for_episode("PLAYER_DEATH_FOG_SPEED", 1/6)
+    self.config.set_for_episode("PLAYER_DEATH_FOG_FINAL_SIZE", 10)
     # Enable +1 hp per tick
     self.config.set_for_episode("PLAYER_HEALTH_INCREMENT", True)
     self._determine_difficulty()  # sets the seize duration
