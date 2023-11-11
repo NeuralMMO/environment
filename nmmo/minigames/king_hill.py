@@ -44,7 +44,7 @@ class KingoftheHill(TeamBattle):
     self.history[-1]["map_size"] = self.map_size
     self.history[-1]["seize_duration"] = self.seize_duration
 
-  def _set_config(self):
+  def _set_config(self, np_random):
     self.config.reset()
     self.config.toggle_systems(self.required_systems)
     self.config.set_for_episode("MAP_CENTER", self.map_size)

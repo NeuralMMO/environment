@@ -64,7 +64,7 @@ class Sandwich(TeamBattle):
     self.history[-1]["outer_npc_num"] = self.outer_npc_num
     self._grass_map = False  # reset to default
 
-  def _set_config(self):
+  def _set_config(self, np_random):
     self.config.reset()
     self.config.toggle_systems(self.required_systems)
     self.config.set_for_episode("TEAMS", self.teams)

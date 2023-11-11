@@ -61,7 +61,7 @@ class TestGymObsSpaces(unittest.TestCase):
 
   def test_system_disable(self):
     class CustomGame(DefaultGame):
-      def _set_config(self):
+      def _set_config(self, np_random):
         self.config.reset()
         self.config.set_for_episode("COMBAT_SYSTEM_ENABLED", False)
         self.config.set_for_episode("ITEM_SYSTEM_ENABLED", False)

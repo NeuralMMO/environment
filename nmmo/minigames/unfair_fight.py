@@ -58,7 +58,7 @@ class UnfairFight(TeamBattle):
     return {"small": list(range(1, self.small_team_size+1)),
             "large": list(range(self.small_team_size+1, self.config.PLAYER_N+1)),}
 
-  def _set_config(self):
+  def _set_config(self, np_random):
     self.config.reset()
     self.config.toggle_systems(self.required_systems)
     self.config.set_for_episode("HORIZON", 256)

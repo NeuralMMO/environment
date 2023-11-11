@@ -43,7 +43,7 @@ class Game(ABC):
     return 0.0
 
   def reset(self, np_random, map_dict, tasks=None):
-    self._set_config()
+    self._set_config(np_random)
     self._set_realm(np_random, map_dict)
     if tasks:
       # tasks comes from env.reset()
@@ -58,7 +58,7 @@ class Game(ABC):
     self._post_setup()
     self._reset_stats()
 
-  def _set_config(self):
+  def _set_config(self, np_random):  # pylint: disable=unused-argument
     """Set config for the episode. Can customize config using config.set_for_episode()"""
     self.config.reset()
 

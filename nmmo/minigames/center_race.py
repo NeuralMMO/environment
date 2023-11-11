@@ -53,7 +53,7 @@ class RacetoCenter(Game):
     super().reset(np_random, map_dict)
     self.history[-1]["map_size"] = self.map_size
 
-  def _set_config(self):
+  def _set_config(self, np_random):
     self.config.reset()
     self.config.toggle_systems(self.required_systems)
     self.config.set_for_episode("ALLOW_MOVE_INTO_OCCUPIED_TILE", False)
