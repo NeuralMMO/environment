@@ -206,14 +206,14 @@ class Realm:
         self.fog_map[l:r, l:r] = -dist
         dist += 1
       # mark the safe area
-      self.fog_map[center-safe:center+safe, center-safe:center+safe] = -self.config.MAP_SIZE
+      self.fog_map[center-safe:center+safe+1, center-safe:center+safe+1] = -self.config.MAP_SIZE
       return
 
     # consider the map border so that the fog can hit the border at fog_start_tick
     if self.tick >= fog_start_tick:
       self.fog_map += fog_speed
       # mark the safe area
-      self.fog_map[center-safe:center+safe, center-safe:center+safe] = -self.config.MAP_SIZE
+      self.fog_map[center-safe:center+safe+1, center-safe:center+safe+1] = -self.config.MAP_SIZE
 
   def record_replay(self, replay_helper: ReplayHelper) -> ReplayHelper:
     self._replay_helper = replay_helper
