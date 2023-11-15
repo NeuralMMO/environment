@@ -389,8 +389,7 @@ class Env(ParallelEnv):
     dones = {}
     for agent_id in self.agents:
       if agent_id in self._dead_this_tick or \
-        self.realm.tick >= self.config.HORIZON or \
-        (self.config.RESET_ON_DEATH and len(self._dead_agents) > 0):
+        self.realm.tick >= self.config.HORIZON:
         self._dead_agents.add(agent_id)
         dones[agent_id] = True
       else:

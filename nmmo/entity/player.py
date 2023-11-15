@@ -124,7 +124,7 @@ class Player(entity.Entity):
     # 10 tiles in, 0 damage in farther
     # This means all agents will be force killed around
     # MAP_CENTER / 2 + 100 ticks after spawning
-    fog = self.config.PLAYER_DEATH_FOG
+    fog = self.config.DEATH_FOG_ONSET
     if fog is not None and self.realm.tick >= fog:
       dmg = self.realm.fog_map[self.pos]
       if dmg > 0.5:  # fog_map has float values

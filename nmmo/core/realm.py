@@ -189,13 +189,13 @@ class Realm:
     return dead_players, dead_npcs
 
   def update_fog_map(self, reset=False):
-    fog_start_tick = self.config.PLAYER_DEATH_FOG
+    fog_start_tick = self.config.DEATH_FOG_ONSET
     if fog_start_tick is None:
       return
 
-    fog_speed = self.config.PLAYER_DEATH_FOG_SPEED
+    fog_speed = self.config.DEATH_FOG_SPEED
     center = self.config.MAP_SIZE // 2
-    safe = self.config.PLAYER_DEATH_FOG_FINAL_SIZE
+    safe = self.config.DEATH_FOG_FINAL_SIZE
 
     if reset:
       dist = -self.config.MAP_BORDER

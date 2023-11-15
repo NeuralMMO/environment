@@ -111,7 +111,7 @@ class ScriptedAgentTestConfig(nmmo.config.Small, nmmo.config.AllGameSystems):
 
   __test__ = False
 
-  PLAYER_DEATH_FOG = 5
+  DEATH_FOG_ONSET = 5
   PLAYERS = [
     baselines.Fisher, baselines.Herbalist,
     baselines.Prospector,baselines.Carver, baselines.Alchemist,
