@@ -50,7 +50,8 @@ class Tile(TileState):
 
   @property
   def occupied(self):
-    return len(self.entities) > 0
+    #return len(self.entities) > 0
+    return sum(1 for ent_id in self.entities if ent_id > 0) > 0
 
   @property
   def repr(self):
