@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
 from nmmo.datastore.serialized import SerializedState
-from nmmo.lib import material
+from nmmo.lib import material, event_code
 
 # pylint: disable=no-member,protected-access
 TileState = SerializedState.subclass(
@@ -43,6 +43,11 @@ class Tile(TileState):
     self.entities = {}
     self.seize_history = []
 
+    # NOTE: the occupied property applies ONLY to players, NOT npcs
+    # Basically, npcs are like ghosts without any physical presence,
+    # so, npcs cannot occupy nor seize a tile
+    self.occupied = False
+
   @property
   def repr(self):
     return ((self.row.val, self.col.val))
@@ -67,10 +72,6 @@ class Tile(TileState):
   def tex(self):
     return self.state.tex
 
-  @property
-  def occupied(self):
-    return len(self.entities) > 0
-
   def reset(self, mat, config, np_random):
     self._np_random = np_random # reset the RNG
     self.entities = {}
@@ -91,10 +92,16 @@ class Tile(TileState):
   def add_entity(self, ent):
     assert ent.ent_id not in self.entities
     self.entities[ent.ent_id] = ent
+    if ent.ent_id > 0:
+      self.occupied = True
 
   def remove_entity(self, ent_id):
     assert ent_id in self.entities
     del self.entities[ent_id]
+    if ent_id > 0:
+      # NOTE: the occupied property applies ONLY to players, NOT npcs,
+      # so, we ONLY check if there are any players left
+      self.occupied = sum(1 for ent_id in self.entities if ent_id > 0) > 0
 
   def step(self):
     if not self.depleted or self.material.respawn == 0:
@@ -120,3 +127,5 @@ class Tile(TileState):
       # no need to add another entry if the last entry is from the same team (incl. self)
       return
     self.seize_history.append((ent_id, self.realm.tick))
+    if self.realm.event_log:
+      self.realm.event_log.record(event_code.EventCode.SEIZE_TILE, entity, tile=self.pos)

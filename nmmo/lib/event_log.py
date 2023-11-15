@@ -37,17 +37,16 @@ EventState.Query = SimpleNamespace(
 # defining col synoyms for different event types
 ATTACK_COL_MAP = {
   'combat_style': EventAttr['type'],
-  'damage': EventAttr['number'] }
-
+  'damage': EventAttr['number']}
 ITEM_COL_MAP = {
   'item_type': EventAttr['type'],
   'quantity': EventAttr['number'],
   'price': EventAttr['gold'],
-  'item_id': EventAttr['target_ent'] }
-
-LEVEL_COL_MAP = { 'skill': EventAttr['type'] }
-
-EXPLORE_COL_MAP = { 'distance': EventAttr['number'] }
+  'item_id': EventAttr['target_ent']}
+LEVEL_COL_MAP = {'skill': EventAttr['type']}
+EXPLORE_COL_MAP = {'distance': EventAttr['number']}
+TILE_COL_MAP = {'tile_row': EventAttr['number'],
+                'tile_col': EventAttr['gold']}
 
 
 class EventLogger(EventCode):
@@ -68,6 +67,7 @@ class EventLogger(EventCode):
     self.attr_to_col.update(ITEM_COL_MAP)
     self.attr_to_col.update(LEVEL_COL_MAP)
     self.attr_to_col.update(EXPLORE_COL_MAP)
+    self.attr_to_col.update(TILE_COL_MAP)
 
   def reset(self):
     EventState.State.table(self.datastore).reset()
@@ -171,6 +171,13 @@ class EventLogger(EventCode):
         log = self._create_event(entity, event_code)
         log.type.update(kwargs['skill'].SKILL_ID)
         log.level.update(kwargs['level'])
+        return
+
+    if event_code == EventCode.SEIZE_TILE:
+      if ('tile' in kwargs and isinstance(kwargs['tile'], tuple)):
+        log = self._create_event(entity, event_code)
+        log.number.update(kwargs['tile'][0])  # row
+        log.gold.update(kwargs['tile'][1])  # col
         return
 
     # If reached here, then something is wrong
