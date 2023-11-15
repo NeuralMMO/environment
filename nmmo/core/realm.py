@@ -171,7 +171,7 @@ class Realm:
       # ent_id, (atn, args) = merged[priority][0]
       for ent_id, (atn, args) in merged[priority]:
         ent = self.entity(ent_id)
-        if ent.alive:
+        if ent.alive and not ent.status.frozen:
           atn.call(self, ent, *args)
     dead_players = self.players.cull()
     dead_npcs = self.npcs.cull()

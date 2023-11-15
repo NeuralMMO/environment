@@ -53,12 +53,12 @@ EntityState = SerializedState.subclass(
 EntityState.Limits = lambda config: {
   **{
     "id": (-math.inf, math.inf),
-    "npc_type": (0, 4),
+    "npc_type": (0, 10),
     "row": (0, config.MAP_SIZE-1),
     "col": (0, config.MAP_SIZE-1),
     "damage": (0, math.inf),
     "time_alive": (0, math.inf),
-    "freeze": (0, 3),
+    "freeze": (0, math.inf),
     "item_level": (0, math.inf),
     "attacker_id": (-np.inf, math.inf),
     "latest_combat_tick": (0, math.inf),
@@ -112,6 +112,7 @@ EntityState.Query = SimpleNamespace(
     r, c, radius),
 )
 
+
 class Resources:
   def __init__(self, ent, config):
     self.config = config
@@ -126,8 +127,8 @@ class Resources:
       self.water.update(config.RESOURCE_BASE)
       self.food.update(config.RESOURCE_BASE)
 
-  def update(self):
-    if not self.config.RESOURCE_SYSTEM_ENABLED:
+  def update(self, immortal=False):
+    if not self.config.RESOURCE_SYSTEM_ENABLED or immortal:
       return
 
     regen = self.config.RESOURCE_HEALTH_RESTORE_FRACTION
@@ -165,18 +166,23 @@ class Resources:
       data['water'] = { 'val': self.water.val, 'max': self.config.RESOURCE_BASE }
     return data
 
+
 class Status:
   def __init__(self, ent):
     self.freeze = ent.freeze
 
   def update(self):
-    if self.freeze.val > 0:
+    if self.frozen:
       self.freeze.decrement(1)
 
   def packet(self):
     data = {}
     data['freeze'] = self.freeze.val
     return data
+
+  @property
+  def frozen(self):
+    return self.freeze.val > 0
 
 
 # NOTE: History.packet() is actively used in visulazing attacks
@@ -213,7 +219,6 @@ class History:
     data['timeAlive'] = self.time_alive.val
     data['damage_inflicted'] = self.damage_inflicted
     data['damage_received'] = self.damage_received
-
     if self.attack is not None:
       data['attack'] = self.attack
 
@@ -266,6 +271,7 @@ class Entity(EntityState):
     self.target = None
     self.closest = None
     self.spawn_pos = pos
+    self._immortal = False  # used for testing/player observer
 
     # Submodules
     self.status = Status(self)
@@ -342,9 +348,11 @@ class Entity(EntityState):
 
   @property
   def alive(self):
-    if self.resources.health.empty:
-      return False
-    return True
+    return self.resources.health.val > 0
+
+  @property
+  def immortal(self):
+    return self._immortal
 
   @property
   def is_player(self) -> bool:

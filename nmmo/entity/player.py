@@ -8,7 +8,7 @@ class Player(entity.Entity):
     super().__init__(realm, pos, agent.iden, agent.policy)
 
     self.agent    = agent
-    self.immortal = realm.config.IMMORTAL
+    self._immortal = realm.config.IMMORTAL
     self.resources.resilient = resilient
     self.my_tasks = None
 
@@ -49,6 +49,12 @@ class Player(entity.Entity):
     # CHECK ME: the initial level is 1 because of Basic skills,
     #   which are harvesting food/water and don't progress
     return max(e.level.val for e in self.skills.skills)
+
+  def make_observer(self):
+    # NOTE: observer cannot act and cannot die
+    self._immortal = True
+    self.status.freeze.update(self.config.MAX_HORIZON)
+    self.npc_type.update(9)  # NOTE: this is a hack to mark this agent as an observer
 
   def apply_damage(self, dmg, style):
     super().apply_damage(dmg, style)
@@ -136,5 +142,5 @@ class Player(entity.Entity):
     if self.config.PLAYER_HEALTH_INCREMENT:
       self.resources.health.increment()
 
-    self.resources.update()
+    self.resources.update(self.immortal)
     self.skills.update()

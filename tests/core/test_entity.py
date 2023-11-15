@@ -4,6 +4,8 @@ import numpy as np
 import nmmo
 from nmmo.entity.entity import Entity, EntityState
 from nmmo.datastore.numpy_datastore import NumpyDatastore
+from scripted.baselines import Random
+
 
 class MockRealm:
   def __init__(self):
@@ -57,6 +59,22 @@ class TestEntity(unittest.TestCase):
     e_row = EntityState.Query.by_id(realm.datastore, entity_id)
     self.assertEqual(e_row[Entity.State.attr_name_to_col["food"]], 11)
 
+  def test_observer(self):
+    config = nmmo.config.Default()
+    config.set("PLAYERS", [Random])
+    env = nmmo.Env(config)
+    env.reset()
+
+    # set player 1 to be the observer
+    # Observers are immortal and cannot act (move)
+    player1 = env.realm.players[1]
+    player1.make_observer()
+    spawn_pos = player1.pos
+
+    for _ in range(50):  # long enough to starve to death
+      env.step({})
+      self.assertEqual(player1.pos, spawn_pos)
+      self.assertEqual(player1.health.val, config.PLAYER_BASE_HEALTH)
 
 if __name__ == '__main__':
   unittest.main()
