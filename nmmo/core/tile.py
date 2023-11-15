@@ -43,15 +43,13 @@ class Tile(TileState):
     self.entities = {}
     self.seize_history = []
 
-    # NOTE: the occupied property applies ONLY to players, NOT npcs
-    # Basically, npcs are like ghosts without any physical presence,
-    # so, npcs cannot occupy nor seize a tile
-    #self.occupied = False
-
   @property
   def occupied(self):
-    #return len(self.entities) > 0
-    return sum(1 for ent_id in self.entities if ent_id > 0) > 0
+    # NOTE: ONLY players consider whether the tile is occupied or not
+    # NPCs can move into occupied tiles.
+    # Surprisingly, this has huge effect on training, so be careful.
+    # Tried this -- "sum(1 for ent_id in self.entities if ent_id > 0) > 0"
+    return len(self.entities) > 0
 
   @property
   def repr(self):
@@ -97,16 +95,10 @@ class Tile(TileState):
   def add_entity(self, ent):
     assert ent.ent_id not in self.entities
     self.entities[ent.ent_id] = ent
-    # if ent.ent_id > 0:
-    #   self.occupied = True
 
   def remove_entity(self, ent_id):
     assert ent_id in self.entities
     del self.entities[ent_id]
-    # if ent_id > 0:
-    #   # NOTE: the occupied property applies ONLY to players, NOT npcs,
-    #   # so, we ONLY check if there are any players left
-    #   self.occupied = sum(1 for ent_id in self.entities if ent_id > 0) > 0
 
   def step(self):
     if not self.depleted or self.material.respawn == 0:

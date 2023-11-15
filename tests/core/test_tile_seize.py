@@ -80,7 +80,7 @@ class TestTileSeize(unittest.TestCase):
     mock_realm.tick = 9
     tile.remove_entity(2)
     self.assertListEqual(list(tile.entities.keys()), [-10])
-    self.assertEqual(tile.occupied, False)
+    self.assertEqual(tile.occupied, True)
     tile.update_seize()
     self.assertEqual(tile.seize_history[-1], (2, 5))
 
