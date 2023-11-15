@@ -226,7 +226,7 @@ class Config(Template):
   PLAYER_N_OBS                 = 100
   '''Number of distinct agent observations'''
 
-  MAX_HORIZON = 2**16  # this is arbitrary
+  MAX_HORIZON = 2**15 - 1  # this is arbitrary
   '''Maximum number of steps the environment can run for'''
 
   HORIZON = 1024
@@ -274,13 +274,13 @@ class Config(Template):
   PLAYER_HEALTH_INCREMENT      = False
   '''Whether to increment health by 1 per tick for players, like npcs'''
 
-  PLAYER_DEATH_FOG             = None
+  DEATH_FOG_ONSET              = None
   '''How long before spawning death fog. None for no death fog'''
 
-  PLAYER_DEATH_FOG_SPEED       = 1
+  DEATH_FOG_SPEED              = 1
   '''Number of tiles per tick that the fog moves in'''
 
-  PLAYER_DEATH_FOG_FINAL_SIZE  = 8
+  DEATH_FOG_FINAL_SIZE         = 8
   '''Number of tiles from the center that the fog stops'''
 
   PLAYER_LOADER                = spawn.SequentialLoader
@@ -297,9 +297,6 @@ class Config(Template):
   ### Debug Parameters
   IMMORTAL = False
   '''Debug parameter: prevents agents from dying except by void'''
-
-  RESET_ON_DEATH = False
-  '''Debug parameter: whether to reset the environment whenever an agent dies'''
 
 
   ############################################################################

@@ -171,7 +171,7 @@ class Realm:
       # ent_id, (atn, args) = merged[priority][0]
       for ent_id, (atn, args) in merged[priority]:
         ent = self.entity(ent_id)
-        if ent.alive:
+        if ent.alive and not ent.status.frozen:
           atn.call(self, ent, *args)
     dead_players = self.players.cull()
     dead_npcs = self.npcs.cull()
@@ -189,13 +189,13 @@ class Realm:
     return dead_players, dead_npcs
 
   def update_fog_map(self, reset=False):
-    fog_start_tick = self.config.PLAYER_DEATH_FOG
+    fog_start_tick = self.config.DEATH_FOG_ONSET
     if fog_start_tick is None:
       return
 
-    fog_speed = self.config.PLAYER_DEATH_FOG_SPEED
+    fog_speed = self.config.DEATH_FOG_SPEED
     center = self.config.MAP_SIZE // 2
-    safe = self.config.PLAYER_DEATH_FOG_FINAL_SIZE
+    safe = self.config.DEATH_FOG_FINAL_SIZE
 
     if reset:
       dist = -self.config.MAP_BORDER
@@ -206,14 +206,14 @@ class Realm:
         self.fog_map[l:r, l:r] = -dist
         dist += 1
       # mark the safe area
-      self.fog_map[center-safe:center+safe, center-safe:center+safe] = -self.config.MAP_SIZE
+      self.fog_map[center-safe:center+safe+1, center-safe:center+safe+1] = -self.config.MAP_SIZE
       return
 
     # consider the map border so that the fog can hit the border at fog_start_tick
     if self.tick >= fog_start_tick:
       self.fog_map += fog_speed
       # mark the safe area
-      self.fog_map[center-safe:center+safe, center-safe:center+safe] = -self.config.MAP_SIZE
+      self.fog_map[center-safe:center+safe+1, center-safe:center+safe+1] = -self.config.MAP_SIZE
 
   def record_replay(self, replay_helper: ReplayHelper) -> ReplayHelper:
     self._replay_helper = replay_helper

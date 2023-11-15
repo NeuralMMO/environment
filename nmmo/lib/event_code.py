@@ -3,6 +3,7 @@ class EventCode:
   EAT_FOOD = 1
   DRINK_WATER = 2
   GO_FARTHEST = 3 # record when breaking the previous record
+  SEIZE_TILE = 4
 
   # Attack
   SCORE_HIT = 11

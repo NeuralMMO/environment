@@ -8,7 +8,7 @@ class Player(entity.Entity):
     super().__init__(realm, pos, agent.iden, agent.policy)
 
     self.agent    = agent
-    self.immortal = realm.config.IMMORTAL
+    self._immortal = realm.config.IMMORTAL
     self.resources.resilient = resilient
     self.my_tasks = None
 
@@ -49,6 +49,12 @@ class Player(entity.Entity):
     # CHECK ME: the initial level is 1 because of Basic skills,
     #   which are harvesting food/water and don't progress
     return max(e.level.val for e in self.skills.skills)
+
+  def make_observer(self):
+    # NOTE: observer cannot act and cannot die
+    self._immortal = True
+    self.status.freeze.update(self.config.MAX_HORIZON)
+    self.npc_type.update(9)  # NOTE: this is a hack to mark this agent as an observer
 
   def apply_damage(self, dmg, style):
     super().apply_damage(dmg, style)
@@ -124,7 +130,7 @@ class Player(entity.Entity):
     # 10 tiles in, 0 damage in farther
     # This means all agents will be force killed around
     # MAP_CENTER / 2 + 100 ticks after spawning
-    fog = self.config.PLAYER_DEATH_FOG
+    fog = self.config.DEATH_FOG_ONSET
     if fog is not None and self.realm.tick >= fog:
       dmg = self.realm.fog_map[self.pos]
       if dmg > 0.5:  # fog_map has float values
@@ -136,5 +142,5 @@ class Player(entity.Entity):
     if self.config.PLAYER_HEALTH_INCREMENT:
       self.resources.health.increment()
 
-    self.resources.update()
+    self.resources.update(self.immortal)
     self.skills.update()

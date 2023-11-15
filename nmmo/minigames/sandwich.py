@@ -78,9 +78,9 @@ class Sandwich(TeamBattle):
     self.config.set_for_episode("TERRAIN_FOILAGE", 0.9)  # prop of stone tiles: 0.05
     self.config.set_for_episode("TERRAIN_RESET_TO_GRASS", self._grass_map)
     # Activate death fog from the onset
-    self.config.set_for_episode("PLAYER_DEATH_FOG", 1)
-    self.config.set_for_episode("PLAYER_DEATH_FOG_SPEED", 1/6)
-    self.config.set_for_episode("PLAYER_DEATH_FOG_FINAL_SIZE", 10)
+    self.config.set_for_episode("DEATH_FOG_ONSET", 1)
+    self.config.set_for_episode("DEATH_FOG_SPEED", 1/6)
+    self.config.set_for_episode("DEATH_FOG_FINAL_SIZE", 10)
     # Enable +1 hp per tick
     self.config.set_for_episode("PLAYER_HEALTH_INCREMENT", True)
     self._determine_difficulty()  # sets the seize duration

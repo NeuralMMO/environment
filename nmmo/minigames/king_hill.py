@@ -57,9 +57,9 @@ class KingoftheHill(TeamBattle):
     self.config.set_for_episode("TERRAIN_SCATTER_EXTRA_RESOURCES", True)
 
     # Activate death fog
-    self.config.set_for_episode("PLAYER_DEATH_FOG", 32)
-    self.config.set_for_episode("PLAYER_DEATH_FOG_SPEED", 1/6)
-    self.config.set_for_episode("PLAYER_DEATH_FOG_FINAL_SIZE", 12)
+    self.config.set_for_episode("DEATH_FOG_ONSET", 32)
+    self.config.set_for_episode("DEATH_FOG_SPEED", 1/6)
+    self.config.set_for_episode("DEATH_FOG_FINAL_SIZE", 12)
 
     self._determine_difficulty()  # sets the seize duration
 
@@ -109,7 +109,7 @@ class KingoftheHill(TeamBattle):
     assert config.RESOURCE_SYSTEM_ENABLED is True
     assert config.COMBAT_SYSTEM_ENABLED is True
     assert config.ALLOW_MOVE_INTO_OCCUPIED_TILE is False
-    assert config.PLAYER_DEATH_FOG == 32
+    assert config.DEATH_FOG_ONSET == 32
     assert env.realm.map.seize_targets == [(config.MAP_SIZE//2, config.MAP_SIZE//2)]
 
     for _ in range(horizon):

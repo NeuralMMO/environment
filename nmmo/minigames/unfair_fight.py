@@ -73,7 +73,7 @@ class UnfairFight(TeamBattle):
     self.config.set_for_episode("TERRAIN_FOILAGE", 0.9)  # prop of stone tiles: 0.05
 
     # NO death fog
-    self.config.set_for_episode("PLAYER_DEATH_FOG", None)
+    self.config.set_for_episode("DEATH_FOG_ONSET", None)
 
     # Disable +1 hp per tick
     self.config.set_for_episode("PLAYER_HEALTH_INCREMENT", False)
@@ -137,7 +137,7 @@ class UnfairFight(TeamBattle):
     config = env.config
     assert config.are_systems_enabled(game.required_systems)
     assert config.COMBAT_SYSTEM_ENABLED is True
-    assert config.PLAYER_DEATH_FOG is None
+    assert config.DEATH_FOG_ONSET is None
     assert config.ITEM_SYSTEM_ENABLED is False
     assert config.ALLOW_MOVE_INTO_OCCUPIED_TILE is False
 

@@ -33,9 +33,12 @@ def meander_toward(ent, goal, dist_crit=10, toward_weight=3):
   delta_r, delta_c = goal[0] - r, goal[1] - c
   abs_dr, abs_dc = abs(delta_r), abs(delta_c)
   dist_l1 = abs_dr + abs_dc
+  # If close (less than dist_crit), use expensive aStar
   if dist_l1 <= dist_crit:
     delta = astar.aStar(ent.realm.map, ent.pos, goal)
     return move_action(DELTA_TO_DIR[delta] if delta in DELTA_TO_DIR else None)
+
+  # Otherwise, use a weighted random walk
   cand_dirs = []
   weights = []
   for i in range(4):
@@ -118,7 +121,7 @@ class NPC(entity.Entity):
     self.last_action = actions
 
   def can_see(self, target):
-    if target is None:
+    if target is None or target.immortal:
       return False
     distance = utils.linf_single(self.pos, target.pos)
     return distance <= self.vision
@@ -131,7 +134,7 @@ class NPC(entity.Entity):
     return move_action(get_habitable_dir(self))
 
   def can_attack(self, target):
-    if target is None or not self.config.NPC_SYSTEM_ENABLED:
+    if target is None or not self.config.NPC_SYSTEM_ENABLED or target.immortal:
       return False
     if not self.config.NPC_ALLOW_ATTACK_OTHER_NPCS and target.is_npc:
       return False

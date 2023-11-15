@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
 from nmmo.datastore.serialized import SerializedState
-from nmmo.lib import material
+from nmmo.lib import material, event_code
 
 # pylint: disable=no-member,protected-access
 TileState = SerializedState.subclass(
@@ -44,6 +44,14 @@ class Tile(TileState):
     self.seize_history = []
 
   @property
+  def occupied(self):
+    # NOTE: ONLY players consider whether the tile is occupied or not
+    # NPCs can move into occupied tiles.
+    # Surprisingly, this has huge effect on training, so be careful.
+    # Tried this -- "sum(1 for ent_id in self.entities if ent_id > 0) > 0"
+    return len(self.entities) > 0
+
+  @property
   def repr(self):
     return ((self.row.val, self.col.val))
 
@@ -66,10 +74,6 @@ class Tile(TileState):
   @property
   def tex(self):
     return self.state.tex
-
-  @property
-  def occupied(self):
-    return len(self.entities) > 0
 
   def reset(self, mat, config, np_random):
     self._np_random = np_random # reset the RNG
@@ -120,3 +124,5 @@ class Tile(TileState):
       # no need to add another entry if the last entry is from the same team (incl. self)
       return
     self.seize_history.append((ent_id, self.realm.tick))
+    if self.realm.event_log:
+      self.realm.event_log.record(event_code.EventCode.SEIZE_TILE, entity, tile=self.pos)

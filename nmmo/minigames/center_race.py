@@ -65,10 +65,10 @@ class RacetoCenter(Game):
     self.config.set_for_episode("TERRAIN_SCATTER_EXTRA_RESOURCES", True)
 
     # Activate death fog
-    self.config.set_for_episode("PLAYER_DEATH_FOG", 32)
-    self.config.set_for_episode("PLAYER_DEATH_FOG_SPEED", 1/6)
+    self.config.set_for_episode("DEATH_FOG_ONSET", 32)
+    self.config.set_for_episode("DEATH_FOG_SPEED", 1/6)
     # Only the center tile is safe
-    self.config.set_for_episode("PLAYER_DEATH_FOG_FINAL_SIZE", 0)
+    self.config.set_for_episode("DEATH_FOG_FINAL_SIZE", 0)
 
     self._determine_difficulty()  # sets the map_size
     self.config.set_for_episode("MAP_CENTER", self.map_size)
@@ -105,7 +105,7 @@ class RacetoCenter(Game):
     config = env.config
     assert config.are_systems_enabled(game.required_systems)
     assert config.COMBAT_SYSTEM_ENABLED is False
-    assert config.PLAYER_DEATH_FOG == 32
+    assert config.DEATH_FOG_ONSET == 32
     assert config.ALLOW_MOVE_INTO_OCCUPIED_TILE is False
 
     for _ in range(horizon):

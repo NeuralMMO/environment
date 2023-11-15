@@ -259,7 +259,11 @@ class Observation:
     # allow friendly fire but no self shooting
     not_me = self.entities.ids != agent.id
 
-    target_mask[:self.entities.len] = within_range & not_me & no_spawn_immunity
+    # NOTE: this is a hack. Only target "normal" agents, which has npc_type of 0, 1, 2, 3
+    # For example, immoratl "observer" agents has npc_type of 9
+    targetable = self.entities.values[:,EntityState.State.attr_name_to_col["npc_type"]] < 9
+
+    target_mask[:self.entities.len] = within_range & not_me & no_spawn_immunity & targetable
     if sum(target_mask[:self.entities.len]) > 0:
       # Mask the no-op option, since there should be at least one allowed move
       # NOTE: this will make agents always attack if there is a valid target

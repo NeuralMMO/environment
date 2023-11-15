@@ -15,6 +15,7 @@ class MockRealm:
     self.config = nmmo.config.Small()
     self._np_random = np.random
     self.tick = 0
+    self.event_log = None
 
 class MockTask:
   def __init__(self, ent_id):
@@ -41,8 +42,9 @@ class TestTileSeize(unittest.TestCase):
     self.assertEqual(tile.material_id.val, material.Foilage.index)
     self.assertEqual(tile.seize_history, [])
 
-    tile.add_entity(MockEntity(1))
     mock_realm.tick = 1
+    tile.add_entity(MockEntity(1))
+    self.assertEqual(tile.occupied, True)
     tile.update_seize()
     self.assertEqual(tile.seize_history[-1], (1, 1))
 
@@ -55,12 +57,14 @@ class TestTileSeize(unittest.TestCase):
     mock_realm.tick = 3
     tile.add_entity(MockEntity(2))
     self.assertCountEqual(tile.entities.keys(), [1, 2])
+    self.assertEqual(tile.occupied, True)
     tile.update_seize()
     self.assertEqual(tile.seize_history[-1], (1, 1))
 
     mock_realm.tick = 5
     tile.remove_entity(1)
     self.assertCountEqual(tile.entities.keys(), [2])
+    self.assertEqual(tile.occupied, True)
     tile.update_seize()
     self.assertEqual(tile.seize_history[-1], (2, 5))  # new seize history
 
@@ -68,6 +72,7 @@ class TestTileSeize(unittest.TestCase):
     mock_realm.tick = 7
     tile.add_entity(MockEntity(-10))
     self.assertListEqual(list(tile.entities.keys()), [2, -10])
+    self.assertEqual(tile.occupied, True)
     tile.update_seize()
     self.assertEqual(tile.seize_history[-1], (2, 5))
 
@@ -75,6 +80,7 @@ class TestTileSeize(unittest.TestCase):
     mock_realm.tick = 9
     tile.remove_entity(2)
     self.assertListEqual(list(tile.entities.keys()), [-10])
+    self.assertEqual(tile.occupied, True)
     tile.update_seize()
     self.assertEqual(tile.seize_history[-1], (2, 5))
 
