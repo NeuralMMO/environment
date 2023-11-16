@@ -86,11 +86,11 @@ class KingoftheHill(TeamBattle):
   @property
   def winning_score(self):
     if self._winners:
-      speed_score = (self.map_size * (self.seize_duration**self.score_scaler))\
-                    / max(self.realm.tick, 1)
+      time_limit = self.config.HORIZON
+      speed_bonus = (time_limit - self.realm.tick) / time_limit
       alive_bonus = sum(1.0 for agent_id in self._winners if agent_id in self.realm.players)\
                     / len(self._winners)
-      return speed_score + alive_bonus
+      return (speed_bonus + alive_bonus) / 2  # set max to 1.0
     # No one succeeded
     return 0.0
 

@@ -1,7 +1,7 @@
 from nmmo.core.game_api import TeamBattle
 from nmmo.task import task_spec
 from nmmo.task.base_predicates import SeizeCenter
-from nmmo.lib import team_helper, event_code
+from nmmo.lib import team_helper
 
 
 def seize_task(num_ticks):
@@ -22,7 +22,7 @@ class Sandwich(TeamBattle):
 
     self.map_size = 60
     self._inner_npc_num = 2  # determines the difficulty
-    self._outer_npc_num = 8  # these npcs rally to the center
+    self._outer_npc_num = None  # these npcs rally to the center
     self.npc_step_size = 2
     self.adaptive_difficulty = True
     self.num_game_won = 1  # at the same duration, threshold to increase the difficulty
@@ -47,7 +47,7 @@ class Sandwich(TeamBattle):
 
   @property
   def outer_npc_num(self):
-    return self._outer_npc_num
+    return self._outer_npc_num or min(self._inner_npc_num*self.num_teams, self.map_size*2)
 
   def set_outer_npc_num(self, outer_npc_num):
     self._outer_npc_num = outer_npc_num
@@ -93,8 +93,6 @@ class Sandwich(TeamBattle):
                       if r["inner_npc_num"] == self.inner_npc_num]
       if sum(last_results) >= self.num_game_won:
         self._inner_npc_num += self.npc_step_size
-        self._outer_npc_num = min(self._outer_npc_num + self.npc_step_size*self.num_teams,
-                                  self.map_size * 2)  # max num npc depends on the map size
 
   def _set_realm(self, np_random, map_dict):
     self.realm.reset(np_random, map_dict, custom_spawn=True, seize_targets=["center"])
@@ -150,12 +148,12 @@ class Sandwich(TeamBattle):
   @property
   def winning_score(self):
     if self._winners:
-      kill_log = self.realm.event_log.get_data(
-        agents=self._winners, event_code=event_code.EventCode.PLAYER_KILL)
-      kill_bonus = kill_log.shape[0] / len(self._winners)  # hacky
+      # kill_log = self.realm.event_log.get_data(
+      #   agents=self._winners, event_code=event_code.EventCode.PLAYER_KILL)
+      # kill_bonus = kill_log.shape[0] / len(self._winners)  # hacky
       time_limit = self.config.HORIZON
       speed_bonus = (time_limit - self.realm.tick) / time_limit
-      return kill_bonus + speed_bonus
+      return speed_bonus  # set max to 1.0
     # No one succeeded
     return 0.0
 
