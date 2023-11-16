@@ -63,7 +63,7 @@ class NPCManager(EntityGroup):
 
   def edge_spawn(self, num_spawn, npc_init_fn):
     assert num_spawn > 0, "Invalid number of spawns"
-    edge_locs = spawn.spawn_concurrent(self.config, self._np_random)
+    edge_locs = spawn.get_edge_tiles(self.config, self._np_random, shuffle=True)
     assert len(edge_locs) >= num_spawn, "Not enough edge locations"
     while num_spawn > 0:
       r, c = edge_locs.pop()

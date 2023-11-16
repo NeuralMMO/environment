@@ -119,8 +119,10 @@ def spawn_team_together(config, num_teams):
   '''
   teams_per_sides = (num_teams + 3) // 4 # 1-4 -> 1, 5-8 -> 2, etc.
 
-  sides = spawn.get_edge_tiles(config)
-  assert len(sides[0]) > 4*teams_per_sides, 'Map too small for teams'
+  tiles = spawn.get_edge_tiles(config)
+  each_side = len(tiles) // 4
+  assert each_side > 4*teams_per_sides, 'Map too small for teams'
+  sides = [tiles[i*each_side:(i+1)*each_side] for i in range(4)]
 
   team_spawn_positions = []
   for side in sides:

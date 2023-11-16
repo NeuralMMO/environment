@@ -1,3 +1,5 @@
+from itertools import chain
+
 class SequentialLoader:
   '''config.PLAYER_LOADER that spreads out agent populations'''
   def __init__(self, config, np_random,
@@ -11,7 +13,7 @@ class SequentialLoader:
       self.candidate_spawn_pos = candidate_spawn_pos
     else:
       # np_random is the env-level rng
-      self.candidate_spawn_pos = spawn_concurrent(config, np_random)
+      self.candidate_spawn_pos = get_edge_tiles(config, np_random, shuffle=True)
 
   def __iter__(self):
     return self
@@ -49,8 +51,10 @@ def get_random_border_coord(config, np_random):
     r, c = c, r
   return (r, c)
 
-def get_edge_tiles(config):
-  '''Returns a list of all edge tiles'''
+def get_edge_tiles(config, np_random=None, shuffle=False):
+  '''Returns a list of all edge tiles.
+     To shuffle the tile, provide a np_random object
+  '''
   # Accounts for void borders in coord calcs
   left = config.MAP_BORDER
   right = config.MAP_CENTER + config.MAP_BORDER
@@ -64,22 +68,7 @@ def get_edge_tiles(config):
   sides.append(list(zip(inc, highs)))
   sides.append(list(zip(highs, inc[::-1])))
   sides.append(list(zip(inc[::-1], lows)))
-  return sides
-
-def spawn_concurrent(config, np_random):
-  '''Generates spawn positions for new agents
-
-  Evenly spaces agents around the borders
-  of the square game map, assuming the edge tiles are all habitable
-
-  Returns:
-      list of tuple(int, int):
-
-  position:
-      The position (row, col) to spawn the given agent
-  '''
-  sides = []
-  for side in get_edge_tiles(config):
-    sides += side
-  np_random.shuffle(sides)
-  return sides[:config.PLAYER_N]
+  tiles = list(chain(*sides))
+  if shuffle and np_random:
+    np_random.shuffle(tiles)
+  return tiles
