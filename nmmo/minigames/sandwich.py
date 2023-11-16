@@ -23,7 +23,7 @@ class Sandwich(TeamBattle):
     self.map_size = 60
     self._inner_npc_num = 2  # determines the difficulty
     self._outer_npc_num = None  # these npcs rally to the center
-    self.npc_step_size = 2
+    self.npc_step_size = 1
     self.adaptive_difficulty = True
     self.num_game_won = 1  # at the same duration, threshold to increase the difficulty
     self.seize_duration = 30
@@ -80,7 +80,7 @@ class Sandwich(TeamBattle):
     # Activate death fog from the onset
     self.config.set_for_episode("DEATH_FOG_ONSET", 1)
     self.config.set_for_episode("DEATH_FOG_SPEED", 1/6)
-    self.config.set_for_episode("DEATH_FOG_FINAL_SIZE", 10)
+    self.config.set_for_episode("DEATH_FOG_FINAL_SIZE", 3)
     # Enable +1 hp per tick
     self.config.set_for_episode("PLAYER_HEALTH_INCREMENT", True)
     self._determine_difficulty()  # sets the seize duration
@@ -131,15 +131,18 @@ class Sandwich(TeamBattle):
 
   def _process_dead_npcs(self, dead_npcs):
     npc_manager = self.realm.npcs
-    if len(npc_manager) < self.outer_npc_num // 2:
+    def spawn_npc(r, c, name, order):
+      return npc_manager.spawn_soldier(r, c, name, order)
+
+    target_num = min(self.realm.num_players, self.outer_npc_num) // 2
+    if len(npc_manager) < target_num:
       center = self.config.MAP_SIZE // 2
       offset = self.config.MAP_CENTER // 6
       r_min = c_min = center - offset
       r_max = c_max = center + offset
-      def spawn_npc(r, c, name, order):
-        return npc_manager.spawn_soldier(r, c, name, order)
-      npc_manager.area_spawn(r_min, r_max, c_min, c_max, self.inner_npc_num,
-                             lambda r, c: spawn_npc(r, c, "NPCa",
+      num_spawn = target_num - len(npc_manager)
+      npc_manager.area_spawn(r_min, r_max, c_min, c_max, num_spawn,
+                            lambda r, c: spawn_npc(r, c, "NPCa",
                                                     order={"rally": (center,center)}))
 
   def _check_winners(self, dones):
@@ -148,9 +151,6 @@ class Sandwich(TeamBattle):
   @property
   def winning_score(self):
     if self._winners:
-      # kill_log = self.realm.event_log.get_data(
-      #   agents=self._winners, event_code=event_code.EventCode.PLAYER_KILL)
-      # kill_bonus = kill_log.shape[0] / len(self._winners)  # hacky
       time_limit = self.config.HORIZON
       speed_bonus = (time_limit - self.realm.tick) / time_limit
       return speed_bonus  # set max to 1.0
