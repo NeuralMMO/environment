@@ -75,7 +75,7 @@ class Sandwich(TeamBattle):
     # Regenerate the map from fractal to have less obstacles
     self.config.set_for_episode("MAP_RESET_FROM_FRACTAL", True)
     self.config.set_for_episode("TERRAIN_WATER", 0.1)
-    self.config.set_for_episode("TERRAIN_FOILAGE", 0.9)  # prop of stone tiles: 0.05
+    self.config.set_for_episode("TERRAIN_FOILAGE", 0.9)
     self.config.set_for_episode("TERRAIN_RESET_TO_GRASS", self._grass_map)
     # Activate death fog from the onset
     self.config.set_for_episode("DEATH_FOG_ONSET", 1)

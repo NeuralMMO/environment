@@ -49,7 +49,8 @@ class Observation:
     tiles,
     entities,
     inventory,
-    market) -> None:
+    market,
+    comm) -> None:
 
     self.config = config
     self.current_tick = current_tick
@@ -82,6 +83,14 @@ class Observation:
     else:
       assert market.size == 0
       self.market = BasicObs(EMPTY_ARR, 0)
+
+    if config.COMMUNICATION_SYSTEM_ENABLED:
+      # comm obs is a subset of entities
+      self.comm = BasicObs(comm[0:config.original["PLAYER_N_OBS"]],
+                           EntityState.State.attr_name_to_col["id"])
+    else:
+      assert comm.size == 0
+      self.comm = BasicObs(EMPTY_ARR[:,:len(EntityState.State.comm_attr_map)], 0)
 
     self._noop_action = 1 if config.original["PROVIDE_NOOP_ACTION_TARGET"] else 0
 
@@ -143,6 +152,9 @@ class Observation:
     if self.config.original["EXCHANGE_SYSTEM_ENABLED"]:
       gym_obs["Market"] = np.zeros((self.config.MARKET_N_OBS,
                                     self.market.values.shape[1]), dtype=np.int16)
+    if self.config.original["COMMUNICATION_SYSTEM_ENABLED"]:
+      gym_obs["Communication"] = np.zeros((self.config.PLAYER_N_OBS,
+                                           self.comm.values.shape[1]), dtype=np.int16)
     return gym_obs
 
   def to_gym(self):
@@ -164,6 +176,9 @@ class Observation:
 
     if self.config.original["EXCHANGE_SYSTEM_ENABLED"]:
       gym_obs["Market"][:self.market.values.shape[0],:] = self.market.values
+
+    if self.config.original["COMMUNICATION_SYSTEM_ENABLED"]:
+      gym_obs["Communication"][:self.comm.values.shape[0],:] = self.comm.values
 
     if self.config.original["PROVIDE_ACTION_TARGETS"]:
       gym_obs["ActionTargets"] = self._make_action_targets()
@@ -212,7 +227,7 @@ class Observation:
 
     if self.config.original["COMMUNICATION_SYSTEM_ENABLED"]:
       masks["Comm"] = {
-        "Token":np.ones(self.config.COMMUNICATION_NUM_TOKENS, dtype=np.int8)
+        "Token": np.ones(self.config.COMMUNICATION_NUM_TOKENS, dtype=np.int8)
       }
 
     return masks

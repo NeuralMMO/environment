@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from typing import Iterable, Dict, List, Union, Type
 from types import FunctionType
 from copy import deepcopy
+from tqdm import tqdm
 
 import numpy as np
 
@@ -157,7 +158,7 @@ def check_task_spec(spec_list: List[TaskSpec], debug=False) -> List[Dict]:
   config.set("TEAMS", teams)
   env = nmmo.Env(config)
   results = []
-  for single_spec in spec_list:
+  for single_spec in tqdm(spec_list):
     result = {"spec_name": single_spec.name}
     try:
       env.reset(make_task_fn=lambda: make_task_from_spec(teams, [single_spec]))
@@ -168,6 +169,5 @@ def check_task_spec(spec_list: List[TaskSpec], debug=False) -> List[Dict]:
       result["runnable"] = False
       if debug:
         raise
-
     results.append(result)
   return results

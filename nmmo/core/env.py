@@ -15,7 +15,7 @@ from nmmo.core import game_api
 from nmmo.core.config import Default
 from nmmo.core.observation import Observation
 from nmmo.core.tile import Tile
-from nmmo.entity.entity import Entity
+from nmmo.entity.entity import Entity, EntityState
 from nmmo.systems.item import Item
 from nmmo.task.game_state import GameStateGenerator
 from nmmo.lib import seeding
@@ -49,6 +49,7 @@ class Env(ParallelEnv):
     self.obs = None
     self._dummy_task_embedding = np.zeros(self.config.TASK_EMBED_DIM, dtype=np.float16)
     self._dummy_obs = self._make_dummy_obs()
+    self._comm_obs = {}
 
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
     self.game_state = None
@@ -99,6 +100,9 @@ class Env(ParallelEnv):
 
     if self.config.original["EXCHANGE_SYSTEM_ENABLED"]:
       obs_space["Market"] = box(self.config.MARKET_N_OBS, Item.State.num_attributes)
+
+    if self.config.original["COMMUNICATION_SYSTEM_ENABLED"]:
+      obs_space["Communication"] = box(self.config.PLAYER_N_OBS, 4)  # id, row, col, message
 
     if self.config.original["PROVIDE_ACTION_TARGETS"]:
       mask_spec = deepcopy(self._atn_space)
@@ -478,8 +482,9 @@ class Env(ParallelEnv):
     dummy_entities = np.zeros((0, len(Entity.State.attr_name_to_col)), dtype=np.int16)
     dummy_inventory = np.zeros((0, len(Item.State.attr_name_to_col)), dtype=np.int16)
     dummy_market = np.zeros((0, len(Item.State.attr_name_to_col)), dtype=np.int16)
-    return Observation(self.config, 0, 0, self._dummy_task_embedding,
-                       dummy_tiles, dummy_entities, dummy_inventory, dummy_market)
+    dummy_comm = np.zeros((0, len(EntityState.State.comm_attr_map)), dtype=np.int16)
+    return Observation(self.config, 0, 0, self._dummy_task_embedding, dummy_tiles,
+                       dummy_entities, dummy_inventory, dummy_market, dummy_comm)
 
   def _compute_observations(self):
     # Clean up unnecessary observations, which cause memory leaks
@@ -492,6 +497,7 @@ class Env(ParallelEnv):
 
     obs = {}
     market = Item.Query.for_sale(self.realm.datastore)
+    self._update_comm_obs()
 
     # get tile map, to bypass the expensive tile window query
     tile_map = Tile.Query.get_map(self.realm.datastore, self.config.MAP_SIZE)
@@ -512,18 +518,15 @@ class Env(ParallelEnv):
         obs[agent_id] = dummy_obs
       else:
         agent = self.realm.players.get(agent_id)
-        agent_r = agent.row.val
-        agent_c = agent.col.val
-
-        visible_entities = Entity.Query.window(
-            self.realm.datastore,
-            agent_r, agent_c,
-            radius
-        )
-        visible_tiles = tile_map[agent_r-radius:agent_r+radius+1,
-                                 agent_c-radius:agent_c+radius+1,:].reshape(tile_obs_size)
-
+        r, c = agent.row.val, agent.col.val
+        visible_entities = Entity.Query.window(self.realm.datastore, r, c, radius)
+        visible_tiles = tile_map[r-radius:r+radius+1,
+                                 c-radius:c+radius+1,:].reshape(tile_obs_size)
         inventory = Item.Query.owned_by(self.realm.datastore, agent_id)
+        if self.config.COMMUNICATION_SYSTEM_ENABLED:
+          comm_obs = self._comm_obs[agent_id]
+        else:
+          comm_obs = self._dummy_obs.comm.values
 
         # NOTE: the tasks for each agent is in self.agent_task_map, and task embeddings are
         #   available in each task instance, via task.embedding
@@ -532,10 +535,23 @@ class Env(ParallelEnv):
         #   task-specific information? This needs research
         task_embedding = self._dummy_task_embedding
         if agent_id in self.agent_task_map:
-          task_embedding = self.agent_task_map[agent_id][0].embedding # NOTE: first task only
+          task_embedding = self.agent_task_map[agent_id][0].embedding  # NOTE: first task only
+
         obs[agent_id] = Observation(self.config, self.realm.tick, agent_id, task_embedding,
-                                    visible_tiles, visible_entities, inventory, market)
+                                    visible_tiles, visible_entities, inventory, market, comm_obs)
     return obs
+
+  def _update_comm_obs(self):
+    if not self.config.COMMUNICATION_SYSTEM_ENABLED:
+      return
+    self._comm_obs.clear()
+    for agent_id in self.realm.players:
+      if agent_id not in self._comm_obs:
+        task_mates = [agent_id] if agent_id not in self.agent_task_map \
+          else self.agent_task_map[agent_id][0].assignee  # NOTE: first task only
+        comm_obs = Entity.Query.comm_obs(self.realm.datastore, task_mates)
+        for eid in task_mates:
+          self._comm_obs[eid] = comm_obs
 
   def _compute_rewards(self):
     '''Computes the reward for the specified agent

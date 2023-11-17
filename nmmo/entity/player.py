@@ -1,6 +1,7 @@
 from nmmo.systems.skill import Skills
 from nmmo.entity import entity
 from nmmo.lib.event_code import EventCode
+from nmmo.lib import spawn
 
 # pylint: disable=no-member
 class Player(entity.Entity):
@@ -11,6 +12,7 @@ class Player(entity.Entity):
     self._immortal = realm.config.IMMORTAL
     self.resources.resilient = resilient
     self.my_tasks = None
+    self._make_mortal_tick = None  # set to realm.tick when the player is made mortal
 
     # Scripted hooks
     self.target = None
@@ -50,11 +52,20 @@ class Player(entity.Entity):
     #   which are harvesting food/water and don't progress
     return max(e.level.val for e in self.skills.skills)
 
+  def _set_immortal(self, value=True, duration=None):
+    self._immortal = value
+    # NOTE: a hack to mark the player as immortal in action targets
+    self.npc_type.update(9 if value else 0)
+
+    if value and duration is not None:
+      self._make_mortal_tick = self.realm.tick + duration
+    if value is False:
+      self._make_mortal_tick = None
+
   def make_observer(self):
     # NOTE: observer cannot act and cannot die
-    self._immortal = True
     self.status.freeze.update(self.config.MAX_HORIZON)
-    self.npc_type.update(9)  # NOTE: this is a hack to mark this agent as an observer
+    self._set_immortal()
 
   def apply_damage(self, dmg, style):
     super().apply_damage(dmg, style)
@@ -114,9 +125,7 @@ class Player(entity.Entity):
       "PlayerDefeats": self.history.player_kills,
       "TimeAlive": self.time_alive.val,
       "Gold": self.gold.val,
-      "DamageTaken": self.history.damage_received,
-    }
-
+      "DamageTaken": self.history.damage_received,}
     return data
 
   def update(self, realm, actions):
@@ -141,6 +150,24 @@ class Player(entity.Entity):
 
     if self.config.PLAYER_HEALTH_INCREMENT:
       self.resources.health.increment()
-
     self.resources.update(self.immortal)
     self.skills.update()
+
+    if self._make_mortal_tick is not None and self.realm.tick >= self._make_mortal_tick:
+      self._set_immortal(False)
+
+  def resurrect(self, health_prop=0.5, freeze_duration=10):
+    # Respawn dead players at the edge
+    assert self.alive is False, "Player is not dead"
+    self.status.freeze.update(freeze_duration)
+    self.resources.health.update(self.config.PLAYER_BASE_HEALTH*health_prop)
+    if self.config.RESOURCE_SYSTEM_ENABLED:
+      self.resources.water.update(self.config.RESOURCE_BASE)
+      self.resources.food.update(self.config.RESOURCE_BASE)
+
+    new_spawn_pos = spawn.get_random_border_coord(self.config, self._np_random)
+    self.row.update(new_spawn_pos[0])
+    self.col.update(new_spawn_pos[1])
+    self.realm.players.spawn_entity(self)  # put back to the system
+
+    self._set_immortal(duration=freeze_duration)

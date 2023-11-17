@@ -15,6 +15,7 @@ class EntityGroup(Mapping):
 
     self.entities: Dict[int, Entity] = {}
     self.dead_this_tick: Dict[int, Entity] = {}
+    self._delete_dead_entity = True  # is default
 
   def __len__(self):
     return len(self.entities)
@@ -39,8 +40,9 @@ class EntityGroup(Mapping):
   def packet(self):
     return {k: v.packet() for k, v in self.corporeal.items()}
 
-  def reset(self, np_random):
+  def reset(self, np_random, delete_dead_entity=True):
     self._np_random = np_random # reset the RNG
+    self._delete_dead_entity = delete_dead_entity
     for ent in self.entities.values():
       # destroy the items
       if self.config.ITEM_SYSTEM_ENABLED:
@@ -56,26 +58,23 @@ class EntityGroup(Mapping):
     self.realm.map.tiles[pos].add_entity(entity)
     self.entities[ent_id] = entity
 
+  def cull_entity(self, entity):
+    pos, ent_id = entity.pos, entity.id.val
+    self.realm.map.tiles[pos].remove_entity(ent_id)
+    self.entities.pop(ent_id)
+    # destroy the remaining items (of starved/dehydrated players)
+    #    of the agents who don't go through receive_damage()
+    if self.config.ITEM_SYSTEM_ENABLED:
+      for item in list(entity.inventory.items):
+        item.destroy()
+
   def cull(self):
     self.dead_this_tick.clear()
-    for ent_id in list(self.entities):
-      player = self.entities[ent_id]
-      if not player.alive:
-        r, c  = player.pos
-        ent_id = player.ent_id
-        self.dead_this_tick[ent_id] = player
-
-        self.realm.map.tiles[r, c].remove_entity(ent_id)
-
-        # destroy the remaining items (of starved/dehydrated players)
-        #    of the agents who don't go through receive_damage()
-        if self.config.ITEM_SYSTEM_ENABLED:
-          for item in list(player.inventory.items):
-            item.destroy()
-
-        self.entities[ent_id].datastore_record.delete()
-        self.entities.pop(ent_id)
-
+    for ent in [ent for ent in self.entities.values() if not ent.alive]:
+      self.dead_this_tick[ent.ent_id] = ent
+      self.cull_entity(ent)
+      if self._delete_dead_entity:
+        ent.datastore_record.delete()
     return self.dead_this_tick
 
   def update(self, actions):

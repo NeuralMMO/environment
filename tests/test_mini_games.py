@@ -13,7 +13,7 @@ class TestMinigames(unittest.TestCase):
     config.set("TEAMS", team_helper.make_teams(config, num_teams=16))
     env = nmmo.Env(config)
 
-    for game_cls in [mg.UnfairFight, mg.RacetoCenter, mg.KingoftheHill, mg.Sandwich]:
+    for game_cls in [mg.RacetoCenter, mg.KingoftheHill, mg.Sandwich, mg.CommTogether]:
       game = game_cls(env)
       env.reset(game=game)
       game.test(env, TEST_HORIZON)

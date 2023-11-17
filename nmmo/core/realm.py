@@ -67,7 +67,8 @@ class Realm:
 
   def reset(self, np_random, map_dict,
             custom_spawn=False,
-            seize_targets=None):
+            seize_targets=None,
+            delete_dead_player=True):
     """Reset the sub-systems and load the provided map"""
     self._np_random = np_random
     self.tick = 0
@@ -82,7 +83,7 @@ class Realm:
     self.map.reset(map_dict, self._np_random, seize_targets)
 
     # EntityState and ItemState tables must be empty after players/npcs.reset()
-    self.players.reset(self._np_random)
+    self.players.reset(self._np_random, delete_dead_player)
     self.npcs.reset(self._np_random)
     assert EntityState.State.table(self.datastore).is_empty(), \
         "EntityState table is not empty"

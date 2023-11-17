@@ -266,8 +266,8 @@ class Attack(Node):
     from nmmo.systems import combat
     dmg = combat.attack(realm, entity, target, style.skill)
 
-    if style.freeze and dmg > 0:
-      target.status.freeze.update(config.COMBAT_FREEZE_TIME)
+    # if style.freeze and dmg > 0:
+    #   target.status.freeze.update(config.COMBAT_FREEZE_TIME)
 
     # record the combat tick for both entities
     # players and npcs both have latest_combat_tick in EntityState
@@ -641,7 +641,7 @@ class Token(Node):
 
   @classmethod
   def init(cls, config):
-    Token.classes = init_discrete(range(config.COMMUNICATION_NUM_TOKENS))
+    Token.classes = init_discrete(range(1, config.COMMUNICATION_NUM_TOKENS+1))
 
   @staticproperty
   def edges():

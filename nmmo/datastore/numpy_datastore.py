@@ -33,7 +33,7 @@ class NumpyTable(DataTable):
     return self._data[self._data[:,col] != value]
 
   def where_in(self, col: int, values: List):
-    return self._data[np.isin(self._data[:,col], values)]
+    return self._data[np.in1d(self._data[:,col], values)]
 
   def window(self, row_idx: int, col_idx: int, row: int, col: int, radius: int):
     return self._data[(

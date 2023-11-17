@@ -18,7 +18,8 @@ OBS_ATTRS = set(["MAX_HORIZON", "PLAYER_N", "MAP_N_OBS", "PLAYER_N_OBS", "TASK_E
                  "INVENTORY_N_OBS", "MARKET_N_OBS", "PRICE_N_OBS", "COMMUNICATION_NUM_TOKENS",
                  "PROVIDE_ACTION_TARGETS", "PROVIDE_DEATH_FOG_OBS",
                  "PROVIDE_NOOP_ACTION_TARGET"])
-IMMUTABLE_ATTRS = set(["CURRICULUM_FILE_PATH", "PLAYER_VISION_RADIUS", "MAP_SIZE"])
+IMMUTABLE_ATTRS = set(["CURRICULUM_FILE_PATH", "PLAYER_VISION_RADIUS", "MAP_SIZE",
+                       "PLAYER_BASE_HEALTH", "RESOURCE_BASE", "PROGRESSION_LEVEL_MAX"])
 
 
 class Template(metaclass=utils.StaticIterable):
@@ -732,8 +733,7 @@ class Communication:
   COMMUNICATION_SYSTEM_ENABLED             = True
   '''Game system flag'''
 
-  # CHECK ME: When do we actually use this?
-  COMMUNICATION_NUM_TOKENS                 = 50
+  COMMUNICATION_NUM_TOKENS                 = 19
   '''Number of distinct COMM tokens'''
 
 

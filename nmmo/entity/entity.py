@@ -92,6 +92,10 @@ EntityState.Limits = lambda config: {
   } if config.PROGRESSION_SYSTEM_ENABLED else {}),
 }
 
+EntityState.State.comm_attr_map = {name: EntityState.State.attr_name_to_col[name]
+                                   for name in ["id", "row", "col", "message"]}
+CommAttr = list(EntityState.State.comm_attr_map.values())
+
 EntityState.Query = SimpleNamespace(
   # Whole table
   table=lambda ds: ds.table("Entity").where_neq(
@@ -110,6 +114,10 @@ EntityState.Query = SimpleNamespace(
     EntityState.State.attr_name_to_col["row"],
     EntityState.State.attr_name_to_col["col"],
     r, c, radius),
+
+  # Communication obs
+  comm_obs=lambda ds, ids: ds.table("Entity").where_in(
+    EntityState.State.attr_name_to_col["id"], ids)[:,CommAttr],
 )
 
 
