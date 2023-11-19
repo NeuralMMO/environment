@@ -21,6 +21,7 @@ class CommTogether(TeamBattle):
     self.team_within_dist = 5  # gather all team members within this distance
 
     self._map_size = 48  # determines the difficulty
+    self._spawn_immunity = 128
     self.adaptive_difficulty = True
     self.num_game_won = 1  # at the same map size, threshold to increase the difficulty
     self.step_size = 8
@@ -68,8 +69,8 @@ class CommTogether(TeamBattle):
     self.config.set_for_episode("COMBAT_MELEE_DAMAGE", 5)
     self.config.set_for_episode("COMBAT_RANGE_DAMAGE", 5)
     self.config.set_for_episode("COMBAT_MAGE_DAMAGE", 5)
-    # Increase spawn immunity, so that agents can scramble early
-    self.config.set_for_episode("COMBAT_SPAWN_IMMUNITY", 50)
+    # Increase spawn immunity, so that agents can move instead of attacking each other
+    self.config.set_for_episode("COMBAT_SPAWN_IMMUNITY", self._spawn_immunity)
 
     self._determine_difficulty()  # sets the map size
 
@@ -81,6 +82,7 @@ class CommTogether(TeamBattle):
       if sum(last_results) >= self.num_game_won \
         and self.map_size <= self.config.original["MAP_CENTER"] - self.step_size:
         self._map_size += self.step_size
+        self._spawn_immunity = max(0, self._spawn_immunity - self.step_size)
 
   def _set_realm(self, np_random, map_dict):
     # NOTE: this game respawns dead players at the edge, so setting delete_dead_entity=False
