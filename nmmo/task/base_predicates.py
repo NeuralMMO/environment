@@ -109,10 +109,16 @@ def AllMembersWithinRange(gs: GameState, subject: Group, dist: int):
   r = subject.row
   if len(r) == 0 or dist < 0:
     return 0.0
-  current_dist = max(r.max()-r.min(), subject.col.max()-subject.col.min())
+  c = subject.col
+  current_dist = max(r.max()-r.min(), c.max()-c.min())
   if current_dist <= dist:
     return 1.0
-  return (max_dist - current_dist) / (max_dist - dist)
+
+  # progress bonus, which takes account of the overall distribution
+  max_dist_score = (max_dist - current_dist) / (max_dist - dist)
+  r_sd_score = dist / max(3*np.std(r), dist)  # becomes 1 if 3*std(r) < dist
+  c_sd_score = dist / max(3*np.std(c), dist)  # becomes 1 if 3*std(c) < dist
+  return (max_dist_score + r_sd_score + c_sd_score) / 3.0
 
 def CanSeeAgent(gs: GameState, subject: Group, target: int):
   """True if obj_agent is present in the subjects' entities obs.

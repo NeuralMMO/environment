@@ -4,12 +4,14 @@ import numpy as np
 import nmmo
 from nmmo.datastore.numpy_datastore import NumpyDatastore
 from nmmo.systems.item import Hat, Top, ItemState
+from nmmo.systems.exchange import Exchange
 
 class MockRealm:
   def __init__(self):
     self.config = nmmo.config.Default()
     self.datastore = NumpyDatastore()
     self.items = {}
+    self.exchange = Exchange(self)
     self.datastore.register_object_type("Item", ItemState.State.num_attributes)
     self.players = {}
 

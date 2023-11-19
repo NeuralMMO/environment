@@ -111,6 +111,8 @@ class Item(ItemState):
   def destroy(self):
     # NOTE: we may want to track the item lifecycle and
     #   and see how many high-level items are wasted
+    if self.config.EXCHANGE_SYSTEM_ENABLED:
+      self.realm.exchange.unlist_item(self)
     if self.owner_id.val in self.realm.players:
       self.realm.players[self.owner_id.val].inventory.remove(self)
     self.realm.items.pop(self.id.val, None)
