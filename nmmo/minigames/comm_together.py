@@ -20,8 +20,8 @@ class CommTogether(TeamBattle):
     # NOTE: all members should fit in 5x5 square.
     self.team_within_dist = 5  # gather all team members within this distance
 
-    self._map_size = 48  # determines the difficulty
-    self._spawn_immunity = 128
+    self._map_size = 32  # determines the difficulty
+    self._spawn_immunity = env.config.HORIZON
     self.adaptive_difficulty = True
     self.num_game_won = 1  # at the same map size, threshold to increase the difficulty
     self.step_size = 8
@@ -39,6 +39,9 @@ class CommTogether(TeamBattle):
   def set_map_size(self, map_size):
     self._map_size = map_size
 
+  def set_spawn_immunity(self, spawn_immunity):
+    self._spawn_immunity = spawn_immunity
+
   def set_grass_map(self, grass_map):
     self._grass_map = grass_map
 
@@ -54,7 +57,6 @@ class CommTogether(TeamBattle):
   def _set_config(self, np_random):
     self.config.reset()
     self.config.toggle_systems(self.required_systems)
-    self.config.set_for_episode("MAP_CENTER", self.map_size)
     self.config.set_for_episode("ALLOW_MOVE_INTO_OCCUPIED_TILE", False)
     # Regenerate the map from fractal to have less obstacles
     self.config.set_for_episode("MAP_RESET_FROM_FRACTAL", True)
@@ -69,20 +71,23 @@ class CommTogether(TeamBattle):
     self.config.set_for_episode("COMBAT_MELEE_DAMAGE", 5)
     self.config.set_for_episode("COMBAT_RANGE_DAMAGE", 5)
     self.config.set_for_episode("COMBAT_MAGE_DAMAGE", 5)
-    # Increase spawn immunity, so that agents can move instead of attacking each other
-    self.config.set_for_episode("COMBAT_SPAWN_IMMUNITY", self._spawn_immunity)
 
     self._determine_difficulty()  # sets the map size
+    self.config.set_for_episode("MAP_CENTER", self.map_size)
+    self.config.set_for_episode("COMBAT_SPAWN_IMMUNITY", self._spawn_immunity)
 
   def _determine_difficulty(self):
     # Determine the difficulty (the map size) based on the previous results
     if self.adaptive_difficulty and self.history \
        and self.history[-1]["result"]:  # the last game was won
       last_results = [r["result"] for r in self.history if r["map_size"] == self.map_size]
-      if sum(last_results) >= self.num_game_won \
-        and self.map_size <= self.config.original["MAP_CENTER"] - self.step_size:
-        self._map_size += self.step_size
-        self._spawn_immunity = max(0, self._spawn_immunity - self.step_size)
+      if sum(last_results) >= self.num_game_won:
+        self._map_size = min(self.map_size + self.step_size,
+                             self.config.original["MAP_CENTER"])
+        # Don't allow agents to attack each other, until they cracked at least once
+        if self._spawn_immunity > self.history[-1]["winning_tick"]:
+          next_immunity = (self._spawn_immunity + self.history[-1]["winning_tick"]) / 2
+          self._spawn_immunity = max(next_immunity, 64)  # 64 is the minimum
 
   def _set_realm(self, np_random, map_dict):
     # NOTE: this game respawns dead players at the edge, so setting delete_dead_entity=False
@@ -128,15 +133,15 @@ class CommTogether(TeamBattle):
 
     # pylint: disable=protected-access
     # These should run without errors
-    game.history.append({"result": False, "map_size": 0})
+    game.history.append({"result": False, "map_size": 0, "winning_tick": 512})
     game._determine_difficulty()
-    game.history.append({"result": True, "winners": None, "map_size": 0})
+    game.history.append({"result": True, "winners": None, "map_size": 0, "winning_tick": 512})
     game._determine_difficulty()
 
     # Test if the difficulty changes
     org_map_size = game.map_size
     for result in [False]*7 + [True]*game.num_game_won:
-      game.history.append({"result": result, "map_size": game.map_size})
+      game.history.append({"result": result, "map_size": game.map_size, "winning_tick": 128})
       game._determine_difficulty()  # pylint: disable=protected-access
     assert game.map_size == (org_map_size + game.step_size)
 
