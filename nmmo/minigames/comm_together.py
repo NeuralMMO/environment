@@ -68,6 +68,8 @@ class CommTogether(TeamBattle):
     self.config.set_for_episode("COMBAT_MELEE_DAMAGE", 5)
     self.config.set_for_episode("COMBAT_RANGE_DAMAGE", 5)
     self.config.set_for_episode("COMBAT_MAGE_DAMAGE", 5)
+    # Increase spawn immunity, so that agents can scramble early
+    self.config.set_for_episode("COMBAT_SPAWN_IMMUNITY", 50)
 
     self._determine_difficulty()  # sets the map size
 

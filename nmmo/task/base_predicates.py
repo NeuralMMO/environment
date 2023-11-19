@@ -105,13 +105,14 @@ def AllMembersWithinRange(gs: GameState, subject: Group, dist: int):
   """True if the max l-inf distance of teammates is
          less than or equal to dist
   """
+  max_dist = gs.config.MAP_CENTER
   r = subject.row
   if len(r) == 0 or dist < 0:
     return 0.0
   current_dist = max(r.max()-r.min(), subject.col.max()-subject.col.min())
   if current_dist <= dist:
     return 1.0
-  return norm(dist / current_dist)
+  return (max_dist - current_dist) / (max_dist - dist)
 
 def CanSeeAgent(gs: GameState, subject: Group, target: int):
   """True if obj_agent is present in the subjects' entities obs.
