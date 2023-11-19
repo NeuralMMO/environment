@@ -149,7 +149,8 @@ class TestEnv(unittest.TestCase):
   def _validate_items(self, items_dict, item_obs):
     item_obs = item_obs[item_obs[:,0] != 0]
     if len(items_dict) != len(item_obs):
-      assert len(items_dict) == len(item_obs)
+      assert len(items_dict) == len(item_obs),\
+        f"Mismatch in number of items. Random seed: {RANDOM_SEED}"
     for item_ob in item_obs:
       item_ob = ItemState.parse_array(item_ob)
       item = items_dict[item_ob.id]

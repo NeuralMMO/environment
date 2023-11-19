@@ -20,11 +20,12 @@ class CommTogether(TeamBattle):
     # NOTE: all members should fit in 5x5 square.
     self.team_within_dist = 5  # gather all team members within this distance
 
-    self._map_size = 32  # determines the difficulty
+    self._map_size = 80  # determines the difficulty
     self.adaptive_difficulty = True
     self.num_game_won = 1  # at the same map size, threshold to increase the difficulty
-    self.step_size = 8
+    self.step_size = 4
     self._grass_map = False
+    self.num_player_resurrect = 0
 
     # NOTE: This is a hacky way to get a hash embedding for a function
     # TODO: Can we get more meaningful embedding? coding LLMs are good but heavy
@@ -47,6 +48,7 @@ class CommTogether(TeamBattle):
     super().reset(np_random, map_dict)
     self.history[-1]["map_size"] = self.map_size
     self._grass_map = False  # reset to default
+    self.num_player_resurrect = 0
 
   def _set_config(self, np_random):
     self.config.reset()
@@ -89,7 +91,8 @@ class CommTogether(TeamBattle):
   def _process_dead_players(self, dones, dead_players):
     # Respawn dead players at the edge
     for player in dead_players.values():
-      player.resurrect()
+      player.resurrect(freeze_duration=30, health_prop=1)
+      self.num_player_resurrect += 1
 
   def _check_winners(self, dones):
     # No winner game is possible
