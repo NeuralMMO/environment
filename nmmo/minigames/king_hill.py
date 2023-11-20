@@ -11,7 +11,7 @@ def seize_task(dur_to_win):
     reward_to="team")
 
 class KingoftheHill(TeamBattle):
-  required_systems = ["TERRAIN", "COMBAT", "RESOURCE"]
+  required_systems = ["TERRAIN", "COMBAT", "RESOURCE", "COMMUNICATION"]
 
   def __init__(self, env, sampling_weight=None):
     super().__init__(env, sampling_weight)

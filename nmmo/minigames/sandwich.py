@@ -14,7 +14,7 @@ def secure_order(pos, radius=5):
   return {"secure": {"position": pos, "radius": radius}}
 
 class Sandwich(TeamBattle):
-  required_systems = ["TERRAIN", "COMBAT", "NPC"]
+  required_systems = ["TERRAIN", "COMBAT", "NPC", "COMMUNICATION"]
   num_teams = 4
 
   def __init__(self, env, sampling_weight=None):
