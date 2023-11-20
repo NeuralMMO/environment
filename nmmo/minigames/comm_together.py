@@ -20,8 +20,8 @@ class CommTogether(TeamBattle):
     # NOTE: all members should fit in 5x5 square.
     self.team_within_dist = 5  # gather all team members within this distance
 
-    self._map_size = 40  # determines the difficulty
-    self._spawn_immunity = 384  # so that agents can start to attack each other later
+    self._map_size = 32  # determines the difficulty
+    self._spawn_immunity = 480  # so that agents can start to attack each other later
     self.adaptive_difficulty = True
     self.num_game_won = 1  # at the same map size, threshold to increase the difficulty
     self.step_size = 8
@@ -84,7 +84,7 @@ class CommTogether(TeamBattle):
       if sum(last_results) >= self.num_game_won:
         self._map_size = min(self.map_size + self.step_size,
                              self.config.original["MAP_CENTER"])
-        # Don't allow agents to attack each other, until they cracked at least once
+        # Decrease the spawn immunity, to increase attack window
         if self._spawn_immunity > self.history[-1]["winning_tick"]:
           next_immunity = (self._spawn_immunity + self.history[-1]["winning_tick"]) / 2
           self._spawn_immunity = max(next_immunity, 64)  # 64 is the minimum
