@@ -45,12 +45,16 @@ class TestGameApi(unittest.TestCase):
 
     # winners should be none when not determined
     self.assertEqual(self.env.game.winners, None)
+    self.assertEqual(self.env.game.is_over, False)
 
     # make agent 1 a winner by destroying all other agents
     for agent_id in self.env.possible_agents[1:]:
       self.env.realm.players[agent_id].resources.health.update(0)
     self.env.step({})
     self.assertEqual(self.env.game.winners, [1])
+
+    # when there are winners, the game is over
+    self.assertEqual(self.env.game.is_over, True)
 
   def test_team_training_game_spawn(self):
     # when TEAMS is set, the possible agents should include all agents
@@ -126,7 +130,7 @@ class TestGameApi(unittest.TestCase):
 
   def test_game_set_next_task(self):
     game = AgentTraining(self.env)
-    tasks = game._define_tasks(self.env._np_random)  # sample tasks for testing
+    tasks = game._define_tasks()  # sample tasks for testing
     game.set_next_tasks(tasks)
     self.env.reset(game=game)
 

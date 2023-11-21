@@ -21,7 +21,7 @@ class CommTogether(TeamBattle):
     self.team_within_dist = 5  # gather all team members within this distance
 
     self._map_size = 32  # determines the difficulty
-    self._spawn_immunity = 480  # so that agents can start to attack each other later
+    self._spawn_immunity = 500  # so that agents can start to attack each other later
     self.adaptive_difficulty = True
     self.num_game_won = 1  # at the same map size, threshold to increase the difficulty
     self.step_size = 8
@@ -54,7 +54,7 @@ class CommTogether(TeamBattle):
     self._grass_map = False  # reset to default
     self.num_player_resurrect = 0
 
-  def _set_config(self, np_random):
+  def _set_config(self):
     self.config.reset()
     self.config.toggle_systems(self.required_systems)
     self.config.set_for_episode("ALLOW_MOVE_INTO_OCCUPIED_TILE", False)
@@ -89,11 +89,11 @@ class CommTogether(TeamBattle):
           next_immunity = (self._spawn_immunity + self.history[-1]["winning_tick"]) / 2
           self._spawn_immunity = max(next_immunity, 64)  # 64 is the minimum
 
-  def _set_realm(self, np_random, map_dict):
+  def _set_realm(self, map_dict):
     # NOTE: this game respawns dead players at the edge, so setting delete_dead_entity=False
-    self.realm.reset(np_random, map_dict, delete_dead_player=False)
+    self.realm.reset(self._np_random, map_dict, delete_dead_player=False)
 
-  def _define_tasks(self, np_random):
+  def _define_tasks(self):
     spec_list = [seek_task(self.team_within_dist)] * len(self.teams)
     return task_spec.make_task_from_spec(self.teams, spec_list)
 

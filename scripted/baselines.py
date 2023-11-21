@@ -317,7 +317,7 @@ class Scripted(nmmo.Scripted):
     self.actions = {}
 
     self.ob = observation
-    self.me = observation.agent()
+    self.me = observation.agent
 
     # combat level
     self.me.level = max(self.me.melee_level, self.me.range_level, self.me.mage_level)

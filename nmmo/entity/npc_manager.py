@@ -1,5 +1,6 @@
+from typing import Callable
 from nmmo.entity.entity_manager import EntityGroup
-from nmmo.entity.npc import NPC, Soldier
+from nmmo.entity.npc import NPC, Soldier, Aggressive, PassiveAggressive, Passive
 from nmmo.core import action
 from nmmo.systems import combat
 from nmmo.lib import spawn
@@ -42,9 +43,25 @@ class NPCManager(EntityGroup):
         super().spawn_entity(npc)
         self.next_id -= 1
 
-  def spawn_soldier(self, r, c, name, order=None):
-    npc = Soldier(self.realm, (r, c), self.next_id, name, order) \
-          if self.realm.map.tiles[r, c].habitable else None
+  def spawn_npc(self, r, c, danger=None, name=None, order=None,
+                apply_beta_to_danger=True):
+    if not self.realm.map.tiles[r, c].habitable:
+      return None
+
+    if danger and apply_beta_to_danger:
+      danger = min(1.0, max(0.0, danger))  # normalize
+      danger = self._np_random.beta(10*danger+0.01, 10.01-10*danger)  # beta cannot take 0
+    if danger is None:
+      npc = Soldier(self.realm, (r, c), self.next_id, name, order)
+    elif danger >= self.config.NPC_SPAWN_AGGRESSIVE:
+      npc = Aggressive(self.realm, (r, c), self.next_id, name)
+    elif danger >= self.config.NPC_SPAWN_NEUTRAL:
+      npc = PassiveAggressive(self.realm, (r, c), self.next_id, name)
+    elif danger >= self.config.NPC_SPAWN_PASSIVE:
+      npc = Passive(self.realm, (r, c), self.next_id, name)
+    else:
+      return None
+
     if npc:
       super().spawn_entity(npc)
       self.next_id -= 1
@@ -52,7 +69,8 @@ class NPCManager(EntityGroup):
       npc.skills.style = self._np_random.choice([action.Melee, action.Range, action.Mage])
     return npc
 
-  def area_spawn(self, r_min, r_max, c_min, c_max, num_spawn, npc_init_fn):
+  def area_spawn(self, r_min, r_max, c_min, c_max, num_spawn,
+                 npc_init_fn: Callable):
     assert r_min < r_max and c_min < c_max, "Invalid area"
     assert num_spawn > 0, "Invalid number of spawns"
     while num_spawn > 0:
@@ -61,7 +79,7 @@ class NPCManager(EntityGroup):
       if npc_init_fn(r, c):
         num_spawn -= 1
 
-  def edge_spawn(self, num_spawn, npc_init_fn):
+  def edge_spawn(self, num_spawn, npc_init_fn: Callable):
     assert num_spawn > 0, "Invalid number of spawns"
     edge_locs = spawn.get_edge_tiles(self.config, self._np_random, shuffle=True)
     assert len(edge_locs) >= num_spawn, "Not enough edge locations"

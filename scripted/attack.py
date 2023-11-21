@@ -11,7 +11,7 @@ def closestTarget(config, ob: Observation):
   shortestDist = np.inf
   closestAgent = None
 
-  agent  = ob.agent()
+  agent  = ob.agent
   start = (agent.row, agent.col)
 
   for target_ent in ob.entities.values:
@@ -30,7 +30,7 @@ def closestTarget(config, ob: Observation):
   return closestAgent, shortestDist
 
 def attacker(config, ob: Observation):
-  agent = ob.agent()
+  agent = ob.agent
 
   attacker_id = agent.attacker_id
   if attacker_id == 0:

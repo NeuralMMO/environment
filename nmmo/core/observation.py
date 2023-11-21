@@ -1,3 +1,4 @@
+# pylint: disable=no-member
 from functools import lru_cache, cached_property
 
 import numpy as np
@@ -62,9 +63,14 @@ class Observation:
                               EntityState.State.attr_name_to_col["id"])
 
     # NOTE: Systems can be turned off when these are enabled during env init
-    self.dummy_obs = self.agent() is None
+    self.dummy_obs = self.agent is None
+    if not self.dummy_obs:
+      self.vision = self.config.PLAYER_VISION_RADIUS
+      self.mat_map = tiles[:,2].reshape(config.PLAYER_VISION_DIAMETER,
+                                        config.PLAYER_VISION_DIAMETER)
+
     if config.COMBAT_SYSTEM_ENABLED and not self.dummy_obs:
-      latest_combat_tick = self.agent().latest_combat_tick
+      latest_combat_tick = self.agent.latest_combat_tick
       self.agent_in_combat = False if latest_combat_tick == 0 else \
         (current_tick - latest_combat_tick) < config.COMBAT_STATUS_DURATION
     else:
@@ -94,8 +100,15 @@ class Observation:
 
     self._noop_action = 1 if config.original["PROVIDE_NOOP_ACTION_TARGET"] else 0
 
-  # pylint: disable=method-cache-max-size-none
-  @lru_cache(maxsize=None)
+  @lru_cache
+  def tile_mat(self, r_delta, c_delta):
+    # light weight version of tile() that only returns the material id
+    try:
+      return self.mat_map[self.vision+r_delta, self.vision+c_delta]
+    except:  # pylint: disable=bare-except
+      return material.Void.index
+
+  @lru_cache
   def tile(self, r_delta, c_delta):
     '''Return the array object corresponding to a nearby tile
 
@@ -106,21 +119,18 @@ class Observation:
     Returns:
         Vector corresponding to the specified tile
     '''
-    agent = self.agent()
     center = self.config.PLAYER_VISION_RADIUS
-    tile_dim = self.config.PLAYER_VISION_DIAMETER
-    mat_map = self.tiles[:,2].reshape(tile_dim,tile_dim)
-    new_row = agent.row + r_delta
-    new_col = agent.col + c_delta
+    new_row = self.agent.row + r_delta
+    new_col = self.agent.col + c_delta
     if (0 <= new_row < self.config.MAP_SIZE) & \
        (0 <= new_col < self.config.MAP_SIZE):
-      return TileState.parse_array([new_row, new_col, mat_map[center+r_delta,center+c_delta]])
+      return TileState.parse_array([new_row, new_col,
+                                    self.mat_map[center+r_delta,center+c_delta]])
 
     # return a dummy void tile at (inf, inf)
     return TileState.parse_array([np.inf, np.inf, material.Void.index])
 
-  # pylint: disable=method-cache-max-size-none
-  @lru_cache(maxsize=None)
+  @lru_cache
   def entity(self, entity_id):
     rows = self.entities.values[self.entities.ids == entity_id]
     if rows.shape[0] == 0:
@@ -128,13 +138,13 @@ class Observation:
     return EntityState.parse_array(rows[0])
 
   # pylint: disable=method-cache-max-size-none
-  @lru_cache(maxsize=None)
+  @cached_property
   def agent(self):
     return self.entity(self.agent_id)
 
   def clear_cache(self):
     # clear the cache, so that this object can be garbage collected
-    self.agent.cache_clear()
+    self.tile_mat.cache_clear()
     self.entity.cache_clear()
     self.tile.cache_clear()
 
@@ -239,7 +249,7 @@ class Observation:
       return mask
 
     # pylint: disable=not-an-iterable
-    return np.array([self.tile(*d.delta).material_id in material.Habitable.indices
+    return np.array([self.tile_mat(*d.delta) in material.Habitable.indices
                      for d in action.Direction.edges], dtype=np.int8)
 
   def _make_attack_mask(self):
@@ -258,24 +268,23 @@ class Observation:
     if not self.config.COMBAT_SYSTEM_ENABLED or self.dummy_obs:
       return style_mask, target_mask
 
-    agent = self.agent()
     within_range = np.maximum( # calculating the l-inf dist
-        np.abs(self.entities.values[:,EntityState.State.attr_name_to_col["row"]] - agent.row),
-        np.abs(self.entities.values[:,EntityState.State.attr_name_to_col["col"]] - agent.col)
+        np.abs(self.entities.values[:,EntityState.State.attr_name_to_col["row"]] - self.agent.row),
+        np.abs(self.entities.values[:,EntityState.State.attr_name_to_col["col"]] - self.agent.col)
       ) <= self.config.COMBAT_MELEE_REACH
 
     immunity = self.config.COMBAT_SPAWN_IMMUNITY
-    if agent.time_alive < immunity:
+    if self.agent.time_alive < immunity:
       # NOTE: CANNOT attack players during immunity, thus mask should set to 0
       no_spawn_immunity = ~(self.entities.ids > 0)  # ids > 0 equals entity.is_player
     else:
       no_spawn_immunity = np.ones(self.entities.len, dtype=bool)
 
     # allow friendly fire but no self shooting
-    not_me = self.entities.ids != agent.id
+    not_me = self.entities.ids != self.agent.id
 
     # NOTE: this is a hack. Only target "normal" agents, which has npc_type of 0, 1, 2, 3
-    # For example, immoratl "observer" agents has npc_type of 9
+    # For example, immortal "scout" agents has npc_type of 9
     targetable = self.entities.values[:,EntityState.State.attr_name_to_col["npc_type"]] < 9
 
     target_mask[:self.entities.len] = within_range & not_me & no_spawn_immunity & targetable
@@ -313,7 +322,7 @@ class Observation:
     return use_mask
 
   def _item_skill(self):
-    agent = self.agent()
+    agent = self.agent
 
     # the minimum agent level is 1
     level = max(1, agent.melee_level, agent.range_level, agent.mage_level,
@@ -363,10 +372,9 @@ class Observation:
        or self.inventory.len == 0:
       return give_mask
 
-    agent = self.agent()
     entities_pos = self.entities.values[:,[EntityState.State.attr_name_to_col["row"],
                                            EntityState.State.attr_name_to_col["col"]]]
-    same_tile = utils.linf(entities_pos, (agent.row, agent.col)) == 0
+    same_tile = utils.linf(entities_pos, (self.agent.row, self.agent.col)) == 0
     not_me = self.entities.ids != self.agent_id
     player = (self.entities.values[:,EntityState.State.attr_name_to_col["npc_type"]] == 0)
 
@@ -379,13 +387,12 @@ class Observation:
       give_mask[-1] = 1
 
     if not self.config.EXCHANGE_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat\
-       or int(self.agent().gold) == 0:
+       or int(self.agent.gold) <= 2:  # NOTE: this is a hack to reduce mask computation
       return give_mask
 
-    agent = self.agent()
     entities_pos = self.entities.values[:,[EntityState.State.attr_name_to_col["row"],
                                            EntityState.State.attr_name_to_col["col"]]]
-    same_tile = utils.linf(entities_pos, (agent.row, agent.col)) == 0
+    same_tile = utils.linf(entities_pos, (self.agent.row, self.agent.col)) == 0
     not_me = self.entities.ids != self.agent_id
     player = (self.entities.values[:,EntityState.State.attr_name_to_col["npc_type"]] == 0)
 
@@ -398,7 +405,7 @@ class Observation:
     if not self.config.EXCHANGE_SYSTEM_ENABLED or self.dummy_obs or self.agent_in_combat:
       return mask
 
-    gold = int(self.agent().gold)
+    gold = int(self.agent.gold)
     mask[:gold] = 1 # NOTE that action.Price starts from Discrete_1
     return mask
 
@@ -427,7 +434,6 @@ class Observation:
        or self.market.len == 0:
       return buy_mask
 
-    agent = self.agent()
     market_items = self.market.values
     not_mine = market_items[:,ItemState.State.attr_name_to_col["owner_id"]] != self.agent_id
 
@@ -439,7 +445,8 @@ class Observation:
         return buy_mask
       not_mine &= exist_ammo_listings
 
-    enough_gold = market_items[:,ItemState.State.attr_name_to_col["listed_price"]] <= agent.gold
+    enough_gold = market_items[:,ItemState.State.attr_name_to_col["listed_price"]] \
+                    <= self.agent.gold
     buy_mask[:self.market.len] = not_mine & enough_gold
     return buy_mask
 

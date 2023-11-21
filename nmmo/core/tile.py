@@ -98,7 +98,7 @@ class Tile(TileState):
 
   def remove_entity(self, ent_id):
     assert ent_id in self.entities
-    del self.entities[ent_id]
+    self.entities.pop(ent_id)
 
   def step(self):
     if not self.depleted or self.material.respawn == 0:

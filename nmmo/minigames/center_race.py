@@ -53,7 +53,7 @@ class RacetoCenter(Game):
     super().reset(np_random, map_dict)
     self.history[-1]["map_size"] = self.map_size
 
-  def _set_config(self, np_random):
+  def _set_config(self):
     self.config.reset()
     self.config.toggle_systems(self.required_systems)
     self.config.set_for_episode("ALLOW_MOVE_INTO_OCCUPIED_TILE", False)
@@ -82,7 +82,7 @@ class RacetoCenter(Game):
         and self.map_size <= self.config.original["MAP_CENTER"] - self.step_size:
         self._map_size += self.step_size
 
-  def _define_tasks(self, np_random):
+  def _define_tasks(self):
     return task_api.make_same_task(ProgressTowardCenter, self.config.POSSIBLE_AGENTS,
                                    task_kwargs={"embedding": self.task_embedding})
 

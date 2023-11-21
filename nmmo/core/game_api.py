@@ -16,6 +16,7 @@ class Game(ABC):
   def __init__(self, env, sampling_weight=None):
     self.config = env.config
     self.realm = env.realm
+    self._np_random = env._np_random
     self.sampling_weight = sampling_weight or 1.0
     self.tasks = None
     self.assign_dead_reward = True
@@ -43,8 +44,9 @@ class Game(ABC):
     return 0.0
 
   def reset(self, np_random, map_dict, tasks=None):
-    self._set_config(np_random)
-    self._set_realm(np_random, map_dict)
+    self._np_random = np_random
+    self._set_config()
+    self._set_realm(map_dict)
     if tasks:
       # tasks comes from env.reset()
       self.tasks = tasks
@@ -54,17 +56,17 @@ class Game(ABC):
       self.tasks = self._next_tasks
       self._next_tasks = None
     else:
-      self.tasks = self._define_tasks(np_random)
+      self.tasks = self._define_tasks()
     self._post_setup()
     self._reset_stats()
 
-  def _set_config(self, np_random):  # pylint: disable=unused-argument
+  def _set_config(self):  # pylint: disable=unused-argument
     """Set config for the episode. Can customize config using config.set_for_episode()"""
     self.config.reset()
 
-  def _set_realm(self, np_random, map_dict):
+  def _set_realm(self, map_dict):
     """Set up the realm for the episode. Can customize map and spawn"""
-    self.realm.reset(np_random, map_dict, custom_spawn=False)
+    self.realm.reset(self._np_random, map_dict, custom_spawn=False)
 
   def _post_setup(self):
     """Post-setup processes, e.g., attach team tags, etc."""
@@ -78,7 +80,7 @@ class Game(ABC):
     self.history.append({"result": False, "winners": None, "winning_score": None})
 
   @abstractmethod
-  def _define_tasks(self, np_random):
+  def _define_tasks(self):
     """Define tasks for the episode."""
     # NOTE: Task embeddings should be provided somehow, e.g., from curriculum file.
     # Otherwise, policies cannot be task-conditioned.
@@ -125,6 +127,11 @@ class Game(ABC):
       return list(dones.keys())
     return None
 
+  @property
+  def is_over(self):
+    return self.winners is not None or self.realm.num_players == 0 or \
+           self.realm.tick >= self.config.HORIZON
+
   def get_episode_stats(self):
     """A helper function for trainers"""
     total_agent_steps = 0
@@ -156,7 +163,7 @@ class DefaultGame(Game):
   def is_compatible(self):
     return True
 
-  def _define_tasks(self, np_random):
+  def _define_tasks(self):
     return task_api.nmmo_default_task(self.config.POSSIBLE_AGENTS)
 
 class AgentTraining(Game):
@@ -173,7 +180,7 @@ class AgentTraining(Game):
       return False
     return True
 
-  def _define_tasks(self, np_random):
+  def _define_tasks(self):
     with open(self.config.CURRICULUM_FILE_PATH, "rb") as f:
       # curriculum file may have been changed, so read the file when sampling
       curriculum = dill.load(f) # a list of TaskSpec
@@ -181,8 +188,8 @@ class AgentTraining(Game):
     assert len(cand_specs) > 0, "No agent task is defined in the curriculum file"
 
     sampling_weights = [spec.sampling_weight for spec in cand_specs]
-    sampled_spec = np_random.choice(cand_specs, size=self.config.PLAYER_N,
-                                    p=sampling_weights/np.sum(sampling_weights))
+    sampled_spec = self._np_random.choice(cand_specs, size=self.config.PLAYER_N,
+                                          p=sampling_weights/np.sum(sampling_weights))
     return task_spec.make_task_from_spec(self.config.POSSIBLE_AGENTS, sampled_spec)
 
 class TeamGameTemplate(Game):
@@ -203,10 +210,10 @@ class TeamGameTemplate(Game):
       return False
     return True
 
-  def _set_realm(self, np_random, map_dict):
-    self.realm.reset(np_random, map_dict, custom_spawn=True)
+  def _set_realm(self, map_dict):
+    self.realm.reset(self._np_random, map_dict, custom_spawn=True)
     # Custom spawning
-    team_loader = team_helper.TeamLoader(self.config, np_random)
+    team_loader = team_helper.TeamLoader(self.config, self._np_random)
     self.realm.players.spawn(team_loader)
     self.realm.npcs.default_spawn()
 
@@ -227,7 +234,7 @@ class TeamGameTemplate(Game):
         if idx == 0:
           self.realm.players[agent_id].name = f"{team_id}_leader"
 
-  def _get_cand_team_tasks(self, np_random, num_tasks, tags=None):
+  def _get_cand_team_tasks(self, num_tasks, tags=None):
     # NOTE: use different file to store different set of tasks?
     with open(self.config.CURRICULUM_FILE_PATH, "rb") as f:
       curriculum = dill.load(f) # a list of TaskSpec
@@ -237,24 +244,24 @@ class TeamGameTemplate(Game):
     assert len(cand_specs) > 0, "No team task is defined in the curriculum file"
 
     sampling_weights = [spec.sampling_weight for spec in cand_specs]
-    sampled_spec = np_random.choice(cand_specs, size=num_tasks,
-                                    p=sampling_weights/np.sum(sampling_weights))
+    sampled_spec = self._np_random.choice(cand_specs, size=num_tasks,
+                                          p=sampling_weights/np.sum(sampling_weights))
     return sampled_spec
 
 class TeamTraining(TeamGameTemplate):
   """Game setting for team training tasks"""
   game_mode = "team_training"
 
-  def _define_tasks(self, np_random):
-    sampled_spec = self._get_cand_team_tasks(np_random, len(self.config.TEAMS))
+  def _define_tasks(self):
+    sampled_spec = self._get_cand_team_tasks(len(self.config.TEAMS))
     return task_spec.make_task_from_spec(self.config.TEAMS, sampled_spec)
 
 class TeamBattle(TeamGameTemplate):
   """Game setting for team battle"""
   game_mode = "team_battle"
 
-  def _define_tasks(self, np_random):
-    sampled_spec = self._get_cand_team_tasks(np_random, num_tasks=1)[0]
+  def _define_tasks(self):
+    sampled_spec = self._get_cand_team_tasks(num_tasks=1)[0]
     return task_spec.make_task_from_spec(self.config.TEAMS,
                                          [sampled_spec] * len(self.config.TEAMS))
 

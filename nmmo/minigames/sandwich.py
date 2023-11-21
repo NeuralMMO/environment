@@ -64,7 +64,7 @@ class Sandwich(TeamBattle):
     self.history[-1]["outer_npc_num"] = self.outer_npc_num
     self._grass_map = False  # reset to default
 
-  def _set_config(self, np_random):
+  def _set_config(self):
     self.config.reset()
     self.config.toggle_systems(self.required_systems)
     self.config.set_for_episode("TEAMS", self.teams)
@@ -94,19 +94,17 @@ class Sandwich(TeamBattle):
       if sum(last_results) >= self.num_game_won:
         self._inner_npc_num += self.npc_step_size
 
-  def _set_realm(self, np_random, map_dict):
-    self.realm.reset(np_random, map_dict, custom_spawn=True, seize_targets=["center"])
+  def _set_realm(self, map_dict):
+    self.realm.reset(self._np_random, map_dict, custom_spawn=True, seize_targets=["center"])
     # team spawn requires custom spawning
     spawn_locs = list(self.realm.map.quad_centers.values())  # 4 centers of each quadrant
-    team_loader = team_helper.TeamLoader(self.config, np_random, spawn_locs)
+    team_loader = team_helper.TeamLoader(self.config, self._np_random, spawn_locs)
     self.realm.players.spawn(team_loader)
 
     # spawn NPCs
     npc_manager = self.realm.npcs
     center = self.config.MAP_SIZE // 2
     offset = self.config.MAP_CENTER // 6
-    def spawn_npc(r, c, name, order):
-      return npc_manager.spawn_soldier(r, c, name, order)
     for i in range(self.num_teams):
       r, c = spawn_locs[i]
       if r < center:
@@ -119,21 +117,18 @@ class Sandwich(TeamBattle):
         c_min, c_max = center + 1, center + offset
       # pylint: disable=cell-var-from-loop
       npc_manager.area_spawn(r_min, r_max, c_min, c_max, self.inner_npc_num,
-                             lambda r, c: spawn_npc(r, c, f"NPC{i+1}",
-                                                    order={"rally": spawn_locs[i]}))
+                             lambda r, c: npc_manager.spawn_npc(
+                               r, c, name=f"NPC{i+1}", order={"rally": spawn_locs[i]}))
     npc_manager.edge_spawn(self.outer_npc_num,
-                           lambda r, c: spawn_npc(r, c, "NPC5",
-                                                  order={"rally": (center,center)}))
+                           lambda r, c: npc_manager.spawn_npc(
+                              r, c, name="NPC5", order={"rally": (center,center)}))
 
-  def _define_tasks(self, np_random):
+  def _define_tasks(self):
     spec_list = [seize_task(self.seize_duration)] * len(self.teams)
     return task_spec.make_task_from_spec(self.teams, spec_list)
 
   def _process_dead_npcs(self, dead_npcs):
     npc_manager = self.realm.npcs
-    def spawn_npc(r, c, name, order):
-      return npc_manager.spawn_soldier(r, c, name, order)
-
     target_num = min(self.realm.num_players, self.outer_npc_num) // 2
     if len(npc_manager) < target_num:
       center = self.config.MAP_SIZE // 2
@@ -142,8 +137,8 @@ class Sandwich(TeamBattle):
       r_max = c_max = center + offset
       num_spawn = target_num - len(npc_manager)
       npc_manager.area_spawn(r_min, r_max, c_min, c_max, num_spawn,
-                            lambda r, c: spawn_npc(r, c, "NPCa",
-                                                    order={"rally": (center,center)}))
+                             lambda r, c: npc_manager.spawn_npc(
+                               r, c, name="NPC5", order={"rally": (center,center)}))
 
   def _check_winners(self, dones):
     return self._who_completed_task()

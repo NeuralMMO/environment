@@ -19,9 +19,8 @@ DELTA_TO_DIR[(0, 0)] = None
 
 def get_habitable_dir(ent):
   r, c = ent.pos
-  realm = ent.realm
-  is_habitable = realm.map.habitable_tiles
-  start = realm._np_random.get_direction()  # pylint: disable=protected-access
+  is_habitable = ent.realm.map.habitable_tiles
+  start = ent._np_random.get_direction()  # pylint: disable=protected-access
   for i in range(4):
     delta_r, delta_c, direction = DIRECTIONS[start + i]
     if is_habitable[r + delta_r, c + delta_c]:
@@ -56,7 +55,7 @@ def meander_toward(ent, goal, dist_crit=10, toward_weight=3):
     return move_action(cand_dirs[0])
   weights = np.array(weights)
   # pylint: disable=protected-access
-  return move_action(ent.realm._np_random.choice(cand_dirs, p=weights/np.sum(weights)))
+  return move_action(ent._np_random.choice(cand_dirs, p=weights/np.sum(weights)))
 
 def move_action(direction):
   return {Action.Move: {Action.Direction: direction}} if direction else {}
@@ -85,13 +84,13 @@ class Equipment:
   @property
   def packet(self):
     packet = {}
-    packet['item_level']    = self.total
-    packet['melee_attack']  = self.melee_attack
-    packet['range_attack']  = self.range_attack
-    packet['mage_attack']   = self.mage_attack
-    packet['melee_defense'] = self.melee_defense
-    packet['range_defense'] = self.range_defense
-    packet['mage_defense']  = self.mage_defense
+    packet["item_level"]    = self.total
+    packet["melee_attack"]  = self.melee_attack
+    packet["range_attack"]  = self.range_attack
+    packet["mage_attack"]   = self.mage_attack
+    packet["melee_defense"] = self.melee_defense
+    packet["range_defense"] = self.range_defense
+    packet["mage_defense"]  = self.mage_defense
     return packet
 
 
@@ -177,7 +176,7 @@ class NPC(entity.Entity):
       for item in self.droptable.roll(self.realm, self.attack_level):
         if source.is_player and source.inventory.space:
           # inventory.receive() returns True if the item is received
-          # if source doesn't have space, inventory.receive() destroys the item
+          # if source does not have space, inventory.receive() destroys the item
           if source.inventory.receive(item):
             self.realm.event_log.record(EventCode.LOOT_ITEM, source, item=item, target=self)
         else:
@@ -186,7 +185,7 @@ class NPC(entity.Entity):
     return False
 
   @staticmethod
-  def default_spawn(realm, pos, iden, np_random):
+  def default_spawn(realm, pos, iden, np_random, danger=None):
     config = realm.config
 
     # check the position
@@ -194,7 +193,7 @@ class NPC(entity.Entity):
       return None
 
     # Select AI Policy
-    danger = combat.danger(config, pos)
+    danger = danger or combat.danger(config, pos)
     if danger >= config.NPC_SPAWN_AGGRESSIVE:
       ent = Aggressive(realm, pos, iden)
     elif danger >= config.NPC_SPAWN_NEUTRAL:
@@ -259,22 +258,22 @@ class NPC(entity.Entity):
 
   def packet(self):
     data = super().packet()
-    data['skills']   = self.skills.packet()
-    data['resource'] = { 'health': {
-      'val': self.resources.health.val, 'max': self.config.PLAYER_BASE_HEALTH } }
+    data["skills"]   = self.skills.packet()
+    data["resource"] = { "health": {
+      "val": self.resources.health.val, "max": self.config.PLAYER_BASE_HEALTH } }
     return data
 
 class Passive(NPC):
-  def __init__(self, realm, pos, iden):
-    super().__init__(realm, pos, iden, 'Passive', 1)
+  def __init__(self, realm, pos, iden, name=None):
+    super().__init__(realm, pos, iden, name or "Passive", 1)
 
   def decide(self):
     # Move only, no attack
     return self._meander()
 
 class PassiveAggressive(NPC):
-  def __init__(self, realm, pos, iden):
-    super().__init__(realm, pos, iden, 'Neutral', 2)
+  def __init__(self, realm, pos, iden, name=None):
+    super().__init__(realm, pos, iden, name or "Neutral", 2)
 
   def decide(self):
     if self._has_target() is None:
@@ -282,8 +281,8 @@ class PassiveAggressive(NPC):
     return self._charge_toward(self.target)
 
 class Aggressive(NPC):
-  def __init__(self, realm, pos, iden):
-    super().__init__(realm, pos, iden, 'Hostile', 3)
+  def __init__(self, realm, pos, iden, name=None):
+    super().__init__(realm, pos, iden, name or "Hostile", 3)
 
   def decide(self):
     if self._has_target(search=True) is None:
@@ -292,7 +291,7 @@ class Aggressive(NPC):
 
 class Soldier(NPC):
   def __init__(self, realm, pos, iden, name, order):
-    super().__init__(realm, pos, iden, name, 3)  # should act like hostile NPCs
+    super().__init__(realm, pos, iden, name or "Soldier", 3)  # Hostile with order
     self.target_entity = None
     self.rally_point = None
     self._process_order(order)
@@ -328,7 +327,7 @@ class Soldier(NPC):
     if self.target_entity:
       return self._move_toward(self.target_entity.pos)
     if self.target:
-      # If it's close enough, it will use A*. Otherwise, random.
+      # If it"s close enough, it will use A*. Otherwise, random.
       return meander_toward(self, self.target.pos)
     if self.rally_point:
       return meander_toward(self, self.rally_point)

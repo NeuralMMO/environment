@@ -59,7 +59,7 @@ def explore(config, ob, actions, r, c, np_random):
   pathfind(config, ob, actions, rr, cc, np_random)
 
 def evade(config, ob: Observation, actions, attacker, np_random):
-  agent = ob.agent()
+  agent = ob.agent
   rr, cc = (2*agent.row - attacker.row, 2*agent.col - attacker.col)
   pathfind(config, ob, actions, rr, cc, np_random)
 
@@ -67,7 +67,7 @@ def forageDijkstra(config, ob: Observation, actions,
                    food_max, water_max, np_random, cutoff=100):
   vision = config.PLAYER_VISION_RADIUS
 
-  agent  = ob.agent()
+  agent  = ob.agent
   food = agent.food
   water = agent.water
 

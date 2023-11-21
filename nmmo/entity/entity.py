@@ -279,7 +279,8 @@ class Entity(EntityState):
     self.target = None
     self.closest = None
     self.spawn_pos = pos
-    self._immortal = False  # used for testing/player observer
+    self._immortal = False  # used for testing/player recon
+    self._recon = False
 
     # Submodules
     self.status = Status(self)
@@ -369,6 +370,10 @@ class Entity(EntityState):
   @property
   def is_npc(self) -> bool:
     return False
+
+  @property
+  def is_recon(self):
+    return self._recon
 
   @property
   def attack_level(self) -> int:

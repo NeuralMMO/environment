@@ -44,7 +44,7 @@ class KingoftheHill(TeamBattle):
     self.history[-1]["map_size"] = self.map_size
     self.history[-1]["seize_duration"] = self.seize_duration
 
-  def _set_config(self, np_random):
+  def _set_config(self):
     self.config.reset()
     self.config.toggle_systems(self.required_systems)
     self.config.set_for_episode("MAP_CENTER", self.map_size)
@@ -73,13 +73,13 @@ class KingoftheHill(TeamBattle):
         self._seize_duration = min(self.seize_duration + self.dur_step_size,
                                    self.max_seize_duration)
 
-  def _set_realm(self, np_random, map_dict):
-    self.realm.reset(np_random, map_dict, custom_spawn=True, seize_targets=["center"])
+  def _set_realm(self, map_dict):
+    self.realm.reset(self._np_random, map_dict, custom_spawn=True, seize_targets=["center"])
     # team spawn requires custom spawning
-    team_loader = team_helper.TeamLoader(self.config, np_random)
+    team_loader = team_helper.TeamLoader(self.config, self._np_random)
     self.realm.players.spawn(team_loader)
 
-  def _define_tasks(self, np_random):
+  def _define_tasks(self):
     spec_list = [seize_task(self.seize_duration)] * len(self.teams)
     return task_spec.make_task_from_spec(self.teams, spec_list)
 

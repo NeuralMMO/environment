@@ -3,6 +3,7 @@
 import cProfile
 import io
 import pstats
+from tqdm import tqdm
 
 import nmmo
 from nmmo.core.config import (NPC, AllGameSystems, Combat, Communication,
@@ -111,18 +112,22 @@ def test_fps_all_med_100_pop(benchmark):
 
 def set_seed_test():
   random_seed = 5000
-  conf = create_config(Medium, Terrain, Resource, Combat, NPC)
-  conf.set("PLAYER_N", 10)
-  conf.set("PLAYERS", [baselines.Random])
+  # conf = create_config(Medium, Terrain, Resource, Combat, NPC, Communication)
+  # conf.set("PLAYER_N", 7)
+  # conf.set("PLAYERS", [baselines.Random])
+  conf = nmmo.config.Default()
+  conf.set("TERRAIN_TRAIN_MAPS", 1)
+  conf.set("TERRAIN_EVAL_MAPS", 1)
+  conf.set("IMMORTAL", True)
+  conf.set("NPC_N", 128)
 
   env = nmmo.Env(conf)
-
   env.reset(seed=random_seed)
-  for _ in range(1024):
+  for _ in tqdm(range(1024)):
     env.step({})
 
 def set_seed_test_complex():
-  tasks = nmmo_default_task(range(128))
+  tasks = nmmo_default_task(range(1, 129))
   tasks += make_same_task(CountEvent, range(128),
                           pred_kwargs={'event': 'EAT_FOOD', 'N': 10})
   tasks += make_same_task(FullyArmed, range(128),
@@ -133,7 +138,8 @@ if __name__ == '__main__':
   with open('profile.run','a', encoding="utf-8") as f:
     pr = cProfile.Profile()
     pr.enable()
-    set_seed_test_complex()
+    #set_seed_test_complex()
+    set_seed_test()
     pr.disable()
     s = io.StringIO()
     ps = pstats.Stats(pr,stream=s).sort_stats('tottime')

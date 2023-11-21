@@ -6,7 +6,7 @@ import numpy as np
 import nmmo
 from nmmo.core.map import Map
 from nmmo.core.tile import TileState
-from nmmo.core.action import Action, Buy
+from nmmo.core.action import Action, Buy, Comm
 from nmmo.entity.entity import EntityState
 from nmmo.entity.entity_manager import PlayerManager
 from nmmo.entity.npc_manager import NPCManager
@@ -172,7 +172,8 @@ class Realm:
       # ent_id, (atn, args) = merged[priority][0]
       for ent_id, (atn, args) in merged[priority]:
         ent = self.entity(ent_id)
-        if ent.alive and not ent.status.frozen:
+        if (ent.alive and not ent.status.frozen) or \
+           (ent.is_recon and priority == Comm.priority):  # recons can always comm
           atn.call(self, ent, *args)
     dead_players = self.players.cull()
     dead_npcs = self.npcs.cull()

@@ -59,16 +59,16 @@ class TestEntity(unittest.TestCase):
     e_row = EntityState.Query.by_id(realm.datastore, entity_id)
     self.assertEqual(e_row[Entity.State.attr_name_to_col["food"]], 11)
 
-  def test_observer(self):
+  def test_recon(self):
     config = nmmo.config.Default()
     config.set("PLAYERS", [Random])
     env = nmmo.Env(config)
     env.reset()
 
-    # set player 1 to be the observer
-    # Observers are immortal and cannot act (move)
+    # set player 1 to be a recon
+    # Recons are immortal and cannot act (move)
     player1 = env.realm.players[1]
-    player1.make_observer()
+    player1.make_recon()
     spawn_pos = player1.pos
 
     for _ in range(50):  # long enough to starve to death

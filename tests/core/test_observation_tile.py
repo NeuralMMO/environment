@@ -44,7 +44,7 @@ class TestObservationTile(unittest.TestCase):
 
     # pylint: disable=inconsistent-return-statements
     def correct_tile(agent_obs: Observation, r_delta, c_delta):
-      agent = agent_obs.agent()
+      agent = agent_obs.agent
       if (0 <= agent.row + r_delta < self.config.MAP_SIZE) & \
         (0 <= agent.col + c_delta < self.config.MAP_SIZE):
         r_cond = (agent_obs.tiles[:,TileState.State.attr_name_to_col["row"]] == agent.row+r_delta)
@@ -59,7 +59,7 @@ class TestObservationTile(unittest.TestCase):
       row_map = agent_obs.tiles[:,TileAttr['row']].reshape(tile_dim,tile_dim)
       col_map = agent_obs.tiles[:,TileAttr['col']].reshape(tile_dim,tile_dim)
       mat_map = agent_obs.tiles[:,TileAttr['material_id']].reshape(tile_dim,tile_dim)
-      agent = agent_obs.agent()
+      agent = agent_obs.agent
       self.assertEqual(agent.row, row_map[center,center])
       self.assertEqual(agent.col, col_map[center,center])
       self.assertEqual(agent_obs.tile(0,0).material_id, mat_map[center,center])
@@ -73,6 +73,8 @@ class TestObservationTile(unittest.TestCase):
     print('reference:', timeit(lambda: correct_tile(agent_obs, *d.delta),
                               number=1000, globals=globals()))
     print('implemented:', timeit(lambda: agent_obs.tile(*d.delta),
+                                number=1000, globals=globals()))
+    print('simplified:', timeit(lambda: agent_obs.tile_mat(*d.delta),
                                 number=1000, globals=globals()))
 
   def test_env_visible_tiles_correctness(self):
@@ -125,7 +127,7 @@ class TestObservationTile(unittest.TestCase):
 
     for agent_obs in obs.values():
       entities = agent_obs.entities.values
-      agent = agent_obs.agent()
+      agent = agent_obs.agent
       self.assertTrue(np.array_equal(
         correct_within_range(entities, attack_range, agent.row, agent.col),
         simple_within_range(entities, attack_range, agent.row, agent.col)))
