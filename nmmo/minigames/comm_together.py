@@ -20,7 +20,7 @@ class CommTogether(TeamBattle):
     # NOTE: all members should fit in 5x5 square.
     self.team_within_dist = 5  # gather all team members within this distance
 
-    self._map_size = 128  # determines the difficulty
+    self._map_size = 80  # determines the difficulty
     self._spawn_immunity = 500  # so that agents can start to attack each other later
     self.adaptive_difficulty = True
     self.num_game_won = 1  # at the same map size, threshold to increase the difficulty

@@ -733,7 +733,7 @@ class Communication:
   COMMUNICATION_SYSTEM_ENABLED             = True
   '''Game system flag'''
 
-  COMMUNICATION_NUM_TOKENS                 = 19
+  COMMUNICATION_NUM_TOKENS                 = 127
   '''Number of distinct COMM tokens'''
 
 
