@@ -100,7 +100,7 @@ class CommTogether(TeamBattle):
   def _process_dead_players(self, dones, dead_players):
     # Respawn dead players at the edge
     for player in dead_players.values():
-      player.resurrect(freeze_duration=30, health_prop=1)
+      player.resurrect(freeze_duration=30, health_prop=1, edge_spawn=False)
       self.num_player_resurrect += 1
 
   def _check_winners(self, dones):

@@ -113,10 +113,12 @@ def identify_closest_target(entity):
   dist = linf(visible_entities[:,EntityAttr["row"]:EntityAttr["col"]+1], entity.pos)
   entity_ids = visible_entities[:,EntityAttr["id"]]
 
+  # Filter out the entities that are not attackable
+  flt_idx = visible_entities[:,EntityAttr["npc_type"]] < 9
   if entity.config.NPC_SYSTEM_ENABLED and not entity.config.NPC_ALLOW_ATTACK_OTHER_NPCS:
-    flt_idx = entity_ids > 0
-    dist = dist[flt_idx]
-    entity_ids = entity_ids[flt_idx]
+    flt_idx &= entity_ids > 0
+  dist = dist[flt_idx]
+  entity_ids = entity_ids[flt_idx]
 
   # TODO: this could be made smarter/faster, or perhaps consider health
   if len(dist) > 1:

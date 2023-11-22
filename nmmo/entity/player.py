@@ -163,7 +163,7 @@ class Player(entity.Entity):
     if self._make_mortal_tick is not None and self.realm.tick >= self._make_mortal_tick:
       self._set_immortal(False)
 
-  def resurrect(self, health_prop=0.5, freeze_duration=10):
+  def resurrect(self, health_prop=0.5, freeze_duration=10, edge_spawn=True):
     # Respawn dead players at the edge
     assert self.alive is False, "Player is not dead"
     self.status.freeze.update(freeze_duration)
@@ -172,7 +172,14 @@ class Player(entity.Entity):
       self.resources.water.update(self.config.RESOURCE_BASE)
       self.resources.food.update(self.config.RESOURCE_BASE)
 
-    new_spawn_pos = spawn.get_random_border_coord(self.config, self._np_random)
+    if edge_spawn:
+      new_spawn_pos = spawn.get_random_coord(self.config, self._np_random, edge=True)
+    else:
+      while True:
+        new_spawn_pos = spawn.get_random_coord(self.config, self._np_random, edge=False)
+        if self.realm.map.tiles[new_spawn_pos].habitable:
+          break
+
     self.row.update(new_spawn_pos[0])
     self.col.update(new_spawn_pos[1])
     self.realm.players.spawn_entity(self)  # put back to the system

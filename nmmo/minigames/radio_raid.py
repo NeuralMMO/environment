@@ -29,8 +29,10 @@ class RadioRaid(TeamBattle):
     self._npc_danger = 0  # increase by .1 per wave
     self._danger_step_size = .1
     self.npc_wave_num = 10  # number of npc to spawn per wave
+    self._last_wave_tick = 0
     self.npc_spawn_crit = 3
     self.npc_spawn_radius = 5
+    self.max_wave_interval = 40
 
     # These will probably affect the difficulty
     self.map_size = 48
@@ -66,6 +68,7 @@ class RadioRaid(TeamBattle):
     super().reset(np_random, map_dict)
     self.history[-1]["goal_num_npc"] = self.goal_num_npc
     self._npc_danger = 0
+    self._last_wave_tick = 0
 
   def _set_config(self):
     self.config.reset()
@@ -84,6 +87,9 @@ class RadioRaid(TeamBattle):
     self.config.set_for_episode("DEATH_FOG_ONSET", None)
     # Disable +1 hp per tick -- restore health by eat/drink
     self.config.set_for_episode("PLAYER_HEALTH_INCREMENT", True)
+    # Make NPCs more aggressive
+    self.config.set_for_episode("NPC_SPAWN_NEUTRAL", 0.3)
+    self.config.set_for_episode("NPC_SPAWN_AGGRESSIVE", 0.8)
 
     self._determine_difficulty()  # sets the goal_num_npc
 
@@ -114,13 +120,19 @@ class RadioRaid(TeamBattle):
 
   def _process_dead_npcs(self, dead_npcs):
     npc_manager = self.realm.npcs
-    if len(npc_manager) <= self.npc_spawn_crit:
+    diff_player_npc = (self.realm.num_players - self.num_teams*4) - len(npc_manager)
+    # Spawn more NPCs if there are more players than NPCs
+    # If the gap is large, spawn in waves
+    # If the gap is small, spawn in small batches
+    if diff_player_npc >= 0 and (len(npc_manager) <= self.npc_spawn_crit or \
+       self.realm.tick - self._last_wave_tick > self.max_wave_interval):
       spawn_pos = self._np_random.choice(self.quad_centers)
       r_min, r_max = spawn_pos[0] - self.npc_spawn_radius, spawn_pos[0] + self.npc_spawn_radius
       c_min, c_max = spawn_pos[1] - self.npc_spawn_radius, spawn_pos[1] + self.npc_spawn_radius
       npc_manager.area_spawn(r_min, r_max, c_min, c_max, self.npc_wave_num,
                              lambda r, c: npc_manager.spawn_npc(r, c, danger=self._npc_danger))
       self._npc_danger += min(self._danger_step_size, 1)  # max danger = 1
+      self._last_wave_tick = self.realm.tick
 
   def _check_winners(self, dones):
     # No winner game is possible

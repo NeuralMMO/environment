@@ -27,7 +27,7 @@ class SequentialLoader:
     # the basic SequentialLoader just provides a random spawn position
     return self.candidate_spawn_pos.pop()
 
-def get_random_border_coord(config, np_random):
+def get_random_coord(config, np_random, edge=True):
   '''Generates spawn positions for new agents
 
   Randomly selects spawn positions around
@@ -39,16 +39,18 @@ def get_random_border_coord(config, np_random):
   position:
       The position (row, col) to spawn the given agent
   '''
-  #Spawn at edges
   mmax = config.MAP_CENTER + config.MAP_BORDER
   mmin = config.MAP_BORDER
 
   # np_random is the env-level RNG, a drop-in replacement of numpy.random
-  var  = np_random.integers(mmin, mmax)
-  fixed = np_random.choice([mmin, mmax])
-  r, c = int(var), int(fixed)
-  if np_random.random() > 0.5:
-    r, c = c, r
+  if edge:
+    var  = np_random.integers(mmin, mmax)
+    fixed = np_random.choice([mmin, mmax])
+    r, c = int(var), int(fixed)
+    if np_random.random() > 0.5:
+      r, c = c, r
+  else:
+    r, c = np_random.integers(mmin, mmax, 2).tolist()
   return (r, c)
 
 def get_edge_tiles(config, np_random=None, shuffle=False):
