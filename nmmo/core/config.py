@@ -12,6 +12,8 @@ from nmmo.core.terrain import MapGenerator
 from nmmo.lib import utils, material, spawn
 
 CONFIG_ATTR_PATTERN = r"^[A-Z_]+$"
+GAME_SYSTEMS = ["TERRAIN", "RESOURCE", "COMBAT", "NPC", "PROGRESSION", "ITEM",
+                "EQUIPMENT", "PROFESSION", "EXCHANGE", "COMMUNICATION"]
 
 # These attributes are critical for trainer and must not change from the initial values
 OBS_ATTRS = set(["MAX_HORIZON", "PLAYER_N", "MAP_N_OBS", "PLAYER_N_OBS", "TASK_EMBED_DIM",
@@ -116,35 +118,9 @@ class Config(Template):
 
     # TODO: Come up with a better way
     # to resolve mixin MRO conflicts
-    if not hasattr(self, 'TERRAIN_SYSTEM_ENABLED'):
-      self.set('TERRAIN_SYSTEM_ENABLED', False)
-
-    if not hasattr(self, 'RESOURCE_SYSTEM_ENABLED'):
-      self.set('RESOURCE_SYSTEM_ENABLED', False)
-
-    if not hasattr(self, 'COMBAT_SYSTEM_ENABLED'):
-      self.set('COMBAT_SYSTEM_ENABLED', False)
-
-    if not hasattr(self, 'NPC_SYSTEM_ENABLED'):
-      self.set('NPC_SYSTEM_ENABLED', False)
-
-    if not hasattr(self, 'PROGRESSION_SYSTEM_ENABLED'):
-      self.set('PROGRESSION_SYSTEM_ENABLED', False)
-
-    if not hasattr(self, 'ITEM_SYSTEM_ENABLED'):
-      self.set('ITEM_SYSTEM_ENABLED', False)
-
-    if not hasattr(self, 'EQUIPMENT_SYSTEM_ENABLED'):
-      self.set('EQUIPMENT_SYSTEM_ENABLED', False)
-
-    if not hasattr(self, 'PROFESSION_SYSTEM_ENABLED'):
-      self.set('PROFESSION_SYSTEM_ENABLED', False)
-
-    if not hasattr(self, 'EXCHANGE_SYSTEM_ENABLED'):
-      self.set('EXCHANGE_SYSTEM_ENABLED', False)
-
-    if not hasattr(self, 'COMMUNICATION_SYSTEM_ENABLED'):
-      self.set('COMMUNICATION_SYSTEM_ENABLED', False)
+    for system in GAME_SYSTEMS:
+      if not hasattr(self, f'{system}_SYSTEM_ENABLED'):
+        self.set(f'{system}_SYSTEM_ENABLED', False)
 
     if __debug__:
       validate(self)
@@ -186,6 +162,12 @@ class Config(Template):
     '''Return a list of the enabled systems from Env.__init__()'''
     return [k[:-len('_SYSTEM_ENABLED')]
             for k, v in self._data.items() if k.endswith('_SYSTEM_ENABLED') and v is True]
+
+  @property
+  def system_states(self):
+    '''Return a one-hot encoding of each system enabled/disabled,
+       which can be used as an observation and changed from episode to episode'''
+    return [int(getattr(self, f'{system}_SYSTEM_ENABLED')) for system in GAME_SYSTEMS]
 
   def are_systems_enabled(self, systems):  # systems is a list of strings
     '''Check if all provided systems are enabled'''
