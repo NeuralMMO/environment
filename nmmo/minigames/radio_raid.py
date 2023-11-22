@@ -33,7 +33,7 @@ class RadioRaid(TeamBattle):
     self.npc_spawn_radius = 5
 
     # These will probably affect the difficulty
-    self.map_size = 60
+    self.map_size = 48
     self.spawn_immunity = self.config.HORIZON
 
     # NOTE: This is a hacky way to get a hash embedding for a function
