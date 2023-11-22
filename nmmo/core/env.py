@@ -102,7 +102,8 @@ class Env(ParallelEnv):
       obs_space["Market"] = box(self.config.MARKET_N_OBS, Item.State.num_attributes)
 
     if self.config.original["COMMUNICATION_SYSTEM_ENABLED"]:
-      obs_space["Communication"] = box(self.config.PLAYER_N_OBS, 4)  # id, row, col, message
+      # Comm obs cols: id, row, col, message
+      obs_space["Communication"] = box(self.config.COMMUNICATION_N_OBS, 4)
 
     if self.config.original["PROVIDE_ACTION_TARGETS"]:
       mask_spec = deepcopy(self._atn_space)

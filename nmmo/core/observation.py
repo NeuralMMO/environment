@@ -92,7 +92,7 @@ class Observation:
 
     if config.COMMUNICATION_SYSTEM_ENABLED:
       # comm obs is a subset of entities
-      self.comm = BasicObs(comm[0:config.original["PLAYER_N_OBS"]],
+      self.comm = BasicObs(comm[0:config.original["COMMUNICATION_N_OBS"]],
                            EntityState.State.attr_name_to_col["id"])
     else:
       assert comm.size == 0
@@ -163,7 +163,7 @@ class Observation:
       gym_obs["Market"] = np.zeros((self.config.MARKET_N_OBS,
                                     self.market.values.shape[1]), dtype=np.int16)
     if self.config.original["COMMUNICATION_SYSTEM_ENABLED"]:
-      gym_obs["Communication"] = np.zeros((self.config.PLAYER_N_OBS,
+      gym_obs["Communication"] = np.zeros((self.config.COMMUNICATION_N_OBS,
                                            self.comm.values.shape[1]), dtype=np.int16)
     return gym_obs
 

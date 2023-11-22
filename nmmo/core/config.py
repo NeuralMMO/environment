@@ -16,7 +16,7 @@ CONFIG_ATTR_PATTERN = r"^[A-Z_]+$"
 # These attributes are critical for trainer and must not change from the initial values
 OBS_ATTRS = set(["MAX_HORIZON", "PLAYER_N", "MAP_N_OBS", "PLAYER_N_OBS", "TASK_EMBED_DIM",
                  "INVENTORY_N_OBS", "MARKET_N_OBS", "PRICE_N_OBS", "COMMUNICATION_NUM_TOKENS",
-                 "PROVIDE_ACTION_TARGETS", "PROVIDE_DEATH_FOG_OBS",
+                 "PROVIDE_ACTION_TARGETS", "PROVIDE_DEATH_FOG_OBS", "COMMUNICATION_N_OBS",
                  "PROVIDE_NOOP_ACTION_TARGET"])
 IMMUTABLE_ATTRS = set(["CURRICULUM_FILE_PATH", "PLAYER_VISION_RADIUS", "MAP_SIZE",
                        "PLAYER_BASE_HEALTH", "RESOURCE_BASE", "PROGRESSION_LEVEL_MAX"])
@@ -730,10 +730,13 @@ class Exchange:
 class Communication:
   '''Exchange Game System'''
 
-  COMMUNICATION_SYSTEM_ENABLED             = True
+  COMMUNICATION_SYSTEM_ENABLED         = True
   '''Game system flag'''
 
-  COMMUNICATION_NUM_TOKENS                 = 127
+  COMMUNICATION_N_OBS                  = 32
+  '''Number of players that share the same communication obs, i.e. the same team'''
+
+  COMMUNICATION_NUM_TOKENS             = 127
   '''Number of distinct COMM tokens'''
 
 
