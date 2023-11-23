@@ -59,7 +59,7 @@ class TestEntity(unittest.TestCase):
     e_row = EntityState.Query.by_id(realm.datastore, entity_id)
     self.assertEqual(e_row[Entity.State.attr_name_to_col["food"]], 11)
 
-  def test_recon(self):
+  def test_recon_resurrect(self):
     config = nmmo.config.Default()
     config.set("PLAYERS", [Random])
     env = nmmo.Env(config)
@@ -75,6 +75,18 @@ class TestEntity(unittest.TestCase):
       env.step({})
       self.assertEqual(player1.pos, spawn_pos)
       self.assertEqual(player1.health.val, config.PLAYER_BASE_HEALTH)
+
+    # resurrect player1
+    player1.health.update(0)
+    self.assertEqual(player1.alive, False)
+
+    player1.resurrect(health_prop=0.5, freeze_duration=10)
+    self.assertEqual(player1.health.val, 50)
+    self.assertEqual(player1.freeze.val, 10)
+    self.assertEqual(player1.message.val, 0)
+    self.assertEqual(player1.npc_type, 9)  # immortal flag
+    # pylint:disable=protected-access
+    self.assertEqual(player1._make_mortal_tick, env.realm.tick + 10)
 
 if __name__ == '__main__':
   unittest.main()

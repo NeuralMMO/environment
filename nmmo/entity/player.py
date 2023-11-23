@@ -182,6 +182,7 @@ class Player(entity.Entity):
 
     self.row.update(new_spawn_pos[0])
     self.col.update(new_spawn_pos[1])
+    self.message.update(0)
     self.realm.players.spawn_entity(self)  # put back to the system
 
     self._set_immortal(duration=freeze_duration)
