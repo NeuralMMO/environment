@@ -39,6 +39,8 @@ class Env(ParallelEnv):
     # Generate maps if they do not exist
     config.MAP_GENERATOR(config).generate_all_maps(self._np_seed)
     self.realm = realm.Realm(config, self._np_random)
+    self.tile_map = None
+    self.tile_obs_shape = None
 
     self.possible_agents = self.config.POSSIBLE_AGENTS
     self._agents = None
@@ -241,6 +243,13 @@ class Env(ParallelEnv):
       if isinstance(ent.agent, nmmo.Scripted):
         self.scripted_agents.add(eid)
         ent.agent.set_rng(self._np_random)
+
+    # Tile map placeholder, to reduce redudunt obs computation
+    self.tile_map = Tile.Query.get_map(self.realm.datastore, self.config.MAP_SIZE)
+    if self.config.PROVIDE_DEATH_FOG_OBS:
+      fog_map = np.round(self.realm.fog_map[:,:,np.newaxis]).astype(np.int16)
+      self.tile_map = np.concatenate((self.tile_map, fog_map), axis=-1)
+    self.tile_obs_shape = (self.config.PLAYER_VISION_DIAMETER**2, self.tile_map.shape[-1])
 
     # Reset the obs, game state generator
     self.obs = self._compute_observations()
@@ -499,16 +508,7 @@ class Env(ParallelEnv):
     obs = {}
     market = Item.Query.for_sale(self.realm.datastore)
     self._update_comm_obs()
-
-    # get tile map, to bypass the expensive tile window query
-    tile_map = Tile.Query.get_map(self.realm.datastore, self.config.MAP_SIZE)
     radius = self.config.PLAYER_VISION_RADIUS
-    tile_obs_size = ((2*radius+1)**2, len(Tile.State.attr_name_to_col))
-
-    if self.config.original["PROVIDE_DEATH_FOG_OBS"]:
-      fog_map = np.round(self.realm.fog_map[:,:,np.newaxis]).astype(np.int16)
-      tile_map = np.concatenate((tile_map, fog_map), axis=2)
-      tile_obs_size = ((2*radius+1)**2, len(Tile.State.attr_name_to_col)+1)
 
     for agent_id in self.agents:
       if agent_id not in self.realm.players:
@@ -521,8 +521,8 @@ class Env(ParallelEnv):
         agent = self.realm.players.get(agent_id)
         r, c = agent.row.val, agent.col.val
         visible_entities = Entity.Query.window(self.realm.datastore, r, c, radius)
-        visible_tiles = tile_map[r-radius:r+radius+1,
-                                 c-radius:c+radius+1,:].reshape(tile_obs_size)
+        visible_tiles = self.tile_map[r-radius:r+radius+1,
+                                      c-radius:c+radius+1,:].reshape(self.tile_obs_shape)
         inventory = Item.Query.owned_by(self.realm.datastore, agent_id)
         if self.config.COMMUNICATION_SYSTEM_ENABLED:
           comm_obs = self._comm_obs[agent_id]
