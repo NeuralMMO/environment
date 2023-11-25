@@ -1,3 +1,4 @@
+# pylint: disable=bare-except,c-extension-no-member
 from __future__ import annotations
 from ast import Tuple
 
@@ -5,6 +6,11 @@ import math
 from types import SimpleNamespace
 from typing import Dict, List
 from nmmo.datastore.datastore import Datastore, DatastoreRecord
+try:
+  import nmmo.lib.cython_helper as chp
+  USE_CYTHON = True
+except:
+  USE_CYTHON = False
 
 """
 This code defines classes for serializing and deserializing data
@@ -115,6 +121,10 @@ class SerializedState():
         # data array.
         assert len(data) == cls.State.num_attributes, \
           f"Expected {cls.State.num_attributes} attributes, got {len(data)}"
+
+        if USE_CYTHON:
+          return chp.parse_array(data, cls.State.attr_name_to_col)
+
         return SimpleNamespace(**{
           attr: data[col] for attr, col in cls.State.attr_name_to_col.items()
         })

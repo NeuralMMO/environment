@@ -120,6 +120,7 @@ def set_seed_test():
   conf.set("TERRAIN_EVAL_MAPS", 1)
   conf.set("IMMORTAL", True)
   conf.set("NPC_N", 128)
+  conf.set("USE_CYTHON", True)
 
   env = nmmo.Env(conf)
   env.reset(seed=random_seed)

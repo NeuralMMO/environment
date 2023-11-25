@@ -71,8 +71,7 @@ class Player(entity.Entity):
       if self.ent_id in self.realm.map.tiles[self.pos].entities:
         self.realm.map.tiles[self.pos].remove_entity(self.ent_id)
       self.realm.map.tiles[new_pos].add_entity(self)
-      self.row.update(new_pos[0])
-      self.col.update(new_pos[1])
+      self.set_pos(*new_pos)
 
   def apply_damage(self, dmg, style):
     super().apply_damage(dmg, style)
@@ -180,8 +179,7 @@ class Player(entity.Entity):
         if self.realm.map.tiles[new_spawn_pos].habitable:
           break
 
-    self.row.update(new_spawn_pos[0])
-    self.col.update(new_spawn_pos[1])
+    self.set_pos(*new_spawn_pos)
     self.message.update(0)
     self.realm.players.spawn_entity(self)  # put back to the system
 

@@ -113,7 +113,7 @@ EntityState.Query = SimpleNamespace(
   window=lambda ds, r, c, radius: ds.table("Entity").window(
     EntityState.State.attr_name_to_col["row"],
     EntityState.State.attr_name_to_col["col"],
-    r, c, radius),
+    r, c, radius, EntityState.State.attr_name_to_col["id"]),
 
   # Communication obs
   comm_obs=lambda ds, ids: ds.table("Entity").where_in(
@@ -262,15 +262,13 @@ class Entity(EntityState):
     #   related to the whole NPC, scripted logic
     # pylint: disable=protected-access
     self._np_random = realm._np_random
-
     self.policy = name
-    self.entity_id = entity_id
     self.repr = None
-
     self.name = name + str(entity_id)
 
-    self.row.update(pos[0])
-    self.col.update(pos[1])
+    self._pos = None
+    self.set_pos(*pos)
+    self.ent_id = entity_id
     self.id.update(entity_id)
 
     self.vision = self.config.PLAYER_VISION_RADIUS
@@ -288,9 +286,9 @@ class Entity(EntityState):
     self.resources = Resources(self, self.config)
     self.inventory = inventory.Inventory(realm, self)
 
-  @property
-  def ent_id(self):
-    return self.id.val
+  # @property
+  # def ent_id(self):
+  #   return self.id.val
 
   def packet(self):
     data = {}
@@ -299,8 +297,8 @@ class Entity(EntityState):
     data['inventory'] = self.inventory.packet()
     data['alive'] = self.alive
     data['base'] = {
-      'r': self.row.val,
-      'c': self.col.val,
+      'r': self.pos[0],
+      'c': self.pos[1],
       'name': self.name,
       'level': self.attack_level,
       'item_level': self.item_level.val,}
@@ -308,6 +306,8 @@ class Entity(EntityState):
 
   def update(self, realm, actions):
     '''Update occurs after actions, e.g. does not include history'''
+    self._pos = None
+
     if self.history.damage == 0:
       self.attacker = None
       self.attacker_id.update(0)
@@ -353,7 +353,14 @@ class Entity(EntityState):
 
   @property
   def pos(self):
-    return self.row.val, self.col.val
+    if self._pos is None:
+      self._pos = (self.row.val, self.col.val)
+    return self._pos
+
+  def set_pos(self, row, col):
+    self._pos = (row, col)
+    self.row.update(row)
+    self.col.update(col)
 
   @property
   def alive(self):

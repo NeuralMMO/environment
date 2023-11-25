@@ -35,8 +35,14 @@ class NumpyTable(DataTable):
   def where_in(self, col: int, values: List):
     return self._data[np.in1d(self._data[:,col], values)]
 
-  def window(self, row_idx: int, col_idx: int, row: int, col: int, radius: int):
-    return self._data[(
+  def window(self, row_idx: int, col_idx: int, row: int, col: int, radius: int,
+             id_col: int=None):
+    if id_col:
+      valid_row = self._data[:,id_col] != 0
+      data = self._data[valid_row]
+    else:
+      data = self._data
+    return data[(
       (np.abs(self._data[:,row_idx] - row) <= radius) &
       (np.abs(self._data[:,col_idx] - col) <= radius)
     ).ravel()]

@@ -17,10 +17,10 @@ GAME_SYSTEMS = ["TERRAIN", "RESOURCE", "COMBAT", "NPC", "PROGRESSION", "ITEM",
 
 # These attributes are critical for trainer and must not change from the initial values
 OBS_ATTRS = set(["MAX_HORIZON", "PLAYER_N", "MAP_N_OBS", "PLAYER_N_OBS", "TASK_EMBED_DIM",
-                 "INVENTORY_N_OBS", "MARKET_N_OBS", "PRICE_N_OBS", "COMMUNICATION_NUM_TOKENS",
-                 "PROVIDE_ACTION_TARGETS", "PROVIDE_DEATH_FOG_OBS", "COMMUNICATION_N_OBS",
-                 "PROVIDE_NOOP_ACTION_TARGET"])
-IMMUTABLE_ATTRS = set(["CURRICULUM_FILE_PATH", "PLAYER_VISION_RADIUS", "MAP_SIZE",
+                 "ITEM_INVENTORY_CAPACITY", "MARKET_N_OBS", "PRICE_N_OBS",
+                 "COMMUNICATION_NUM_TOKENS", "COMMUNICATION_N_OBS", "PROVIDE_ACTION_TARGETS",
+                 "PROVIDE_DEATH_FOG_OBS", "PROVIDE_NOOP_ACTION_TARGET"])
+IMMUTABLE_ATTRS = set(["USE_CYTHON", "CURRICULUM_FILE_PATH", "PLAYER_VISION_RADIUS", "MAP_SIZE",
                        "PLAYER_BASE_HEALTH", "RESOURCE_BASE", "PROGRESSION_LEVEL_MAX"])
 
 
@@ -186,9 +186,6 @@ class Config(Template):
 
   ############################################################################
   ### Meta-Parameters
-  def game_system_enabled(self, name) -> bool:
-    return hasattr(self, name)
-
   PLAYERS                      = [Agent]
   '''Player classes from which to spawn'''
 
@@ -242,6 +239,15 @@ class Config(Template):
 
 
   ############################################################################
+  ### System/debug Parameters
+  USE_CYTHON = True
+  '''Whether to use cython modules for performance'''
+
+  IMMORTAL = False
+  '''Debug parameter: prevents agents from dying except by void'''
+
+
+  ############################################################################
   ### Player Parameters
   PLAYER_BASE_HEALTH           = 100
   '''Initial agent health'''
@@ -274,12 +280,6 @@ class Config(Template):
   ### Team Parameters
   TEAMS                        = None  # Dict[Any, List[int]]
   '''A dictionary of team assignments: key is team_id, value is a list of agent_ids'''
-
-
-  ############################################################################
-  ### Debug Parameters
-  IMMORTAL = False
-  '''Debug parameter: prevents agents from dying except by void'''
 
 
   ############################################################################

@@ -2,7 +2,7 @@ import os
 import functools
 from typing import Any, Dict, List, Callable
 from collections import defaultdict
-from copy import copy, deepcopy
+from copy import deepcopy
 
 import gym
 import dill
@@ -15,7 +15,7 @@ from nmmo.core import game_api
 from nmmo.core.config import Default
 from nmmo.core.observation import Observation
 from nmmo.core.tile import Tile
-from nmmo.entity.entity import Entity, EntityState
+from nmmo.entity.entity import Entity
 from nmmo.systems.item import Item
 from nmmo.task.game_state import GameStateGenerator
 from nmmo.lib import seeding
@@ -48,9 +48,10 @@ class Env(ParallelEnv):
     self._dead_this_tick = None
     self.scripted_agents = set()
 
-    self.obs = None
+    self.obs = {agent_id: Observation(self.config, agent_id)
+                for agent_id in self.possible_agents}
     self._dummy_task_embedding = np.zeros(self.config.TASK_EMBED_DIM, dtype=np.float16)
-    self._dummy_obs = self._make_dummy_obs()
+    self._dummy_obs = Observation(self.config, 0).empty_obs
     self._comm_obs = {}
 
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
@@ -247,12 +248,21 @@ class Env(ParallelEnv):
     # Tile map placeholder, to reduce redudunt obs computation
     self.tile_map = Tile.Query.get_map(self.realm.datastore, self.config.MAP_SIZE)
     if self.config.PROVIDE_DEATH_FOG_OBS:
-      fog_map = np.round(self.realm.fog_map[:,:,np.newaxis]).astype(np.int16)
+      fog_map = np.round(self.realm.fog_map)[:,:,np.newaxis]
       self.tile_map = np.concatenate((self.tile_map, fog_map), axis=-1)
     self.tile_obs_shape = (self.config.PLAYER_VISION_DIAMETER**2, self.tile_map.shape[-1])
 
     # Reset the obs, game state generator
-    self.obs = self._compute_observations()
+    for agent_id in self.possible_agents:
+      # NOTE: the tasks for each agent is in self.agent_task_map, and task embeddings are
+      #   available in each task instance, via task.embedding
+      #   For now, each agent is assigned to a single task, so we just use the first task
+      # TODO: can the embeddings of multiple tasks be superposed while preserving the
+      #   task-specific information? This needs research
+      task_embedding = self.agent_task_map[agent_id][0].embedding \
+        if agent_id in self.agent_task_map else self._dummy_task_embedding
+      self.obs[agent_id].reset(self.realm.map.habitable_tiles, task_embedding)
+    self._compute_observations()
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
     if self.game_state is not None:
       self.game_state.clear_cache()
@@ -413,7 +423,7 @@ class Env(ParallelEnv):
     self.game.update(dones, self._dead_this_tick, dead_npcs)
 
     # Store the observations, since actions reference them
-    self.obs = self._compute_observations()
+    self._compute_observations()
     gym_obs = {a: o.to_gym() for a,o in self.obs.items()}
 
     rewards, infos = self._compute_rewards()
@@ -485,62 +495,28 @@ class Env(ParallelEnv):
 
     return actions
 
-  def _make_dummy_obs(self):
-    num_tile_attributes = len(Tile.State.attr_name_to_col)
-    num_tile_attributes += 1 if self.config.original["PROVIDE_DEATH_FOG_OBS"] else 0
-    dummy_tiles = np.zeros((0, num_tile_attributes), dtype=np.int16)
-    dummy_entities = np.zeros((0, len(Entity.State.attr_name_to_col)), dtype=np.int16)
-    dummy_inventory = np.zeros((0, len(Item.State.attr_name_to_col)), dtype=np.int16)
-    dummy_market = np.zeros((0, len(Item.State.attr_name_to_col)), dtype=np.int16)
-    dummy_comm = np.zeros((0, len(EntityState.State.comm_attr_map)), dtype=np.int16)
-    return Observation(self.config, 0, 0, self._dummy_task_embedding, dummy_tiles,
-                       dummy_entities, dummy_inventory, dummy_market, dummy_comm)
-
   def _compute_observations(self):
-    # Clean up unnecessary observations, which cause memory leaks
-    if self.obs is not None:
-      for agent_id, agent_obs in self.obs.items():
-        agent_obs.clear_cache()  # clear the lru_cache
-        self.obs[agent_id] = None
-        del agent_obs
-      self.obs = None
-
-    obs = {}
-    market = Item.Query.for_sale(self.realm.datastore)
-    self._update_comm_obs()
     radius = self.config.PLAYER_VISION_RADIUS
+    market = Item.Query.for_sale(self.realm.datastore) \
+      if self.config.EXCHANGE_SYSTEM_ENABLED else None
+    self._update_comm_obs()
+    if self.config.PROVIDE_DEATH_FOG_OBS:
+      self.tile_map[:, :, -1] = np.round(self.realm.fog_map)
 
     for agent_id in self.agents:
       if agent_id not in self.realm.players:
-        # return dummy obs for the agents in dead_this_tick
-        dummy_obs = copy(self._dummy_obs)
-        dummy_obs.current_tick = self.realm.tick
-        dummy_obs.agent_id = agent_id
-        obs[agent_id] = dummy_obs
+        self.obs[agent_id].set_agent_dead()
       else:
-        agent = self.realm.players.get(agent_id)
-        r, c = agent.row.val, agent.col.val
+        r, c = self.realm.players.get(agent_id).pos
         visible_entities = Entity.Query.window(self.realm.datastore, r, c, radius)
         visible_tiles = self.tile_map[r-radius:r+radius+1,
-                                      c-radius:c+radius+1,:].reshape(self.tile_obs_shape)
-        inventory = Item.Query.owned_by(self.realm.datastore, agent_id)
-        if self.config.COMMUNICATION_SYSTEM_ENABLED:
-          comm_obs = self._comm_obs[agent_id]
-        else:
-          comm_obs = self._dummy_obs.comm.values
-
-        # NOTE: the tasks for each agent is in self.agent_task_map, and task embeddings are
-        #   available in each task instance, via task.embedding
-        #   For now, each agent is assigned to a single task, so we just use the first task
-        # TODO: can the embeddings of multiple tasks be superposed while preserving the
-        #   task-specific information? This needs research
-        task_embedding = self._dummy_task_embedding
-        if agent_id in self.agent_task_map:
-          task_embedding = self.agent_task_map[agent_id][0].embedding  # NOTE: first task only
-
-        obs[agent_id] = Observation(self.config, self.realm.tick, agent_id, task_embedding,
-                                    visible_tiles, visible_entities, inventory, market, comm_obs)
-    return obs
+                                      c-radius:c+radius+1, :].reshape(self.tile_obs_shape)
+        inventory = Item.Query.owned_by(self.realm.datastore, agent_id) \
+          if self.config.ITEM_SYSTEM_ENABLED else None
+        comm_obs = self._comm_obs[agent_id] \
+          if self.config.COMMUNICATION_SYSTEM_ENABLED else None
+        self.obs[agent_id].update(self.realm.tick, visible_tiles, visible_entities,
+                                  inventory=inventory, market=market, comm=comm_obs)
 
   def _update_comm_obs(self):
     if not self.config.COMMUNICATION_SYSTEM_ENABLED:

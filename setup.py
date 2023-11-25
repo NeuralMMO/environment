@@ -1,6 +1,8 @@
 from itertools import chain
 
 from setuptools import find_packages, setup
+from Cython.Build import cythonize
+import numpy as np
 
 REPO_URL = "https://github.com/neuralmmo/environment"
 
@@ -46,6 +48,8 @@ setup(
     'tqdm<5',
     'dill==0.3.6',
   ],
+  ext_modules = cythonize(["nmmo/lib/cython_helper.pyx"]),
+  include_dirs=[np.get_include()],
   extras_require=extra,
   python_requires=">=3.7",
   license="MIT",

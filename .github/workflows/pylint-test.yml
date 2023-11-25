@@ -19,8 +19,9 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip setuptools wheel
+        python -m pip install --upgrade pip setuptools wheel cython
         pip install .
+        python setup.py build_ext --inplace
     - name: Running unit tests
       run: pytest
     - name: Analysing the code with pylint

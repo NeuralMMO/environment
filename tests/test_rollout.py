@@ -5,8 +5,9 @@ class SimpleConfig(nmmo.config.Small, nmmo.config.Combat):
   pass
 
 def test_rollout():
-  config = SimpleConfig()  #nmmo.config.Default()
+  config = nmmo.config.Default()  #SimpleConfig()  #nmmo.config.Default()
   config.set("PLAYERS", [Random])
+  config.set("USE_CYTHON", False)
 
   env = nmmo.Env(config)
   env.reset()

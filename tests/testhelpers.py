@@ -171,8 +171,7 @@ def change_spawn_pos(realm: Realm, ent_id: int, new_pos):
   realm.map.tiles[old_pos].remove_entity(ent_id)
 
   # set to new pos
-  entity.row.update(new_pos[0])
-  entity.col.update(new_pos[1])
+  entity.set_pos(*new_pos)
   entity.spawn_pos = new_pos
   realm.map.tiles[new_pos].add_entity(entity)
 
@@ -254,7 +253,7 @@ class ScriptedTestTemplate(unittest.TestCase):
         tile.material_id.update(Material.Grass.index)
         tile.state = Material.Grass(env.config)
 
-    env.obs = env._compute_observations()
+    env._compute_observations()
 
     if check_assert:
       self._check_default_asserts(env)
@@ -388,7 +387,7 @@ def profile_env_step(action_target=True, tasks=None, condition=None):
   for _ in range(3):
     env.step({})
 
-  env.obs = env._compute_observations()
+  env._compute_observations()
   obs = deepcopy(env.obs)
 
   test_func = [

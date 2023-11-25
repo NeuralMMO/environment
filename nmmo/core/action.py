@@ -1,9 +1,6 @@
-# CHECK ME: Should these be fixed as well?
 # pylint: disable=no-method-argument,unused-argument,no-self-argument,no-member
-
 from enum import Enum, auto
 import numpy as np
-from nmmo.core.observation import Observation
 
 from nmmo.lib import utils
 from nmmo.lib.utils import staticproperty
@@ -48,7 +45,7 @@ class Node(metaclass=utils.IterableNameComparable):
   def N(cls, config):
     return len(cls.edges)
 
-  def deserialize(realm, entity, index, obs: Observation):
+  def deserialize(realm, entity, index: int, obs):
     return index
 
 class Fixed:
@@ -132,9 +129,7 @@ class Move(Node):
     if entity.status.freeze > 0:
       return
 
-    entity.row.update(r_new)
-    entity.col.update(c_new)
-
+    entity.set_pos(r_new, c_new)
     realm.map.tiles[r, c].remove_entity(ent_id)
     realm.map.tiles[r_new, c_new].add_entity(entity)
 
@@ -170,7 +165,7 @@ class Direction(Node):
   def edges():
     return [North, South, East, West, Stay]
 
-  def deserialize(realm, entity, index, obs: Observation):
+  def deserialize(realm, entity, index: int, obs):
     return deserialize_fixed_arg(Direction, index)
 
 # a quick helper function
@@ -282,7 +277,7 @@ class Style(Node):
   def edges():
     return [Melee, Range, Mage]
 
-  def deserialize(realm, entity, index, obs: Observation):
+  def deserialize(realm, entity, index: int, obs):
     return deserialize_fixed_arg(Style, index)
 
 class Target(Node):
@@ -292,7 +287,7 @@ class Target(Node):
   def N(cls, config):
     return config.PLAYER_N_OBS + cls.noop_action
 
-  def deserialize(realm, entity, index: int, obs: Observation):
+  def deserialize(realm, entity, index: int, obs):
     if index >= len(obs.entities.ids):
       return None
     return realm.entity_or_none(obs.entities.ids[index])
@@ -334,7 +329,7 @@ class InventoryItem(Node):
   def N(cls, config):
     return config.INVENTORY_N_OBS + cls.noop_action
 
-  def deserialize(realm, entity, index: int, obs: Observation):
+  def deserialize(realm, entity, index: int, obs):
     if index >= len(obs.inventory.ids):
       return None
     return realm.items.get(obs.inventory.ids[index])
@@ -513,10 +508,9 @@ class MarketItem(Node):
   def N(cls, config):
     return config.MARKET_N_OBS + cls.noop_action
 
-  def deserialize(realm, entity, index: int, obs: Observation):
+  def deserialize(realm, entity, index: int, obs):
     if index >= len(obs.market.ids):
       return None
-
     return realm.items.get(obs.market.ids[index])
 
 class Buy(Node):
@@ -633,7 +627,7 @@ class Price(Node):
   def edges():
     return Price.classes
 
-  def deserialize(realm, entity, index, obs: Observation):
+  def deserialize(realm, entity, index: int, obs):
     return deserialize_fixed_arg(Price, index)
 
 class Token(Node):
@@ -647,7 +641,7 @@ class Token(Node):
   def edges():
     return Token.classes
 
-  def deserialize(realm, entity, index, obs: Observation):
+  def deserialize(realm, entity, index: int, obs):
     return deserialize_fixed_arg(Token, index)
 
 class Comm(Node):

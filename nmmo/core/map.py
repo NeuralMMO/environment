@@ -26,7 +26,7 @@ class Map:
 
     sz          = config.MAP_SIZE
     self.tiles  = np.zeros((sz,sz), dtype=object)
-    self.habitable_tiles = np.zeros((sz,sz))
+    self.habitable_tiles = np.zeros((sz,sz), dtype=np.int8)
 
     for r in range(sz):
       for c in range(sz):

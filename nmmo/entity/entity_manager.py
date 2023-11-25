@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from typing import Dict
 
-from nmmo.entity.entity import Entity
+from nmmo.entity.entity import Entity, EntityState
 from nmmo.entity.player import Player
 from nmmo.lib import spawn
 
@@ -12,6 +12,7 @@ class EntityGroup(Mapping):
     self.realm = realm
     self.config = realm.config
     self._np_random = np_random
+    self._entity_table = EntityState.Query.table(self.datastore)
 
     self.entities: Dict[int, Entity] = {}
     self.dead_this_tick: Dict[int, Entity] = {}
@@ -78,6 +79,15 @@ class EntityGroup(Mapping):
     return self.dead_this_tick
 
   def update(self, actions):
+    # # batch updates
+    # # time_alive, damage are from entity.py, History.update()
+    # ent_idx = self._entity_table[:, EntityState.State.attr_name_to_col["id"]] != 0
+    # self._entity_table[ent_idx, EntityState.State.attr_name_to_col["time_alive"]] += 1
+    # self._entity_table[ent_idx, EntityState.State.attr_name_to_col["damage"]] = 0
+    # # freeze from entity.py, Status.update()
+    # freeze_idx = self._entity_table[:, EntityState.State.attr_name_to_col["freeze"]] > 0
+    # self._entity_table[freeze_idx, EntityState.State.attr_name_to_col["freeze"]] -= 1
+
     for entity in self.entities.values():
       entity.update(self.realm, actions)
 

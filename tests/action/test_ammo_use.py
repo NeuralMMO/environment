@@ -28,9 +28,10 @@ class TestAmmoUse(ScriptedTestTemplate):
           + np.sum(gym_obs["ActionTargets"]["Buy"]["MarketItem"])
     for atn in [action.Use, action.Give, action.Destroy, action.Sell]:
       mask += np.sum(gym_obs["ActionTargets"][atn.__name__]["InventoryItem"])
-    # If MarketItem and InventoryTarget have no-action flags, these sum up to 5
+    # If MarketItem and InventoryTarget have no-action flags, these sum up to 104
     # To prevent entropy collapse, GiveGold/Price and Buy/MarketItem masks are tweaked
-    self.assertEqual(mask, 1 + 5*int(self.config.PROVIDE_NOOP_ACTION_TARGET))
+    # The Price mask is all ones, so the sum is 104
+    self.assertEqual(mask, 99 + 5*int(self.config.PROVIDE_NOOP_ACTION_TARGET))
 
   def test_spawn_immunity(self):
     env = self._setup_env(random_seed=RANDOM_SEED)
@@ -180,7 +181,6 @@ class TestAmmoUse(ScriptedTestTemplate):
     ent_id = 3
     provide_item(env.realm, ent_id, Item.Whetstone, level=5, quantity=3)
     provide_item(env.realm, ent_id, Item.Whetstone, level=7, quantity=3)
-    env.obs = env._compute_observations()
 
     # First tick actions: SELL level-0 ammo
     env.step({ ent_id: { action.Sell:
@@ -249,9 +249,9 @@ class TestAmmoUse(ScriptedTestTemplate):
 
     # level up the agent 1 (Melee) to 2
     env.realm.players[1].skills.melee.level.update(2)
-    env.obs = env._compute_observations()
 
     # check inventory
+    env._compute_observations()
     for ent_id in self.ammo:
       # realm data
       inv_realm = { item.signature: item.quantity.val
@@ -269,20 +269,20 @@ class TestAmmoUse(ScriptedTestTemplate):
         ItemState.parse_array(inv_obs.values[inv_obs.sig(*wstone_lvl1)]).quantity)
       if ent_id == 1:
         # if the ammo has the same signature, the quantity is added to the existing stack
-        self.assertEqual( inv_realm[sig_int_tuple(wstone_lvl0)],
+        self.assertEqual(inv_realm[sig_int_tuple(wstone_lvl0)],
                          extra_ammo + self.ammo_quantity )
-        self.assertEqual( extra_ammo + self.ammo_quantity,
+        self.assertEqual(extra_ammo + self.ammo_quantity,
           ItemState.parse_array(inv_obs.values[inv_obs.sig(*wstone_lvl0)]).quantity)
         # so there should be 1 more space
-        self.assertEqual( inv_obs.len, self.config.ITEM_INVENTORY_CAPACITY - 1)
+        self.assertEqual(inv_obs.len, self.config.ITEM_INVENTORY_CAPACITY - 1)
 
       else:
         # if the signature is different, it occupies a new inventory space
-        self.assertEqual( inv_realm[sig_int_tuple(wstone_lvl0)], extra_ammo )
-        self.assertEqual( extra_ammo,
+        self.assertEqual(inv_realm[sig_int_tuple(wstone_lvl0)], extra_ammo )
+        self.assertEqual(extra_ammo,
           ItemState.parse_array(inv_obs.values[inv_obs.sig(*wstone_lvl0)]).quantity)
         # thus the inventory is full
-        self.assertEqual( inv_obs.len, self.config.ITEM_INVENTORY_CAPACITY)
+        self.assertEqual(inv_obs.len, self.config.ITEM_INVENTORY_CAPACITY)
 
       if ent_id == 1:
         gym_obs = env.obs[ent_id].to_gym()
@@ -341,7 +341,6 @@ class TestAmmoUse(ScriptedTestTemplate):
       env.realm.players[ent_id].resources.food.update(init_res)
       env.realm.players[ent_id].resources.water.update(init_res)
       env.realm.players[ent_id].resources.health.update(init_res)
-    env.obs = env._compute_observations()
 
     """First tick: try to use level-3 ration & potion"""
     ration_lvl3 = (Item.Ration, 3)

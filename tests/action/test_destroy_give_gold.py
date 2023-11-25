@@ -96,7 +96,7 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
 
     # teleport the npc -1 to agent 5's location
     change_spawn_pos(env.realm, -1, self.spawn_locs[5])
-    env.obs = env._compute_observations()
+    #env._compute_observations()
 
     """ First tick actions """
     actions = {}
@@ -203,8 +203,7 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
       for item_sig in extra_items:
         self.item_sig[ent_id].append(item_sig)
         provide_item(env.realm, ent_id, item_sig[0], item_sig[1], 1)
-
-    env.obs = env._compute_observations()
+    env._compute_observations()
 
     # check if the inventory is full
     for ent_id in [1, 2]:
@@ -247,7 +246,7 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
 
     # teleport the npc -1 to agent 3's location
     change_spawn_pos(env.realm, -1, self.spawn_locs[3])
-    env.obs = env._compute_observations()
+    env._compute_observations()
 
     test_cond = {}
 

@@ -112,7 +112,6 @@ class TestBasePredicate(unittest.TestCase):
     # kill agents 1-3
     for ent_id in death_note:
       env.realm.players[ent_id].resources.health.update(0)
-    env.obs = env._compute_observations()
 
     # 6th tick
     _, _, _, infos = env.step({})
@@ -168,10 +167,7 @@ class TestBasePredicate(unittest.TestCase):
     # All agents to one corner
     for ent_id in env.realm.players:
       change_agent_pos(env.realm,ent_id,(BORDER,BORDER))
-
-    env.obs = env._compute_observations()
     _, _, _, infos = env.step({})
-
     # no target tiles are found, so all are false
     true_task = []
     self._check_result(env, test_preds, infos, true_task)
@@ -179,10 +175,7 @@ class TestBasePredicate(unittest.TestCase):
     # Team one to foilage, team two to water
     change_agent_pos(env.realm,1,(BORDER,MS-2)) # agent 1, team 0, foilage
     change_agent_pos(env.realm,2,(MS-2,BORDER)) # agent 2, team 1, water
-    env.obs = env._compute_observations()
-
     _, _, _, infos = env.step({})
-
     # t0, t2, t4 are true
     true_task = [0, 2, 4]
     self._check_result(env, test_preds, infos, true_task)
@@ -210,28 +203,20 @@ class TestBasePredicate(unittest.TestCase):
 
     # Teleport agent 1 to the opposite corner
     change_agent_pos(env.realm,1,(MS-2,MS-2))
-    env.obs = env._compute_observations()
-
     _, _, _, infos = env.step({})
-
     # Only CanSeeAgent(Group([1]), search_target) is true, others are false
     true_task = [0]
     self._check_result(env, test_preds, infos, true_task)
 
     # Teleport agent 2 to agent 1's pos
     change_agent_pos(env.realm,2,(MS-2,MS-2))
-    env.obs = env._compute_observations()
-
     _, _, _, infos = env.step({})
-
     # SearchAgent(Team([2]), search_target) is also true
     true_task = [0,1]
     self._check_result(env, test_preds, infos, true_task)
 
     # Teleport agent 3 to agent 1s position
     change_agent_pos(env.realm,3,(MS-2,MS-2))
-    env.obs = env._compute_observations()
-
     _, _, _, infos = env.step({})
     true_task = [0,1,2,3]
     self._check_result(env, test_preds, infos, true_task)
@@ -255,10 +240,7 @@ class TestBasePredicate(unittest.TestCase):
     BORDER = env.config.MAP_BORDER
     for ent_id in env.realm.players:
       change_agent_pos(env.realm,ent_id,(BORDER,BORDER))
-    env.obs = env._compute_observations()
-
     _, _, _, infos = env.step({})
-
     # all tasks must be false
     true_task = []
     self._check_result(env, test_preds, infos, true_task)
@@ -266,10 +248,7 @@ class TestBasePredicate(unittest.TestCase):
     # teleport agent 1 to the target tile, agent 2 to the adjacent tile
     change_agent_pos(env.realm,1,target_tile)
     change_agent_pos(env.realm,2,(target_tile[0],target_tile[1]-1))
-    env.obs = env._compute_observations()
-
     _, _, _, infos = env.step({})
-
     # tid 0 and 1 should be true: OccupyTile(Group([1]), *target_tile)
     #  & OccupyTile(Group([1,2,3]), *target_tile)
     true_task = [0, 1]
@@ -292,9 +271,7 @@ class TestBasePredicate(unittest.TestCase):
 
     # make all tiles habitable
     env = self._get_taskenv(test_preds, grass_map=True)
-
     _, _, _, infos = env.step({})
-
     # one cannot accomplish these goals in the first tick, so all false
     true_task = []
     self._check_result(env, test_preds, infos, true_task)
@@ -307,10 +284,7 @@ class TestBasePredicate(unittest.TestCase):
     change_agent_pos(env.realm, ent_id, (spawn_pos[ent_id][0]+2, spawn_pos[ent_id][1]))
     ent_id = 3 # move 3, fail to reach agent_dist, but reach team_dist if add all
     change_agent_pos(env.realm, ent_id, (spawn_pos[ent_id][0], spawn_pos[ent_id][1]+3))
-    env.obs = env._compute_observations()
-
     _,_,_, infos = env.step({})
-
     true_task = [0, 3]
     self._check_result(env, test_preds, infos, true_task)
 
@@ -344,7 +318,6 @@ class TestBasePredicate(unittest.TestCase):
     change_agent_pos(env.realm, 2, (MS//2+1, MS//2)) # also StayCloseTo a1 = True
     change_agent_pos(env.realm, 4, (MS//2+5, MS//2))
     change_agent_pos(env.realm, 6, (MS//2+8, MS//2))
-    env.obs = env._compute_observations()
 
     _, _, _, infos = env.step({})
 
@@ -379,7 +352,6 @@ class TestBasePredicate(unittest.TestCase):
     env.realm.players[2].skills.carving.level.update(goal_level)
     # AttainSkill(Group([2,4]), Skill.Carving, goal_level, 2) is true
     env.realm.players[4].skills.carving.level.update(goal_level+2)
-    env.obs = env._compute_observations()
 
     _, _, _, infos = env.step({})
 
@@ -414,7 +386,6 @@ class TestBasePredicate(unittest.TestCase):
     env.realm.players[2].skills.carving.exp.update(goal_exp)
     # AttainSkill(Group([2,4]), Skill.Carving, goal_level, 2) is true
     env.realm.players[4].skills.carving.exp.update(goal_exp+2)
-    env.obs = env._compute_observations()
 
     _, _, _, infos = env.step({})
 
@@ -442,20 +413,14 @@ class TestBasePredicate(unittest.TestCase):
     # add one items to agent 1 within the limit
     capacity = env.realm.players[1].inventory.capacity
     provide_item(env.realm, 1, Item.Ration, level=1, quantity=capacity-target_space)
-    env.obs = env._compute_observations()
-
     _, _, _, infos = env.step({})
-
     self.assertTrue(env.realm.players[1].inventory.space >= target_space)
     true_task = [0, 1, 2, 4, 6]
     self._check_result(env, test_preds, infos, true_task)
 
     # add one more item to agent 1
     provide_item(env.realm, 1, Item.Ration, level=1, quantity=1)
-    env.obs = env._compute_observations()
-
     _, _, _, infos = env.step({})
-
     self.assertTrue(env.realm.players[1].inventory.space < target_space)
     true_task = [1, 4, 5, 6]
     self._check_result(env, test_preds, infos, true_task)
@@ -508,7 +473,6 @@ class TestBasePredicate(unittest.TestCase):
     for ent_id in [4, 5, 6]:
       whetstone = env.realm.players[ent_id].inventory.items[0]
       whetstone.use(env.realm.players[ent_id])
-    env.obs = env._compute_observations()
 
     _, _, _, infos = env.step({})
 
@@ -541,7 +505,6 @@ class TestBasePredicate(unittest.TestCase):
       for itm in item_list:
         env.realm.players[ent_id].inventory.receive(itm)
         itm.use(env.realm.players[ent_id])
-    env.obs = env._compute_observations()
 
     _, _, _, infos = env.step({})
 
@@ -567,7 +530,6 @@ class TestBasePredicate(unittest.TestCase):
     gold_struck = [1, 2, 3]
     for ent_id in gold_struck:
       env.realm.players[ent_id].gold.update(ent_id * 10)
-    env.obs = env._compute_observations()
 
     _, _, _, infos = env.step({})
 
@@ -601,10 +563,7 @@ class TestBasePredicate(unittest.TestCase):
     env.realm.event_log.record(EventCode.EARN_GOLD, players[1], amount = 5)
     env.realm.event_log.record(EventCode.EARN_GOLD, players[1], amount = 3)
     env.realm.event_log.record(EventCode.EARN_GOLD, players[2], amount = 2)
-
-    env.obs = env._compute_observations()
     _, _, _, infos = env.step({})
-
     true_task = [0,4,5]
     self._check_result(env, test_preds, infos, true_task)
     self._check_progress(env.tasks[1], infos, 2 / gold_goal)
@@ -612,9 +571,7 @@ class TestBasePredicate(unittest.TestCase):
     env.realm.event_log.record(EventCode.BUY_ITEM, players[1],
                                item=Item.Ration(env.realm,1),
                                price=5)
-    env.obs = env._compute_observations()
     _, _, _, infos = env.step({})
-
     true_task = [0,2,4]
     self._check_result(env, test_preds, infos, true_task)
 
@@ -636,9 +593,7 @@ class TestBasePredicate(unittest.TestCase):
     players = env.realm.players
     env.realm.event_log.record(EventCode.EAT_FOOD, players[1])
     env.realm.event_log.record(EventCode.GIVE_GOLD, players[2])
-    env.obs = env._compute_observations()
     _, _, _, infos = env.step({})
-
     true_task = [0,3]
     self._check_result(env, test_preds, infos, true_task)
 
@@ -663,7 +618,6 @@ class TestBasePredicate(unittest.TestCase):
                                combat_style = Skill.Melee,
                                damage=1)
 
-    env.obs = env._compute_observations()
     _, _, _, infos = env.step({})
 
     true_task = [1]
@@ -679,7 +633,6 @@ class TestBasePredicate(unittest.TestCase):
                                combat_style = Skill.Melee,
                                damage=1)
 
-    env.obs = env._compute_observations()
     _, _, _, infos = env.step({})
 
     true_task = [0,1]
@@ -765,34 +718,24 @@ class TestBasePredicate(unittest.TestCase):
       # True case: split the required items between 3 and 5
       for player in (1,3):
         for _ in range(quantity // 2 + 1):
-          env.realm.event_log.record(id_,
-                                players[player],
-                                price=1,
-                                item=true_item(env.realm,
-                                               lvl+random.randint(0,3)))
+          env.realm.event_log.record(id_, players[player], price=1,
+                                     item=true_item(env.realm, lvl+random.randint(0,3)))
 
       # False case 1: Quantity
       for _ in range(quantity-1):
-        env.realm.event_log.record(id_,
-                              players[2],
-                              price=1,
-                              item=true_item(env.realm, lvl))
+        env.realm.event_log.record(id_, players[2], price=1,
+                                   item=true_item(env.realm, lvl))
 
       # False case 2: Type
       for _ in range(quantity+1):
-        env.realm.event_log.record(id_,
-                              players[4],
-                              price=1,
-                              item=false_item(env.realm, lvl))
+        env.realm.event_log.record(id_, players[4], price=1,
+                                   item=false_item(env.realm, lvl))
 
       # False case 3: Level
       for _ in range(quantity+1):
-        env.realm.event_log.record(id_,
-                              players[4],
-                              price=1,
-                              item=true_item(env.realm,
-                                              random.randint(0,lvl-1)))
-      env.obs = env._compute_observations()
+        env.realm.event_log.record(id_, players[4], price=1,
+                                   item=true_item(env.realm, random.randint(0,lvl-1)))
+
       _, _, _, infos = env.step({})
       true_task = [0]
       self._check_result(env, test_preds, infos, true_task)

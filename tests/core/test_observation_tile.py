@@ -38,9 +38,10 @@ class TestObservationTile(unittest.TestCase):
     self.assertEqual(len(Action.Token.edges), self.config.COMMUNICATION_NUM_TOKENS)
 
   def test_obs_tile_correctness(self):
-    obs = self.env._compute_observations()
     center = self.config.PLAYER_VISION_RADIUS
     tile_dim = self.config.PLAYER_VISION_DIAMETER
+    self.env._compute_observations()
+    obs = self.env.obs
 
     # pylint: disable=inconsistent-return-statements
     def correct_tile(agent_obs: Observation, r_delta, c_delta):
@@ -74,8 +75,6 @@ class TestObservationTile(unittest.TestCase):
                               number=1000, globals=globals()))
     print('implemented:', timeit(lambda: agent_obs.tile(*d.delta),
                                 number=1000, globals=globals()))
-    print('simplified:', timeit(lambda: agent_obs.tile_mat(*d.delta),
-                                number=1000, globals=globals()))
 
   def test_env_visible_tiles_correctness(self):
     def correct_visible_tile(realm, agent_id):
@@ -97,7 +96,8 @@ class TestObservationTile(unittest.TestCase):
     # get tile map, to bypass the expensive tile window query
     tile_map = TileState.Query.get_map(self.env.realm.datastore, self.config.MAP_SIZE)
 
-    obs = self.env._compute_observations()
+    self.env._compute_observations()
+    obs = self.env.obs
     for agent_id in self.env.realm.players:
       self.assertTrue(np.array_equal(correct_visible_tile(self.env.realm, agent_id),
                                      obs[agent_id].tiles))
@@ -122,7 +122,8 @@ class TestObservationTile(unittest.TestCase):
           np.abs(entities[:,EntityAttr["col"]] - agent_col)
         ) <= attack_range
 
-    obs = self.env._compute_observations()
+    self.env._compute_observations()
+    obs = self.env.obs
     attack_range = self.config.COMBAT_MELEE_REACH
 
     for agent_obs in obs.values():
