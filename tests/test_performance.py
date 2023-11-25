@@ -121,6 +121,7 @@ def set_seed_test():
   conf.set("IMMORTAL", True)
   conf.set("NPC_N", 128)
   conf.set("USE_CYTHON", True)
+  conf.set("PROVIDE_DEATH_FOG_OBS", True)
 
   env = nmmo.Env(conf)
   env.reset(seed=random_seed)

@@ -248,7 +248,7 @@ class Env(ParallelEnv):
     # Tile map placeholder, to reduce redudunt obs computation
     self.tile_map = Tile.Query.get_map(self.realm.datastore, self.config.MAP_SIZE)
     if self.config.PROVIDE_DEATH_FOG_OBS:
-      fog_map = np.round(self.realm.fog_map)[:,:,np.newaxis]
+      fog_map = np.round(self.realm.fog_map)[:,:,np.newaxis].astype(np.int16)
       self.tile_map = np.concatenate((self.tile_map, fog_map), axis=-1)
     self.tile_obs_shape = (self.config.PLAYER_VISION_DIAMETER**2, self.tile_map.shape[-1])
 
@@ -424,7 +424,7 @@ class Env(ParallelEnv):
 
     # Store the observations, since actions reference them
     self._compute_observations()
-    gym_obs = {a: o.to_gym() for a,o in self.obs.items()}
+    gym_obs = {a: self.obs[a].to_gym() for a in self.agents}
 
     rewards, infos = self._compute_rewards()
 

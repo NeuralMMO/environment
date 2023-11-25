@@ -1,6 +1,7 @@
 # pylint: disable=no-member,c-extension-no-member
 from functools import lru_cache
 from copy import deepcopy
+from types import MappingProxyType
 
 import numpy as np
 
@@ -94,8 +95,9 @@ class GymObs:
                                            dtype=np.int16)
     return gym_obs
 
-  def set_values(self, key, values):
-    self.values[key][:values.shape[0]] = values
+  def set_arr_values(self, key, values):
+    obs_shape = self.values[key].shape
+    self.values[key][:values.shape[0], :] = values[:, :obs_shape[1]]
 
 class ActionTargets:
   keys = ["Move", "Attack", "Use", "Give", "Destroy", "Sell", "Buy", "GiveGold", "Comm"]
@@ -269,20 +271,22 @@ class Observation:
   def to_gym(self):
     '''Convert the observation to a format that can be used by OpenAI Gym'''
     if self.return_dummy_obs:
-      return self.empty_obs
+      return MappingProxyType(self.empty_obs)  # NOTE: read-only
     self.gym_obs.clear()
     # NOTE: assume that all len(self.tiles) == self.config.MAP_N_OBS
-    self.gym_obs.set_values('Tile', self.tiles)
-    self.gym_obs.set_values('Entity', self.entities.values)
+    self.gym_obs.set_arr_values('Tile', self.tiles)
+    self.gym_obs.set_arr_values('Entity', self.entities.values)
     if self.config.ITEM_SYSTEM_ENABLED:
-      self.gym_obs.set_values('Inventory', self.inventory.values)
+      self.gym_obs.set_arr_values('Inventory', self.inventory.values)
     if self.config.EXCHANGE_SYSTEM_ENABLED:
-      self.gym_obs.set_values('Market', self.market.values)
+      self.gym_obs.set_arr_values('Market', self.market.values)
     if self.config.COMMUNICATION_SYSTEM_ENABLED:
-      self.gym_obs.set_values('Communication', self.comm.values)
+      self.gym_obs.set_arr_values('Communication', self.comm.values)
     if self.config.PROVIDE_ACTION_TARGETS:
       self.gym_obs.values["ActionTargets"] = self._make_action_targets()
-    return self.gym_obs.values
+
+    # Making the gym obs read-only
+    return MappingProxyType(self.gym_obs.values)
 
   def _make_action_targets(self):
     self.action_targets.clear()
