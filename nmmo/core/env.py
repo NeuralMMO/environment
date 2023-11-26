@@ -521,14 +521,20 @@ class Env(ParallelEnv):
   def _update_comm_obs(self):
     if not self.config.COMMUNICATION_SYSTEM_ENABLED:
       return
+    comm_obs = Entity.Query.comm_obs(self.realm.datastore)
+    agent_ids = comm_obs[:, Entity.State.attr_name_to_col['id']]
     self._comm_obs.clear()
     for agent_id in self.realm.players:
       if agent_id not in self._comm_obs:
-        task_mates = [agent_id] if agent_id not in self.agent_task_map \
+        my_team = [agent_id] if agent_id not in self.agent_task_map \
           else self.agent_task_map[agent_id][0].assignee  # NOTE: first task only
-        comm_obs = Entity.Query.comm_obs(self.realm.datastore, task_mates)
-        for eid in task_mates:
-          self._comm_obs[eid] = comm_obs
+        team_obs = [comm_obs[agent_ids == eid] for eid in my_team]
+        if len(team_obs) == 1:
+          team_obs = team_obs[0]
+        else:
+          team_obs = np.concatenate(team_obs, axis=0)
+        for eid in my_team:
+          self._comm_obs[eid] = team_obs
 
   def _compute_rewards(self):
     '''Computes the reward for the specified agent

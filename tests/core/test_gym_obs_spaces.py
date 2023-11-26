@@ -1,8 +1,11 @@
 import unittest
 from copy import deepcopy
+import numpy as np
 
 import nmmo
 from nmmo.core.game_api import DefaultGame
+
+RANDOM_SEED = np.random.randint(0, 100000)
 
 
 class TestGymObsSpaces(unittest.TestCase):
@@ -36,7 +39,6 @@ class TestGymObsSpaces(unittest.TestCase):
     env.reset(seed=1)
     for _ in range(3):
       env.step({})
-
     self._test_gym_obs_space(env)
 
   def test_env_with_noop(self):
@@ -46,7 +48,6 @@ class TestGymObsSpaces(unittest.TestCase):
     env.reset(seed=1)
     for _ in range(3):
       env.step({})
-
     self._test_gym_obs_space(env)
 
   def test_env_with_fogmap(self):
@@ -56,7 +57,6 @@ class TestGymObsSpaces(unittest.TestCase):
     env.reset(seed=1)
     for _ in range(3):
       env.step({})
-
     self._test_gym_obs_space(env)
 
   def test_system_disable(self):
@@ -80,7 +80,7 @@ class TestGymObsSpaces(unittest.TestCase):
 
     # test the custom game
     game = CustomGame(env)
-    env.reset(game=game)
+    env.reset(game=game, seed=RANDOM_SEED)
     for _ in range(3):
       env.step({})
     new_obs = self._test_gym_obs_space(env)
@@ -91,8 +91,8 @@ class TestGymObsSpaces(unittest.TestCase):
     # check if the combat system is disabled
     for agent_obs in new_obs.values():
       self.assertEqual(sum(agent_obs["ActionTargets"]["Attack"]["Target"]),
-                       int(config.PROVIDE_NOOP_ACTION_TARGET))
-
+                        int(config.PROVIDE_NOOP_ACTION_TARGET),
+                        f"Incorrect gym obs. seed: {RANDOM_SEED}")
 
 if __name__ == "__main__":
   unittest.main()

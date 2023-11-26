@@ -1,10 +1,11 @@
 # pylint: disable=protected-access
 import unittest
+import numpy as np
 import nmmo
 from nmmo import minigames as mg
 from nmmo.lib import team_helper
 
-TEST_HORIZON = 30
+TEST_HORIZON = 10
 
 
 class TestMinigames(unittest.TestCase):
@@ -17,6 +18,14 @@ class TestMinigames(unittest.TestCase):
       game = game_cls(env)
       env.reset(game=game)
       game.test(env, TEST_HORIZON)
+
+      # Check if the gym_obs is correctly set, on alive agents
+      for agent_id in env.realm.players:
+        gym_obs = env.obs[agent_id].to_gym()
+        self.assertEqual(gym_obs["AgentId"], agent_id)
+        self.assertEqual(gym_obs["CurrentTick"], env.realm.tick)
+        self.assertTrue(
+          np.array_equal(gym_obs["Task"], env.agent_task_map[agent_id][0].embedding))
 
 if __name__ == "__main__":
   unittest.main()

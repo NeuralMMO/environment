@@ -94,7 +94,7 @@ EntityState.Limits = lambda config: {
 
 EntityState.State.comm_attr_map = {name: EntityState.State.attr_name_to_col[name]
                                    for name in ["id", "row", "col", "message"]}
-CommAttr = list(EntityState.State.comm_attr_map.values())
+CommAttr = np.array(list(EntityState.State.comm_attr_map.values()), dtype=np.int64)
 
 EntityState.Query = SimpleNamespace(
   # Whole table
@@ -113,11 +113,11 @@ EntityState.Query = SimpleNamespace(
   window=lambda ds, r, c, radius: ds.table("Entity").window(
     EntityState.State.attr_name_to_col["row"],
     EntityState.State.attr_name_to_col["col"],
-    r, c, radius, EntityState.State.attr_name_to_col["id"]),
+    r, c, radius),
 
   # Communication obs
-  comm_obs=lambda ds, ids: ds.table("Entity").where_in(
-    EntityState.State.attr_name_to_col["id"], ids)[:,CommAttr],
+  comm_obs=lambda ds: ds.table("Entity").where_gt(
+    EntityState.State.attr_name_to_col["id"], 0)[:, CommAttr]
 )
 
 

@@ -60,17 +60,27 @@ class InventoryObs(BasicObs):
     return idx[0] if len(idx) else None
 
 class GymObs:
-  keys = ["Task", "Tile", "Entity", "Inventory", "Market", "Communication"]
+  keys_to_clear = ["Tile", "Entity", "Inventory", "Market", "Communication"]
 
   def __init__(self, config, agent_id):
     self.config = config
     self.agent_id = agent_id
     self.values = self._make_empty_obs()
 
-  def clear(self):
-    self.values["CurrentTick"] = 0
-    for key in self.keys:
+  def reset(self, task_embedding=None):
+    self.clear()
+    self.values["Task"][:] = 0 if task_embedding is None else task_embedding
+
+  def clear(self, tick=None):
+    self.values["CurrentTick"] = tick or 0
+    for key in self.keys_to_clear:
       if key in self.values:
+        if key == "Inventory" and not self.config.ITEM_SYSTEM_ENABLED:
+          continue
+        if key == "Market" and not self.config.EXCHANGE_SYSTEM_ENABLED:
+          continue
+        if key == "Communication" and not self.config.COMMUNICATION_SYSTEM_ENABLED:
+          continue
         self.values[key][:] = 0
 
   def _make_empty_obs(self):
@@ -100,7 +110,6 @@ class GymObs:
     self.values[key][:values.shape[0], :] = values[:, :obs_shape[1]]
 
 class ActionTargets:
-  keys = ["Move", "Attack", "Use", "Give", "Destroy", "Sell", "Buy", "GiveGold", "Comm"]
   no_op_keys = ["Direction", "Target", "InventoryItem", "MarketItem"]
   all_ones = ["Style", "Price", "Token"]
 
@@ -111,17 +120,36 @@ class ActionTargets:
 
     self._no_op = 1 if config.original["PROVIDE_NOOP_ACTION_TARGET"] else 0
     self.values = self._make_empty_targets()
-    self.clear()  # to set the no-op option to 1, if needed
+    self.keys_to_clear = None
+    self.clear(reset=True)  # to set the no-op option to 1, if needed
 
-  def clear(self):
+  def _get_keys_to_clear(self):
+    keys = []
+    if self.config.COMBAT_SYSTEM_ENABLED:
+      keys.append("Attack")
+    if self.config.ITEM_SYSTEM_ENABLED:
+      keys.extend(["Use", "Give", "Destroy"])
+    if self.config.EXCHANGE_SYSTEM_ENABLED:
+      keys.extend(["Sell", "Buy", "GiveGold"])
+    if self.config.COMMUNICATION_SYSTEM_ENABLED:
+      keys.append("Comm")
+    return keys
+
+  def reset(self):
     if not self.config.original["PROVIDE_ACTION_TARGETS"]:
       return
-    for key in self.keys:
-      if key in self.values:
-        for sub_key in self.values[key]:
-          self.values[key][sub_key][:] = 1 if sub_key in self.all_ones else 0
+    self.keys_to_clear = self._get_keys_to_clear()
+    self.clear(reset=True)
+
+  def clear(self, reset=False):
+    if not self.config.original["PROVIDE_ACTION_TARGETS"]:
+      return
+    for key, mask in self.values.items():
+      if reset is True or key in self.keys_to_clear:
+        for sub_key in mask:
+          mask[sub_key][:] = 1 if sub_key in self.all_ones else 0
           if self._no_op > 0 and sub_key in self.no_op_keys:
-            self.values[key][sub_key][-1] = 1  # set the no-op option to 1
+            mask[sub_key][-1] = 1  # set the no-op option to 1
 
   def _make_empty_targets(self):
     masks = {}
@@ -158,7 +186,6 @@ class Observation:
     self.agent = None
 
     self.current_tick = None
-    self.task_embedding = None
     self._is_agent_dead = None
     self.habitable_tiles = None
     self.agent_in_combat = None
@@ -185,8 +212,9 @@ class Observation:
       if config.original["COMMUNICATION_SYSTEM_ENABLED"] else None
 
   def reset(self, habitable_tiles, task_embedding=None):
+    self.gym_obs.reset(task_embedding)
+    self.action_targets.reset()
     self.habitable_tiles = habitable_tiles
-    self.task_embedding = task_embedding
     self._is_agent_dead = False
     self.agent_in_combat = None
 
@@ -272,7 +300,7 @@ class Observation:
     '''Convert the observation to a format that can be used by OpenAI Gym'''
     if self.return_dummy_obs:
       return MappingProxyType(self.empty_obs)  # NOTE: read-only
-    self.gym_obs.clear()
+    self.gym_obs.clear(self.current_tick)
     # NOTE: assume that all len(self.tiles) == self.config.MAP_N_OBS
     self.gym_obs.set_arr_values('Tile', self.tiles)
     self.gym_obs.set_arr_values('Entity', self.entities.values)
@@ -292,15 +320,15 @@ class Observation:
     self.action_targets.clear()
     masks = self.action_targets.values
     self._make_move_mask(masks["Move"])
-    if self.config.original["COMBAT_SYSTEM_ENABLED"]:
+    if self.config.COMBAT_SYSTEM_ENABLED:
       # Test below. see tests/core/test_observation_tile.py, test_action_target_consts()
       # assert len(action.Style.edges) == 3
       self._make_attack_mask(masks["Attack"])
-    if self.config.original["ITEM_SYSTEM_ENABLED"]:
+    if self.config.ITEM_SYSTEM_ENABLED:
       self._make_use_mask(masks["Use"])
       self._make_destroy_item_mask(masks["Destroy"])
       self._make_give_mask(masks["Give"])
-    if self.config.original["EXCHANGE_SYSTEM_ENABLED"]:
+    if self.config.EXCHANGE_SYSTEM_ENABLED:
       self._make_sell_mask(masks["Sell"])
       self._make_give_gold_mask(masks["GiveGold"])
       self._make_buy_mask(masks["Buy"])
