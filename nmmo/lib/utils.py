@@ -103,6 +103,7 @@ def get_hash_embedding(func, embed_dim):
   # Convert the hexadecimal hash to a numpy array with float16 data type
   hash_bytes = bytes.fromhex(hex_digest)
   hash_array = np.frombuffer(hash_bytes, dtype=np.float16)
+  hash_array = np.nan_to_num(hash_array, nan=0, posinf=0, neginf=0)
   return np.resize(hash_array, (embed_dim,))
 
 def identify_closest_target(entity):

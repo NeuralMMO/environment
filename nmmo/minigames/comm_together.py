@@ -1,4 +1,5 @@
 # pylint: disable=duplicate-code, invalid-name
+import time
 from nmmo.core.game_api import TeamBattle
 from nmmo.task import task_spec
 from nmmo.task.base_predicates import AllMembersWithinRange
@@ -116,9 +117,9 @@ class CommTogether(TeamBattle):
     return 0.0
 
   @staticmethod
-  def test(env, horizon=30):
+  def test(env, horizon=30, seed=0):
     game = CommTogether(env)
-    env.reset(game=game)
+    env.reset(game=game, seed=seed)
 
     # Check configs
     config = env.config
@@ -128,8 +129,10 @@ class CommTogether(TeamBattle):
     assert config.ITEM_SYSTEM_ENABLED is False
     assert config.ALLOW_MOVE_INTO_OCCUPIED_TILE is False
 
+    start_time = time.time()
     for _ in range(horizon):
       env.step({})
+    print(f"Time taken: {time.time() - start_time:.3f} s")  # pylint: disable=bad-builtin
 
     # pylint: disable=protected-access
     # These should run without errors
@@ -151,9 +154,10 @@ if __name__ == "__main__":
   teams = team_helper.make_teams(test_config, num_teams=7)
   test_config.set("TEAMS", teams)
   test_env = nmmo.Env(test_config)
-  CommTogether.test(test_env)
+  CommTogether.test(test_env)  # 0.65 s
 
   # performance test
-  # from tests.testhelpers import profile_env_step
-  # tasks = task_spec.make_task_from_spec(teams, [seek_task(5)]*len(teams))
-  # profile_env_step(tasks=tasks)
+  from tests.testhelpers import profile_env_step
+  test_tasks = task_spec.make_task_from_spec(teams, [seek_task(5)]*len(teams))
+  profile_env_step(tasks=test_tasks)
+  # env._compute_rewards(): 0.27938533399719745

@@ -1,4 +1,5 @@
 # pylint: disable=duplicate-code, invalid-name
+import time
 from nmmo.core.game_api import TeamBattle
 from nmmo.task import task_spec
 from nmmo.task.base_predicates import DefeatEntity
@@ -154,9 +155,9 @@ class RadioRaid(TeamBattle):
     return 0.0
 
   @staticmethod
-  def test(env, horizon=30):
+  def test(env, horizon=30, seed=0):
     game = RadioRaid(env)
-    env.reset(game=game)
+    env.reset(game=game, seed=seed)
 
     # Check configs
     config = env.config
@@ -170,8 +171,10 @@ class RadioRaid(TeamBattle):
     assert config.NPC_SYSTEM_ENABLED is True
     assert config.NPC_DEFAULT_REFILL_DEAD_NPCS is False
 
+    start_time = time.time()
     for _ in range(horizon):
       env.step({})
+    print(f"Time taken: {time.time() - start_time:.3f} s")  # pylint: disable=bad-builtin
 
     # pylint: disable=protected-access
     # These should run without errors
@@ -189,4 +192,11 @@ if __name__ == "__main__":
   import nmmo
   test_config = nmmo.config.Default()  # Medium, AllGameSystems
   test_env = nmmo.Env(test_config)
-  RadioRaid.test(test_env)
+  RadioRaid.test(test_env)  # 0.60 s
+
+  # performance test
+  from tests.testhelpers import profile_env_step
+  test_tasks = task_spec.make_task_from_spec(test_config.TEAMS,
+                                             [hunt_task(30)]*len(test_config.TEAMS))
+  profile_env_step(tasks=test_tasks)
+  # env._compute_rewards(): 0.17201571099940338

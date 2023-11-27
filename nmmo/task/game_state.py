@@ -53,10 +53,9 @@ class GameState:
   # add helper functions below
   @functools.lru_cache
   def entity_or_none(self, ent_id):
-    flt_ent = self.entity_data[:, EntityAttr['id']] == ent_id
-    if np.any(flt_ent):
-      return EntityState.parse_array(self.entity_data[flt_ent][0])
-    return None
+    if ent_id not in self.entity_index:
+      return None
+    return EntityState.parse_array(self.entity_data[self.entity_index[ent_id]][0])
 
   def where_in_id(self, data_type, subject: Iterable[int]):
     k = (data_type, subject)
@@ -165,7 +164,7 @@ class TileView(ArrayView):
     super().__init__(TileAttr, 'tile', gs, subject, arr)
 
   def get_attribute(self, attr) -> np.ndarray:
-    return [o[:, self._mapping[attr]]for o in self._arr]
+    return [o[:, self._mapping[attr]] for o in self._arr]
 
 class EventCodeView(ArrayView):
   def __init__(self,

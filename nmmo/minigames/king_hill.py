@@ -1,4 +1,5 @@
 # pylint: disable=invalid-name, duplicate-code
+import time
 from nmmo.core.game_api import TeamBattle
 from nmmo.task import task_spec, base_predicates
 from nmmo.lib import utils, team_helper
@@ -98,9 +99,9 @@ class KingoftheHill(TeamBattle):
     return self._who_completed_task()
 
   @staticmethod
-  def test(env, horizon=30):
+  def test(env, horizon=30, seed=0):
     game = KingoftheHill(env)
-    env.reset(game=game)
+    env.reset(game=game, seed=seed)
 
     # Check configs
     config = env.config
@@ -112,8 +113,10 @@ class KingoftheHill(TeamBattle):
     assert config.DEATH_FOG_ONSET == 32
     assert env.realm.map.seize_targets == [(config.MAP_SIZE//2, config.MAP_SIZE//2)]
 
+    start_time = time.time()
     for _ in range(horizon):
       env.step({})
+    print(f"Time taken: {time.time() - start_time:.3f} s")  # pylint: disable=bad-builtin
 
     # Test if the difficulty increases
     org_seize_dur = game.seize_duration
@@ -127,4 +130,11 @@ if __name__ == "__main__":
   test_config = nmmo.config.Default()  # Medium, AllGameSystems
   test_config.set("TEAMS", team_helper.make_teams(test_config, num_teams=7))
   test_env = nmmo.Env(test_config)
-  KingoftheHill.test(test_env)
+  KingoftheHill.test(test_env)  # 0.59 s
+
+  # performance test
+  from tests.testhelpers import profile_env_step
+  teams = test_config.TEAMS
+  test_tasks = task_spec.make_task_from_spec(teams, [seize_task(30)]*len(teams))
+  profile_env_step(tasks=test_tasks)
+  # env._compute_rewards(): 0.24291237899888074

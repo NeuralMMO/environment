@@ -1,3 +1,4 @@
+import time
 from nmmo.core.game_api import TeamBattle
 from nmmo.task import task_spec
 from nmmo.task.base_predicates import SeizeCenter
@@ -153,9 +154,9 @@ class Sandwich(TeamBattle):
     return 0.0
 
   @staticmethod
-  def test(env, horizon=30):
+  def test(env, horizon=30, seed=0):
     game = Sandwich(env)
-    env.reset(game=game)
+    env.reset(game=game, seed=seed)
 
     # Check configs
     config = env.config
@@ -169,8 +170,10 @@ class Sandwich(TeamBattle):
     assert config.ALLOW_MOVE_INTO_OCCUPIED_TILE is False
     assert env.realm.map.seize_targets == [(config.MAP_SIZE//2, config.MAP_SIZE//2)]
 
+    start_time = time.time()
     for _ in range(horizon):
       env.step({})
+    print(f"Time taken: {time.time() - start_time:.3f} s")  # pylint: disable=bad-builtin
 
     # Test if the difficulty increases
     org_inner_npc_num = game.inner_npc_num
@@ -183,4 +186,11 @@ if __name__ == "__main__":
   import nmmo
   test_config = nmmo.config.Default()  # Medium, AllGameSystems
   test_env = nmmo.Env(test_config)
-  Sandwich.test(test_env)
+  Sandwich.test(test_env)  # 0.74 s
+
+  # performance test
+  from tests.testhelpers import profile_env_step
+  test_tasks = task_spec.make_task_from_spec(test_config.TEAMS,
+                                        [seize_task(30)]*len(test_config.TEAMS))
+  profile_env_step(tasks=test_tasks)
+  # env._compute_rewards(): 0.1768564050034911

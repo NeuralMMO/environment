@@ -1,23 +1,10 @@
 # pylint: disable=invalid-name, duplicate-code
+import time
 from nmmo.core.game_api import Game
 from nmmo.task import task_api
+from nmmo.task.base_predicates import ProgressTowardCenter
 from nmmo.lib import utils
 
-
-def ProgressTowardCenter(gs, subject):
-  if not any(subject.health > 0):  # subject should be alive
-    return 0.0
-
-  center = gs.config.MAP_SIZE // 2
-  max_dist = center - gs.config.MAP_BORDER
-
-  r = subject.row
-  c = subject.col
-  # distance to the center tile, so dist = 0 when subject is on the center tile
-  # NOTE: subject can be multiple agents (e.g., team), so taking the minimum
-  dists = min(utils.linf(list(zip(r,c)), (center, center)))
-
-  return 1.0 - dists/max_dist
 
 class RacetoCenter(Game):
   required_systems = ["TERRAIN", "RESOURCE"]
@@ -97,9 +84,9 @@ class RacetoCenter(Game):
     return self._who_completed_task()
 
   @staticmethod
-  def test(env, horizon=30):
+  def test(env, horizon=30, seed=0):
     game = RacetoCenter(env)
-    env.reset(game=game)
+    env.reset(game=game, seed=seed)
 
     # Check configs
     config = env.config
@@ -108,8 +95,10 @@ class RacetoCenter(Game):
     assert config.DEATH_FOG_ONSET == 32
     assert config.ALLOW_MOVE_INTO_OCCUPIED_TILE is False
 
+    start_time = time.time()
     for _ in range(horizon):
       env.step({})
+    print(f"Time taken: {time.time() - start_time:.3f} s")  # pylint: disable=bad-builtin
 
     # Test if the difficulty increases
     org_map_size = game.map_size
@@ -122,4 +111,10 @@ if __name__ == "__main__":
   import nmmo
   test_config = nmmo.config.Default()  # Medium, AllGameSystems
   test_env = nmmo.Env(test_config)
-  RacetoCenter.test(test_env)
+  RacetoCenter.test(test_env)  # 0.85 s
+
+  # performance test
+  from tests.testhelpers import profile_env_step
+  test_tasks = task_api.make_same_task(ProgressTowardCenter, test_env.possible_agents)
+  profile_env_step(tasks=test_tasks)
+  # env._compute_rewards(): 1.9577480710031523
