@@ -295,7 +295,7 @@ class Water(HarvestSkill):
     if not config.RESOURCE_SYSTEM_ENABLED:
       return
 
-    if config.IMMORTAL:
+    if config.IMMORTAL or self.entity.immortal:
       return
 
     depletion = config.RESOURCE_DEPLETION_RATE
@@ -317,7 +317,7 @@ class Food(HarvestSkill):
     if not config.RESOURCE_SYSTEM_ENABLED:
       return
 
-    if config.IMMORTAL:
+    if config.IMMORTAL or self.entity.immortal:
       return
 
     depletion = config.RESOURCE_DEPLETION_RATE

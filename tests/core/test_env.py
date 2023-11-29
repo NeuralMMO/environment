@@ -40,10 +40,8 @@ class TestEnv(unittest.TestCase):
 
   def test_observations(self):
     obs = self.env.reset()
-
     self.assertEqual(obs.keys(), self.env.realm.players.keys())
 
-    dead_agents = set()
     for _ in tqdm(range(TEST_HORIZON)):
       entity_locations = [
         [ev.row.val, ev.col.val, e] for e, ev in self.env.realm.players.entities.items()
@@ -72,18 +70,17 @@ class TestEnv(unittest.TestCase):
       # make sure dead agents return proper dones=True, dummy obs, and -1 reward
       self.assertEqual(len(self.env.agents),
                        len(self.env.realm.players) + len(self.env._dead_this_tick))
-      self.assertEqual(len(self.env.possible_agents),
-                       len(self.env.realm.players) + len(self.env._dead_agents))
+      # NOTE: the below is no longer true when mini games resurrect dead players
+      # self.assertEqual(len(self.env.possible_agents),
+      #                  len(self.env.realm.players) + len(self.env._dead_agents))
       for agent_id in self.env.agents:
         self.assertTrue(agent_id in obs)
         self.assertTrue(agent_id in rewards)
         self.assertTrue(agent_id in dones)
         self.assertTrue(agent_id in infos)
-      if len(self.env._dead_agents) > len(dead_agents):
-        for dead_id in self.env._dead_agents - dead_agents:
-          self.assertEqual(rewards[dead_id], -1)
-          self.assertTrue(dones[dead_id])
-          dead_agents.add(dead_id)
+      for dead_id in self.env._dead_this_tick:
+        self.assertEqual(rewards[dead_id], -1)
+        self.assertTrue(dones[dead_id])
 
       # check dead and alive
       entity_all = EntityState.Query.table(self.env.realm.datastore)

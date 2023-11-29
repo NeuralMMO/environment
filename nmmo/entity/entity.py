@@ -53,7 +53,7 @@ EntityState = SerializedState.subclass(
 EntityState.Limits = lambda config: {
   **{
     "id": (-math.inf, math.inf),
-    "npc_type": (0, 10),
+    "npc_type": (-1, 3),  # -1 for immortal
     "row": (0, config.MAP_SIZE-1),
     "col": (0, config.MAP_SIZE-1),
     "damage": (0, math.inf),

@@ -145,7 +145,7 @@ if __name__ == '__main__':
     pr.disable()
     s = io.StringIO()
     ps = pstats.Stats(pr,stream=s).sort_stats('tottime')
-    ps.print_stats()
+    ps.print_stats(100)
     f.write(s.getvalue())
 
 '''

@@ -13,7 +13,7 @@ def seek_task(within_dist):
     reward_to="team")
 
 class CommTogether(TeamBattle):
-  required_systems = ["TERRAIN", "COMBAT", "COMMUNICATION"]
+  _required_systems = ["TERRAIN", "COMMUNICATION"]
 
   def __init__(self, env, sampling_weight=None):
     super().__init__(env, sampling_weight)
@@ -32,6 +32,21 @@ class CommTogether(TeamBattle):
     # NOTE: This is a hacky way to get a hash embedding for a function
     # TODO: Can we get more meaningful embedding? coding LLMs are good but heavy
     self.task_embedding = utils.get_hash_embedding(seek_task, self.config.TASK_EMBED_DIM)
+
+  @property
+  def required_systems(self):
+    return self._required_systems
+
+  def set_combat_system(self, use_combat_system):
+    if use_combat_system and "COMBAT" not in self._required_systems:
+      self._required_systems.append("COMBAT")
+    if not use_combat_system and "COMBAT" in self._required_systems:
+      self._required_systems.remove("COMBAT")
+
+  @property
+  def _use_combat_system(self):
+    # Would adding the combat system make the game more interesting?
+    return "COMBAT" in self.required_systems
 
   @property
   def map_size(self):
@@ -66,16 +81,18 @@ class CommTogether(TeamBattle):
     self.config.set_for_episode("TERRAIN_RESET_TO_GRASS", self._grass_map)
     # NO death fog
     self.config.set_for_episode("DEATH_FOG_ONSET", None)
-    # Enable +1 hp per tick
-    self.config.set_for_episode("PLAYER_HEALTH_INCREMENT", True)
-    # Make the attacks weaker
-    self.config.set_for_episode("COMBAT_MELEE_DAMAGE", 5)
-    self.config.set_for_episode("COMBAT_RANGE_DAMAGE", 5)
-    self.config.set_for_episode("COMBAT_MAGE_DAMAGE", 5)
+    if self._use_combat_system:
+      # Enable +1 hp per tick
+      self.config.set_for_episode("PLAYER_HEALTH_INCREMENT", True)
+      # Make the attacks weaker
+      self.config.set_for_episode("COMBAT_MELEE_DAMAGE", 5)
+      self.config.set_for_episode("COMBAT_RANGE_DAMAGE", 5)
+      self.config.set_for_episode("COMBAT_MAGE_DAMAGE", 5)
 
     self._determine_difficulty()  # sets the map size
     self.config.set_for_episode("MAP_CENTER", self.map_size)
-    self.config.set_for_episode("COMBAT_SPAWN_IMMUNITY", self._spawn_immunity)
+    if self._use_combat_system:
+      self.config.set_for_episode("COMBAT_SPAWN_IMMUNITY", self._spawn_immunity)
 
   def _determine_difficulty(self):
     # Determine the difficulty (the map size) based on the previous results
@@ -86,7 +103,7 @@ class CommTogether(TeamBattle):
         self._map_size = min(self.map_size + self.step_size,
                              self.config.original["MAP_CENTER"])
         # Decrease the spawn immunity, to increase attack window
-        if self._spawn_immunity > self.history[-1]["winning_tick"]:
+        if self._use_combat_system and self._spawn_immunity > self.history[-1]["winning_tick"]:
           next_immunity = (self._spawn_immunity + self.history[-1]["winning_tick"]) / 2
           self._spawn_immunity = max(next_immunity, 64)  # 64 is the minimum
 
@@ -99,10 +116,11 @@ class CommTogether(TeamBattle):
     return task_spec.make_task_from_spec(self.teams, spec_list)
 
   def _process_dead_players(self, dones, dead_players):
-    # Respawn dead players at the edge
-    for player in dead_players.values():
-      player.resurrect(freeze_duration=30, health_prop=1, edge_spawn=False)
-      self.num_player_resurrect += 1
+    if self._use_combat_system:
+      # Respawn dead players at a random location
+      for player in dead_players.values():
+        player.resurrect(freeze_duration=30, health_prop=1, edge_spawn=False)
+        self.num_player_resurrect += 1
 
   def _check_winners(self, dones):
     # No winner game is possible
@@ -118,13 +136,14 @@ class CommTogether(TeamBattle):
 
   @staticmethod
   def test(env, horizon=30, seed=0):
+    # pylint: disable=protected-access
     game = CommTogether(env)
     env.reset(game=game, seed=seed)
 
     # Check configs
     config = env.config
     assert config.are_systems_enabled(game.required_systems)
-    assert config.COMBAT_SYSTEM_ENABLED is True
+    assert config.COMBAT_SYSTEM_ENABLED is game._use_combat_system  # default is false
     assert config.DEATH_FOG_ONSET is None
     assert config.ITEM_SYSTEM_ENABLED is False
     assert config.ALLOW_MOVE_INTO_OCCUPIED_TILE is False
@@ -134,7 +153,6 @@ class CommTogether(TeamBattle):
       env.step({})
     print(f"Time taken: {time.time() - start_time:.3f} s")  # pylint: disable=bad-builtin
 
-    # pylint: disable=protected-access
     # These should run without errors
     game.history.append({"result": False, "map_size": 0, "winning_tick": 512})
     game._determine_difficulty()
@@ -145,8 +163,18 @@ class CommTogether(TeamBattle):
     org_map_size = game.map_size
     for result in [False]*7 + [True]*game.num_game_won:
       game.history.append({"result": result, "map_size": game.map_size, "winning_tick": 128})
-      game._determine_difficulty()  # pylint: disable=protected-access
+      game._determine_difficulty()
     assert game.map_size == (org_map_size + game.step_size)
+
+    # Test combat system on/off
+    game.set_combat_system(True)
+    env.reset(game=game)
+    assert game.config.COMBAT_SYSTEM_ENABLED is True
+    assert game.config.COMBAT_MELEE_DAMAGE == 5
+
+    game.set_combat_system(False)
+    env.reset(game=game)
+    assert game.config.COMBAT_SYSTEM_ENABLED is False
 
 if __name__ == "__main__":
   import nmmo

@@ -46,7 +46,7 @@ def make_attack_mask(cnp.ndarray[cnp.int8_t] mask,
     if entities[idx, attr_id] == my_info["agent_id"]:
       continue
     # npc_type must be 0, 1, 2, 3
-    if entities[idx, attr_npc_type] > 3:
+    if entities[idx, attr_npc_type] < 0:  # immortal (-1)
       continue
     mask[idx] = 1
     num_valid_target += 1

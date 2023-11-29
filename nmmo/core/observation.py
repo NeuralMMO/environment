@@ -366,8 +366,8 @@ class Observation:
     targetable = self.entities.ids != self.agent.id
 
     # NOTE: this is a hack. Only target "normal" agents, which has npc_type of 0, 1, 2, 3
-    # For example, immortal "scout" agents has npc_type of 9
-    targetable &= self.entities.values[:,EntityState.State.attr_name_to_col["npc_type"]] < 9
+    # For example, immortal "scout" agents has npc_type of -1
+    targetable &= self.entities.values[:,EntityState.State.attr_name_to_col["npc_type"]] >= 0
 
     immunity = self.config.COMBAT_SPAWN_IMMUNITY
     if self.agent.time_alive < immunity:

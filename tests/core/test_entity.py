@@ -84,7 +84,8 @@ class TestEntity(unittest.TestCase):
     self.assertEqual(player1.health.val, 50)
     self.assertEqual(player1.freeze.val, 10)
     self.assertEqual(player1.message.val, 0)
-    self.assertEqual(player1.npc_type, 9)  # immortal flag
+    self.assertEqual(player1.npc_type, -1)  # immortal flag
+    self.assertEqual(player1.my_task.progress, 0)  # task progress should be reset
     # pylint:disable=protected-access
     self.assertEqual(player1._make_mortal_tick, env.realm.tick + 10)
 

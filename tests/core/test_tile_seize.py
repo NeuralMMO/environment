@@ -26,7 +26,7 @@ class MockEntity:
     self.ent_id = ent_id
     self.my_tasks = None
     if ent_id > 0:  # only for players
-      self.my_tasks = [MockTask(ent_id)]
+      self.my_task = MockTask(ent_id)
 
 class TestTileSeize(unittest.TestCase):
   # pylint: disable=no-member

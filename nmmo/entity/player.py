@@ -11,7 +11,7 @@ class Player(entity.Entity):
     self.agent    = agent
     self._immortal = realm.config.IMMORTAL
     self.resources.resilient = resilient
-    self.my_tasks = None
+    self.my_task = None
     self._make_mortal_tick = None  # set to realm.tick when the player is made mortal
 
     # Scripted hooks
@@ -55,7 +55,7 @@ class Player(entity.Entity):
   def _set_immortal(self, value=True, duration=None):
     self._immortal = value
     # NOTE: a hack to mark the player as immortal in action targets
-    self.npc_type.update(9 if value else 0)
+    self.npc_type.update(-1 if value else 0)
 
     if value and duration is not None:
       self._make_mortal_tick = self.realm.tick + duration
@@ -164,7 +164,7 @@ class Player(entity.Entity):
 
   def resurrect(self, health_prop=0.5, freeze_duration=10, edge_spawn=True):
     # Respawn dead players at the edge
-    assert self.alive is False, "Player is not dead"
+    assert not self.alive, "Player is not dead"
     self.status.freeze.update(freeze_duration)
     self.resources.health.update(self.config.PLAYER_BASE_HEALTH*health_prop)
     if self.config.RESOURCE_SYSTEM_ENABLED:
@@ -182,5 +182,7 @@ class Player(entity.Entity):
     self.set_pos(*new_spawn_pos)
     self.message.update(0)
     self.realm.players.spawn_entity(self)  # put back to the system
-
     self._set_immortal(duration=freeze_duration)
+    if self.my_task:
+      # NOTE: Only one task per agent is supported for now
+      self.my_task.reset()  # Agent's task progress need to be reset

@@ -119,7 +119,7 @@ class Tile(TileState):
     ent_id, entity = list(self.entities.items())[0]
     if ent_id < 0:  # not counting npcs
       return
-    team_members = entity.my_tasks[0].assignee  # NOTE: only one task per player
+    team_members = entity.my_task.assignee  # NOTE: only one task per player
     if self.seize_history and self.seize_history[-1][0] in team_members:
       # no need to add another entry if the last entry is from the same team (incl. self)
       return

@@ -17,6 +17,7 @@ class RacetoCenter(Game):
     self.adaptive_difficulty = True
     self.num_game_won = 1  # at the same map size, threshold to increase the difficulty
     self.step_size = 8
+    self.num_player_resurrect = 0
 
     # NOTE: This is a hacky way to get a hash embedding for a function
     # TODO: Can we get more meaningful embedding? coding LLMs are good but huge
@@ -39,6 +40,7 @@ class RacetoCenter(Game):
     map_dict["mark_center"] = True  # mark the center tile
     super().reset(np_random, map_dict)
     self.history[-1]["map_size"] = self.map_size
+    self.num_player_resurrect = 0
 
   def _set_config(self):
     self.config.reset()
@@ -52,10 +54,10 @@ class RacetoCenter(Game):
     self.config.set_for_episode("TERRAIN_SCATTER_EXTRA_RESOURCES", True)
 
     # Activate death fog
-    self.config.set_for_episode("DEATH_FOG_ONSET", 32)
-    self.config.set_for_episode("DEATH_FOG_SPEED", 1/6)
-    # Only the center tile is safe
-    self.config.set_for_episode("DEATH_FOG_FINAL_SIZE", 0)
+    self.config.set_for_episode("DEATH_FOG_ONSET", None)  # 32
+    # self.config.set_for_episode("DEATH_FOG_SPEED", 1/6)
+    # # Only the center tile is safe
+    # self.config.set_for_episode("DEATH_FOG_FINAL_SIZE", 0)
 
     self._determine_difficulty()  # sets the map_size
     self.config.set_for_episode("MAP_CENTER", self.map_size)
@@ -69,9 +71,19 @@ class RacetoCenter(Game):
         and self.map_size <= self.config.original["MAP_CENTER"] - self.step_size:
         self._map_size += self.step_size
 
+  def _set_realm(self, map_dict):
+    # NOTE: this game respawns dead players at the edge, so setting delete_dead_entity=False
+    self.realm.reset(self._np_random, map_dict, delete_dead_player=False)
+
   def _define_tasks(self):
     return task_api.make_same_task(ProgressTowardCenter, self.config.POSSIBLE_AGENTS,
                                    task_kwargs={"embedding": self.task_embedding})
+
+  def _process_dead_players(self, dones, dead_players):
+    # Respawn dead players at the edge
+    for player in dead_players.values():
+      player.resurrect(freeze_duration=10, health_prop=1, edge_spawn=True)
+      self.num_player_resurrect += 1
 
   @property
   def winning_score(self):
@@ -92,12 +104,11 @@ class RacetoCenter(Game):
     config = env.config
     assert config.are_systems_enabled(game.required_systems)
     assert config.COMBAT_SYSTEM_ENABLED is False
-    assert config.DEATH_FOG_ONSET == 32
     assert config.ALLOW_MOVE_INTO_OCCUPIED_TILE is False
 
     start_time = time.time()
     for _ in range(horizon):
-      env.step({})
+      _, r, d, _ = env.step({})
     print(f"Time taken: {time.time() - start_time:.3f} s")  # pylint: disable=bad-builtin
 
     # Test if the difficulty increases
@@ -106,6 +117,14 @@ class RacetoCenter(Game):
       game.history.append({"result": result, "map_size": game.map_size})
       game._determine_difficulty()  # pylint: disable=protected-access
     assert game.map_size == (org_map_size + game.step_size)
+
+    # Check if returns of resurrect/frozen players are correct
+    for agent_id, player in env._dead_this_tick.items():  # pylint: disable=protected-access
+      assert player.alive, "Resurrected players should be alive"
+      assert player.status.frozen, "Resurrected players should be frozen"
+      assert player.my_task.progress == 0, "Resurrected players should have 0 progress"
+      assert d[agent_id], "Resurrected players should be done = True"
+      assert r[agent_id] == -1, "Resurrected players should have -1 reward"
 
 if __name__ == "__main__":
   import nmmo

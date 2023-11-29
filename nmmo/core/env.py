@@ -303,7 +303,7 @@ class Env(ParallelEnv):
     if self.config.ALLOW_MULTI_TASKS_PER_AGENT is False:
       for agent_id, agent_tasks in self.agent_task_map.items():
         assert len(agent_tasks) == 1, "Only one task per agent is supported"
-        self.realm.players[agent_id].my_tasks = agent_tasks
+        self.realm.players[agent_id].my_task = agent_tasks[0]
 
   def step(self, actions: Dict[int, Dict[str, Dict[str, Any]]]):
     '''Simulates one game tick or timestep
@@ -415,11 +415,13 @@ class Env(ParallelEnv):
       if agent_id in self._dead_this_tick or \
         self.realm.tick >= self.config.HORIZON:
         self._dead_agents.add(agent_id)
+        # NOTE: Even though players can be resurrected, the time of death must be marked.
         dones[agent_id] = True
       else:
         dones[agent_id] = False
 
-    # Update the game stats, determine winners, if any
+    # Update the game stats, determine winners, etc.
+    # Also, resurrect dead agents and/or spawn new npcs if the game allows it
     self.game.update(dones, self._dead_this_tick, dead_npcs)
 
     # Store the observations, since actions reference them
@@ -573,7 +575,14 @@ class Env(ParallelEnv):
       else:
         task.close()  # To prevent memory leak
 
+    # Reward for frozen agents (recon, resurrected, frozen) is 0 because they cannot act
+    for agent_id, agent in self.realm.players.items():
+      if agent.status.frozen:
+        rewards[agent_id] = 0
+
     # Reward for dead agents is defined by the game
+    # NOTE: Resurrected agents are frozen and in the realm.players, so run through
+    # self._dead_this_tick to give out the dead reward
     if self.game.assign_dead_reward:
       for agent_id in self._dead_this_tick:
         rewards[agent_id] = -1
