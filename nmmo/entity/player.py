@@ -183,6 +183,7 @@ class Player(entity.Entity):
     self.message.update(0)
     self.realm.players.spawn_entity(self)  # put back to the system
     self._set_immortal(duration=freeze_duration)
-    if self.my_task:
+    if self.my_task and len(self.my_task.assignee) == 1:
       # NOTE: Only one task per agent is supported for now
-      self.my_task.reset()  # Agent's task progress need to be reset
+      # Agent's task progress need to be reset ONLY IF the task is an agent task
+      self.my_task.reset()

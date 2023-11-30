@@ -13,7 +13,6 @@ class RacetoCenter(Game):
     super().__init__(env, sampling_weight)
 
     self._map_size = 32  # determines the difficulty
-    self.score_scaler = 1.3
     self.adaptive_difficulty = True
     self.num_game_won = 1  # at the same map size, threshold to increase the difficulty
     self.step_size = 8
@@ -88,7 +87,8 @@ class RacetoCenter(Game):
   @property
   def winning_score(self):
     if self._winners:
-      return (self.map_size**self.score_scaler)/max(self.realm.tick, 1)
+      time_limit = self.config.HORIZON
+      return (time_limit - self.realm.tick) / time_limit  # speed bonus
     # No one reached the center
     return 0.0
 
