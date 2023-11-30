@@ -22,11 +22,11 @@ class Sandwich(TeamBattle):
     super().__init__(env, sampling_weight)
 
     self.map_size = 60
-    self._inner_npc_num = 2  # determines the difficulty
+    self._inner_npc_num = 4  # determines the difficulty
     self._outer_npc_num = None  # these npcs rally to the center
-    self.npc_step_size = 1
+    self.npc_step_size = 2
     self.adaptive_difficulty = True
-    self.num_game_won = 1  # at the same duration, threshold to increase the difficulty
+    self.num_game_won = 2  # at the same duration, threshold to increase the difficulty
     self.seize_duration = 30
     self._grass_map = False
 
@@ -80,10 +80,10 @@ class Sandwich(TeamBattle):
     self.config.set_for_episode("TERRAIN_RESET_TO_GRASS", self._grass_map)
     # Activate death fog from the onset
     self.config.set_for_episode("DEATH_FOG_ONSET", 1)
-    self.config.set_for_episode("DEATH_FOG_SPEED", 1/6)
-    self.config.set_for_episode("DEATH_FOG_FINAL_SIZE", 3)
+    self.config.set_for_episode("DEATH_FOG_SPEED", 1/8)
+    self.config.set_for_episode("DEATH_FOG_FINAL_SIZE", 6)
     # Enable +1 hp per tick
-    self.config.set_for_episode("PLAYER_HEALTH_INCREMENT", True)
+    self.config.set_for_episode("PLAYER_HEALTH_INCREMENT", 1)
     self._determine_difficulty()  # sets the seize duration
 
   def _determine_difficulty(self):
@@ -130,7 +130,7 @@ class Sandwich(TeamBattle):
 
   def _process_dead_npcs(self, dead_npcs):
     npc_manager = self.realm.npcs
-    target_num = min(self.realm.num_players, self.outer_npc_num) // 2
+    target_num = min(self.realm.num_players, self.inner_npc_num) // 2
     if len(npc_manager) < target_num:
       center = self.config.MAP_SIZE // 2
       offset = self.config.MAP_CENTER // 6

@@ -21,19 +21,19 @@ class RadioRaid(TeamBattle):
 
     self._goal_num_npc = 5  # determines the difficulty
     self.adaptive_difficulty = True
-    self.num_game_won = 1  # at the same map size, threshold to increase the difficulty
+    self.num_game_won = 2  # at the same map size, threshold to increase the difficulty
     self.step_size = 5
     self.quad_centers = None
     self._grass_map = False
 
     # npc danger: 0=all npc are passive, 1=all npc are aggressive
     self._npc_danger = 0  # increase by .1 per wave
-    self._danger_step_size = .1
+    self._danger_step_size = .15
     self.npc_wave_num = 10  # number of npc to spawn per wave
     self._last_wave_tick = 0
     self.npc_spawn_crit = 3
     self.npc_spawn_radius = 5
-    self.max_wave_interval = 40
+    self.max_wave_interval = 25
 
     # These will probably affect the difficulty
     self.map_size = 48
@@ -86,8 +86,8 @@ class RadioRaid(TeamBattle):
     self.config.set_for_episode("TERRAIN_RESET_TO_GRASS", self._grass_map)
     # NO death fog
     self.config.set_for_episode("DEATH_FOG_ONSET", None)
-    # Disable +1 hp per tick -- restore health by eat/drink
-    self.config.set_for_episode("PLAYER_HEALTH_INCREMENT", True)
+    # Enable +1 hp per tick -- restore health by eat/drink
+    self.config.set_for_episode("PLAYER_HEALTH_INCREMENT", 1)
     # Make NPCs more aggressive
     self.config.set_for_episode("NPC_SPAWN_NEUTRAL", 0.3)
     self.config.set_for_episode("NPC_SPAWN_AGGRESSIVE", 0.8)

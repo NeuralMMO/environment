@@ -13,17 +13,17 @@ def seek_task(within_dist):
     reward_to="team")
 
 class CommTogether(TeamBattle):
-  _required_systems = ["TERRAIN", "COMMUNICATION"]
+  _required_systems = ["TERRAIN", "COMMUNICATION", "COMBAT"]
 
   def __init__(self, env, sampling_weight=None):
     super().__init__(env, sampling_weight)
 
-    # NOTE: all members should fit in 5x5 square.
-    self.team_within_dist = 5  # gather all team members within this distance
+    # NOTE: all should fit in a 8x8 square, in which all can see each other
+    self.team_within_dist = 7  # gather all team members within this distance
 
-    self._map_size = 32  # determines the difficulty
-    self._spawn_immunity = 500  # so that agents can start to attack each other later
-    self.adaptive_difficulty = True
+    self._map_size = 128  # determines the difficulty
+    self._spawn_immunity = 128  # so that agents can attack each other later
+    self.adaptive_difficulty = False
     self.num_game_won = 1  # at the same map size, threshold to increase the difficulty
     self.step_size = 8
     self._grass_map = False
@@ -36,17 +36,6 @@ class CommTogether(TeamBattle):
   @property
   def required_systems(self):
     return self._required_systems
-
-  def set_combat_system(self, use_combat_system):
-    if use_combat_system and "COMBAT" not in self._required_systems:
-      self._required_systems.append("COMBAT")
-    if not use_combat_system and "COMBAT" in self._required_systems:
-      self._required_systems.remove("COMBAT")
-
-  @property
-  def _use_combat_system(self):
-    # Would adding the combat system make the game more interesting?
-    return "COMBAT" in self.required_systems
 
   @property
   def map_size(self):
@@ -81,18 +70,12 @@ class CommTogether(TeamBattle):
     self.config.set_for_episode("TERRAIN_RESET_TO_GRASS", self._grass_map)
     # NO death fog
     self.config.set_for_episode("DEATH_FOG_ONSET", None)
-    if self._use_combat_system:
-      # Enable +1 hp per tick
-      self.config.set_for_episode("PLAYER_HEALTH_INCREMENT", True)
-      # Make the attacks weaker
-      self.config.set_for_episode("COMBAT_MELEE_DAMAGE", 5)
-      self.config.set_for_episode("COMBAT_RANGE_DAMAGE", 5)
-      self.config.set_for_episode("COMBAT_MAGE_DAMAGE", 5)
+    # Enable +10 hp per tick, so that getting hit once doesn't damage the agent
+    self.config.set_for_episode("PLAYER_HEALTH_INCREMENT", 10)
 
     self._determine_difficulty()  # sets the map size
     self.config.set_for_episode("MAP_CENTER", self.map_size)
-    if self._use_combat_system:
-      self.config.set_for_episode("COMBAT_SPAWN_IMMUNITY", self._spawn_immunity)
+    self.config.set_for_episode("COMBAT_SPAWN_IMMUNITY", self._spawn_immunity)
 
   def _determine_difficulty(self):
     # Determine the difficulty (the map size) based on the previous results
@@ -102,10 +85,10 @@ class CommTogether(TeamBattle):
       if sum(last_results) >= self.num_game_won:
         self._map_size = min(self.map_size + self.step_size,
                              self.config.original["MAP_CENTER"])
-        # Decrease the spawn immunity, to increase attack window
-        if self._use_combat_system and self._spawn_immunity > self.history[-1]["winning_tick"]:
-          next_immunity = (self._spawn_immunity + self.history[-1]["winning_tick"]) / 2
-          self._spawn_immunity = max(next_immunity, 64)  # 64 is the minimum
+        # # Decrease the spawn immunity, to increase attack window
+        # if self._spawn_immunity > self.history[-1]["winning_tick"]:
+        #   next_immunity = (self._spawn_immunity + self.history[-1]["winning_tick"]) / 2
+        #   self._spawn_immunity = max(next_immunity, 64)  # 64 is the minimum
 
   def _set_realm(self, map_dict):
     # NOTE: this game respawns dead players at the edge, so setting delete_dead_entity=False
@@ -116,11 +99,10 @@ class CommTogether(TeamBattle):
     return task_spec.make_task_from_spec(self.teams, spec_list)
 
   def _process_dead_players(self, dones, dead_players):
-    if self._use_combat_system:
-      # Respawn dead players at a random location
-      for player in dead_players.values():
-        player.resurrect(freeze_duration=30, health_prop=1, edge_spawn=False)
-        self.num_player_resurrect += 1
+    # Respawn dead players at a random location
+    for player in dead_players.values():
+      player.resurrect(freeze_duration=30, health_prop=1, edge_spawn=False)
+      self.num_player_resurrect += 1
 
   def _check_winners(self, dones):
     # No winner game is possible
@@ -143,7 +125,6 @@ class CommTogether(TeamBattle):
     # Check configs
     config = env.config
     assert config.are_systems_enabled(game.required_systems)
-    assert config.COMBAT_SYSTEM_ENABLED is game._use_combat_system  # default is false
     assert config.DEATH_FOG_ONSET is None
     assert config.ITEM_SYSTEM_ENABLED is False
     assert config.ALLOW_MOVE_INTO_OCCUPIED_TILE is False
@@ -164,17 +145,8 @@ class CommTogether(TeamBattle):
     for result in [False]*7 + [True]*game.num_game_won:
       game.history.append({"result": result, "map_size": game.map_size, "winning_tick": 128})
       game._determine_difficulty()
-    assert game.map_size == (org_map_size + game.step_size)
-
-    # Test combat system on/off
-    game.set_combat_system(True)
-    env.reset(game=game)
-    assert game.config.COMBAT_SYSTEM_ENABLED is True
-    assert game.config.COMBAT_MELEE_DAMAGE == 5
-
-    game.set_combat_system(False)
-    env.reset(game=game)
-    assert game.config.COMBAT_SYSTEM_ENABLED is False
+    if game.adaptive_difficulty:
+      assert game.map_size == (org_map_size + game.step_size)
 
 if __name__ == "__main__":
   import nmmo

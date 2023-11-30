@@ -260,8 +260,8 @@ class Config(Template):
     '''Size of the square tile crop visible to an agent'''
     return 2*self.PLAYER_VISION_RADIUS + 1
 
-  PLAYER_HEALTH_INCREMENT      = False
-  '''Whether to increment health by 1 per tick for players, like npcs'''
+  PLAYER_HEALTH_INCREMENT      = 0
+  '''The amount to increment health by 1 per tick for players, like npcs'''
 
   DEATH_FOG_ONSET              = None
   '''How long before spawning death fog. None for no death fog'''
