@@ -29,6 +29,7 @@ class RadioRaid(TeamBattle):
     # npc danger: 0=all npc are passive, 1=all npc are aggressive
     self._npc_danger = 0  # increase by .1 per wave
     self._danger_step_size = .15
+    self._spawn_center_crit = 0.4  # if danger is less than crit, spawn at center
     self.npc_wave_num = 10  # number of npc to spawn per wave
     self._last_wave_tick = 0
     self.npc_spawn_crit = 3
@@ -127,7 +128,10 @@ class RadioRaid(TeamBattle):
     # If the gap is small, spawn in small batches
     if diff_player_npc >= 0 and (len(npc_manager) <= self.npc_spawn_crit or \
        self.realm.tick - self._last_wave_tick > self.max_wave_interval):
-      spawn_pos = self._np_random.choice(self.quad_centers)
+      if self._npc_danger < self._spawn_center_crit:
+        spawn_pos = self.realm.map.center_coord
+      else:
+        spawn_pos = self._np_random.choice(self.quad_centers)
       r_min, r_max = spawn_pos[0] - self.npc_spawn_radius, spawn_pos[0] + self.npc_spawn_radius
       c_min, c_max = spawn_pos[1] - self.npc_spawn_radius, spawn_pos[1] + self.npc_spawn_radius
       npc_manager.area_spawn(r_min, r_max, c_min, c_max, self.npc_wave_num,

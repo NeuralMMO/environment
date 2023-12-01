@@ -33,6 +33,10 @@ class Game(ABC):
     raise NotImplementedError
 
   @property
+  def name(self):
+    return self.__class__.__name__
+
+  @property
   def winners(self):
     return self._winners
 
