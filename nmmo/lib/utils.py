@@ -103,12 +103,13 @@ def get_hash_embedding(func, embed_dim):
   # Convert the hexadecimal hash to a numpy array with float16 data type
   hash_bytes = bytes.fromhex(hex_digest)
   hash_array = np.frombuffer(hash_bytes, dtype=np.float16)
-  hash_array = np.nan_to_num(hash_array, nan=0, posinf=0, neginf=0)
-  hash_array = np.resize(hash_array, (embed_dim,))
-  # normalize
-  hash_array -= hash_array.astype(np.float).mean()
-  hash_array /= hash_array.astype(np.float).std()
-  return hash_array
+  hash_array = np.nan_to_num(hash_array, nan=1, posinf=1, neginf=1)
+  hash_array = np.log(abs(hash_array.astype(float)))
+  hash_array -= hash_array.mean()
+  hash_array /= hash_array.std()
+  embedding = np.zeros(embed_dim, dtype=np.float16)
+  embedding[:len(hash_array)] = hash_array
+  return embedding
 
 def identify_closest_target(entity):
   realm = entity.realm
