@@ -45,6 +45,7 @@ setup(
     'pylint==2.16.0',
     'psutil==5.9.3',
     'tqdm<5',
+    'py==1.11.0',
     'dill==0.3.6',
   ],
   ext_modules = cythonize(["nmmo/lib/cython_helper.pyx"]),
