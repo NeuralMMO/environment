@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Callable
 from collections import defaultdict
 from copy import deepcopy
 
-import gym
+import gymnasium as gym
 import dill
 import numpy as np
 from pettingzoo.utils.env import AgentID, ParallelEnv
@@ -43,7 +43,8 @@ class Env(ParallelEnv):
     self.tile_obs_shape = None
 
     self.possible_agents = self.config.POSSIBLE_AGENTS
-    self._agents = None
+    self._alive_agents = None
+    self._current_agents = None
     self._dead_agents = set()
     self._dead_this_tick = None
     self.scripted_agents = set()
@@ -233,10 +234,11 @@ class Env(ParallelEnv):
           task.reset()
 
     # Reset the agent vars
-    self._agents = list(self.realm.players.keys())
+    self._alive_agents = self.possible_agents
     self._dead_agents.clear()
     self._dead_this_tick = {}
     self._map_task_to_agent()
+    self._current_agents = self.possible_agents  # tracking alive + dead_this_tick
 
     # Check scripted agents
     self.scripted_agents.clear()
@@ -253,14 +255,17 @@ class Env(ParallelEnv):
     self.tile_obs_shape = (self.config.PLAYER_VISION_DIAMETER**2, self.tile_map.shape[-1])
 
     # Reset the obs, game state generator
+    infos = {}
     for agent_id in self.possible_agents:
       # NOTE: the tasks for each agent is in self.agent_task_map, and task embeddings are
       #   available in each task instance, via task.embedding
       #   For now, each agent is assigned to a single task, so we just use the first task
       # TODO: can the embeddings of multiple tasks be superposed while preserving the
       #   task-specific information? This needs research
-      task_embedding = self.agent_task_map[agent_id][0].embedding \
-        if agent_id in self.agent_task_map else self._dummy_task_embedding
+      task_embedding = self._dummy_task_embedding
+      if agent_id in self.agent_task_map:
+        task_embedding = self.agent_task_map[agent_id][0].embedding
+        infos[agent_id] = {"task": self.agent_task_map[agent_id][0].name}
       self.obs[agent_id].reset(self.realm.map.habitable_tiles, task_embedding)
     self._compute_observations()
     self._gamestate_generator = GameStateGenerator(self.realm, self.config)
@@ -270,7 +275,7 @@ class Env(ParallelEnv):
 
     self._reset_required = False
 
-    return {a: o.to_gym() for a,o in self.obs.items()}
+    return {a: o.to_gym() for a,o in self.obs.items()}, infos
 
   def _load_map_file(self, map_id: int=None):
     '''Loads a map file, which is a 2D numpy array'''
@@ -407,31 +412,36 @@ class Env(ParallelEnv):
     actions = self._validate_actions(actions)
     # Execute actions
     self._dead_this_tick, dead_npcs = self.realm.step(actions)
-    # the list of "current" agents, both alive and dead_this_tick
-    self._agents = list(set(list(self.realm.players.keys()) + list(self._dead_this_tick.keys())))
+    self._alive_agents = list(self.realm.players.keys())
+    self._current_agents = list(set(self._alive_agents + list(self._dead_this_tick.keys())))
 
-    dones = {}
-    for agent_id in self.agents:
-      if agent_id in self._dead_this_tick or \
-        self.realm.tick >= self.config.HORIZON:
+    terminated = {}
+    truncated = {}
+    for agent_id in self._current_agents:
+      if agent_id in self._dead_this_tick:
         self._dead_agents.add(agent_id)
         # NOTE: Even though players can be resurrected, the time of death must be marked.
-        dones[agent_id] = True
+        terminated[agent_id] = True
       else:
-        dones[agent_id] = False
+        terminated[agent_id] = False
+
+      if self.realm.tick >= self.config.HORIZON:
+        truncated[agent_id] = agent_id not in self._dead_agents
+      else:
+        truncated[agent_id] = False
 
     # Update the game stats, determine winners, etc.
     # Also, resurrect dead agents and/or spawn new npcs if the game allows it
-    self.game.update(dones, self._dead_this_tick, dead_npcs)
+    self.game.update(terminated, self._dead_this_tick, dead_npcs)
 
     # Store the observations, since actions reference them
     self._compute_observations()
-    gym_obs = {a: self.obs[a].to_gym() for a in self.agents}
+    gym_obs = {a: self.obs[a].to_gym() for a in self._current_agents}
 
     rewards, infos = self._compute_rewards()
 
     # NOTE: all obs, rewards, dones, infos have data for each agent in self.agents
-    return gym_obs, rewards, dones, infos
+    return gym_obs, rewards, terminated, truncated, infos
 
   @property
   def dead_this_tick(self):
@@ -505,7 +515,7 @@ class Env(ParallelEnv):
     if self.config.PROVIDE_DEATH_FOG_OBS:
       self.tile_map[:, :, -1] = np.round(self.realm.fog_map)
 
-    for agent_id in self.agents:
+    for agent_id in self._current_agents:
       if agent_id not in self.realm.players:
         self.obs[agent_id].set_agent_dead()
       else:
@@ -554,7 +564,7 @@ class Env(ParallelEnv):
           entity identified by ent_id.
     '''
     # Initialization
-    agents = set(self.agents)
+    agents = set(self._current_agents)
     infos = {agent_id: {'task': {}} for agent_id in agents}
     rewards = defaultdict(int)
 
@@ -598,9 +608,8 @@ class Env(ParallelEnv):
 
   @property
   def agents(self) -> List[AgentID]:
-    '''For conformity with the PettingZoo API'''
-    # returns the list of "current" agents, both alive and dead_this_tick
-    return self._agents
+    '''For conformity with the PettingZoo API; retuning only the alive agents'''
+    return self._alive_agents
 
   def close(self):
     '''For conformity with the PettingZoo API only; rendering is external'''

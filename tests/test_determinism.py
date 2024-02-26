@@ -74,7 +74,7 @@ class TestDeterminism(unittest.TestCase):
     env2 = ScriptedAgentTestEnv(config2, seed=RANDOM_SEED)
     envs = [env1, env2]
 
-    init_obs = [env.reset(seed=RANDOM_SEED+1) for env in envs]
+    init_obs = [env.reset(seed=RANDOM_SEED+1)[0] for env in envs]
 
     self.assertTrue(observations_are_equal(init_obs[0], init_obs[0])) # sanity check
     self.assertTrue(observations_are_equal(init_obs[0], init_obs[1]),

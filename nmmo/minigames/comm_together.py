@@ -1,4 +1,4 @@
-# pylint: disable=duplicate-code, invalid-name
+# pylint: disable=duplicate-code, invalid-name, unused-argument
 import time
 from nmmo.core.game_api import TeamBattle
 from nmmo.task import task_spec
@@ -98,13 +98,13 @@ class CommTogether(TeamBattle):
     spec_list = [seek_task(self.team_within_dist)] * len(self.teams)
     return task_spec.make_task_from_spec(self.teams, spec_list)
 
-  def _process_dead_players(self, dones, dead_players):
+  def _process_dead_players(self, terminated, dead_players):
     # Respawn dead players at a random location
     for player in dead_players.values():
       player.resurrect(freeze_duration=30, health_prop=1, edge_spawn=False)
       self.num_player_resurrect += 1
 
-  def _check_winners(self, dones):
+  def _check_winners(self, terminated):
     # No winner game is possible
     return self._who_completed_task()
 

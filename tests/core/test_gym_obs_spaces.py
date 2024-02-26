@@ -17,7 +17,7 @@ class TestGymObsSpaces(unittest.TestCase):
 
   def _test_gym_obs_space(self, env):
     obs_spec = env.observation_space(1)
-    obs, _, _, _ = env.step({})
+    obs, _, _, _, _ = env.step({})
     self._is_obs_valid(obs_spec, obs)
     for agent_obs in obs.values():
       if "ActionTargets" in agent_obs:

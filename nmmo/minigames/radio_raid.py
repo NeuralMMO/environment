@@ -1,4 +1,4 @@
-# pylint: disable=duplicate-code, invalid-name
+# pylint: disable=duplicate-code, invalid-name, unused-argument
 import time
 from nmmo.core.game_api import TeamBattle
 from nmmo.task import task_spec
@@ -139,7 +139,7 @@ class RadioRaid(TeamBattle):
       self._npc_danger += min(self._danger_step_size, 1)  # max danger = 1
       self._last_wave_tick = self.realm.tick
 
-  def _check_winners(self, dones):
+  def _check_winners(self, terminated):
     # No winner game is possible
     return self._who_completed_task()
 

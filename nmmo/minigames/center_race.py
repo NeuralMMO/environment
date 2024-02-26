@@ -1,4 +1,4 @@
-# pylint: disable=invalid-name, duplicate-code
+# pylint: disable=invalid-name, duplicate-code, unused-argument
 import time
 from nmmo.core.game_api import Game
 from nmmo.task import task_api
@@ -78,7 +78,7 @@ class RacetoCenter(Game):
     return task_api.make_same_task(ProgressTowardCenter, self.config.POSSIBLE_AGENTS,
                                    task_kwargs={"embedding": self.task_embedding})
 
-  def _process_dead_players(self, dones, dead_players):
+  def _process_dead_players(self, terminated, dead_players):
     # Respawn dead players at the edge
     for player in dead_players.values():
       player.resurrect(freeze_duration=10, health_prop=1, edge_spawn=True)
@@ -92,7 +92,7 @@ class RacetoCenter(Game):
     # No one reached the center
     return 0.0
 
-  def _check_winners(self, dones):
+  def _check_winners(self, terminated):
     return self._who_completed_task()
 
   @staticmethod
@@ -108,7 +108,7 @@ class RacetoCenter(Game):
 
     start_time = time.time()
     for _ in range(horizon):
-      _, r, d, _ = env.step({})
+      _, r, terminated, _, _ = env.step({})
     print(f"Time taken: {time.time() - start_time:.3f} s")  # pylint: disable=bad-builtin
 
     # Test if the difficulty increases
@@ -123,7 +123,7 @@ class RacetoCenter(Game):
       assert player.alive, "Resurrected players should be alive"
       assert player.status.frozen, "Resurrected players should be frozen"
       assert player.my_task.progress == 0, "Resurrected players should have 0 progress"
-      assert d[agent_id], "Resurrected players should be done = True"
+      assert terminated[agent_id], "Resurrected players should be done = True"
       assert r[agent_id] == -1, "Resurrected players should have -1 reward"
 
 if __name__ == "__main__":

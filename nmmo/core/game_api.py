@@ -94,11 +94,11 @@ class Game(ABC):
     """Set the next task to be completed"""
     self._next_tasks = tasks
 
-  def update(self, dones, dead_players, dead_npcs):
+  def update(self, terminated, dead_players, dead_npcs):
     """Process dead players/npcs, update the game stats, winners, etc."""
-    self._process_dead_players(dones, dead_players)
+    self._process_dead_players(terminated, dead_players)
     self._process_dead_npcs(dead_npcs)
-    self._winners = self._check_winners(dones)
+    self._winners = self._check_winners(terminated)
     if self._winners and not self._game_done:
       self._game_done = self.history[-1]["result"] = True
       self.history[-1]["winners"] = self._winners
@@ -106,9 +106,9 @@ class Game(ABC):
       self.history[-1]["winning_tick"] = self.realm.tick
       self.history[-1].update(self.get_episode_stats())
 
-  def _process_dead_players(self, dones, dead_players):
-    for agent_id in dones:
-      if dones[agent_id]:
+  def _process_dead_players(self, terminated, dead_players):
+    for agent_id in terminated:
+      if terminated[agent_id]:
         agent = dead_players[agent_id] if agent_id in dead_players\
                                        else self.realm.players[agent_id]
         self._agent_stats[agent_id] = {"time_alive": self.realm.tick,
@@ -122,13 +122,16 @@ class Game(ABC):
       # refill npcs to target config.NPC_N, within config.NPC_SPAWN_ATTEMPTS
       self.realm.npcs.default_spawn()
 
-  def _check_winners(self, dones):
+  def _check_winners(self, terminated):
     # Determine winners for the default task
     if self.realm.num_players == 1:  # only one survivor
       return list(self.realm.players.keys())
-    if all(dones.values()) or self.realm.tick >= self.config.HORIZON:
-      # several agents died at the same time or reached the time limit
-      return list(dones.keys())
+    if all(terminated.values()):
+      # declare all winners when they died at the same time
+      return list(terminated.keys())
+    if self.realm.tick >= self.config.HORIZON:
+      # declare all survivors as winners when the time is up
+      return [agent_id for agent_id, done in terminated.items() if not done]
     return None
 
   @property
@@ -269,7 +272,7 @@ class TeamBattle(TeamGameTemplate):
     return task_spec.make_task_from_spec(self.config.TEAMS,
                                          [sampled_spec] * len(self.config.TEAMS))
 
-  def _check_winners(self, dones):
+  def _check_winners(self, terminated):
     # A team is won, when their task is completed first or only one team remains
     assert self.config.TEAMS is not None, "Team battle mode requires TEAMS to be defined"
     current_teams = {}

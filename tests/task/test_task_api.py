@@ -240,7 +240,7 @@ class TestTaskAPI(unittest.TestCase):
                        env.realm.players[1].pos)
 
     for tick in range(goal_tick+2):
-      _, rewards, _, infos = env.step({})
+      _, rewards, _, _, infos = env.step({})
 
       if tick < 10:
         target_reward = 1.0 if env.realm.tick == goal_tick else 1/goal_tick
@@ -304,7 +304,7 @@ class TestTaskAPI(unittest.TestCase):
 
     # tasks are all instantiated with the agent ids
     env.reset(make_task_fn=lambda: test_tasks)
-    _, _, _, infos = env.step({})
+    _, _, _, _, infos = env.step({})
 
     # agent 1: assigned only task 1, which is always True
     self.assertEqual(infos[1]["task"][env.tasks[0].name]["reward"], 1.0)

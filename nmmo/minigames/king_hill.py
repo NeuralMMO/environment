@@ -1,4 +1,4 @@
-# pylint: disable=invalid-name, duplicate-code
+# pylint: disable=invalid-name, duplicate-code, unused-argument
 import time
 from nmmo.core.game_api import TeamBattle
 from nmmo.task import task_spec, base_predicates
@@ -95,7 +95,7 @@ class KingoftheHill(TeamBattle):
     # No one succeeded
     return 0.0
 
-  def _check_winners(self, dones):
+  def _check_winners(self, terminated):
     return self._who_completed_task()
 
   @staticmethod

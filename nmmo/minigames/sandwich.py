@@ -141,7 +141,7 @@ class Sandwich(TeamBattle):
                              lambda r, c: npc_manager.spawn_npc(
                                r, c, name="NPC5", order={"rally": (center,center)}))
 
-  def _check_winners(self, dones):
+  def _check_winners(self, terminated):  # pylint: disable=unused-argument
     return self._who_completed_task()
 
   @property

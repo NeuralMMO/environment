@@ -1,15 +1,17 @@
-
+import unittest
+from pettingzoo.test import parallel_api_test
 
 import nmmo
 from scripted import baselines
 
-def test_pettingzoo_api():
-  config = nmmo.config.Default()
-  config.PLAYERS = [baselines.Random]
-  # ensv = nmmo.Env(config)
-  # TODO: disabled due to Env not implementing the correct PettinZoo step() API
-  # parallel_api_test(env, num_cycles=1000)
 
+class TestPettingZoo(unittest.TestCase):
+  def test_pettingzoo_api(self):
+    config = nmmo.config.Default()
+    config.set("PLAYERS", [baselines.Random])
+    config.set("HORIZON", 290)
+    env = nmmo.Env(config)
+    parallel_api_test(env, num_cycles=300)
 
-if __name__ == '__main__':
-  test_pettingzoo_api()
+if __name__ == "__main__":
+  unittest.main()
