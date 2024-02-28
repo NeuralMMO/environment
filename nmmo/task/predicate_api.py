@@ -51,7 +51,7 @@ class Predicate(ABC):
     if self.name in cache:
       progress = cache[self.name]
     else:
-      progress = max(min(self._evaluate(gs)*1.0,1.0),0.0)
+      progress = max(min(float(self._evaluate(gs)),1.0),0.0)
       cache[self.name] = progress
     return progress
 
@@ -163,7 +163,7 @@ def make_predicate(fn: Callable) -> Type[Predicate]:
       self._kwargs = kwargs
       self.name = self._make_name(fn.__name__, args, kwargs)
     def _evaluate(self, gs: GameState) -> float:
-      return fn(gs, *self._args, **self._kwargs)
+      return float(fn(gs, *self._args, **self._kwargs))
     def get_source_code(self):
       return inspect.getsource(fn).strip()
     def get_signature(self) -> List:

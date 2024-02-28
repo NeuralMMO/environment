@@ -87,7 +87,7 @@ class Task(ABC):
     if self.completed:
       return 0.0
 
-    new_progress = max(min(self._eval_fn(gs)*1.0,1.0),0.0)
+    new_progress = max(min(float(self._eval_fn(gs)),1.0),0.0)
     diff = new_progress - self._progress
     self._progress = new_progress
     if self._progress >= 1:
