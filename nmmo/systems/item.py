@@ -404,3 +404,11 @@ class Potion(Consumable):
     entity.poultice_consumed += 1
     entity.poultice_level_consumed = max(
       entity.poultice_level_consumed, self.level.val)
+
+# Item groupings
+ARMOR = [Hat, Top, Bottom]
+WEAPON = [Spear, Bow, Wand]
+TOOL = [Rod, Gloves, Pickaxe, Axe, Chisel]
+AMMUNITION = [Whetstone, Arrow, Runes]
+CONSUMABLE = [Ration, Potion]
+ALL_ITEM = ARMOR + WEAPON + TOOL + AMMUNITION + CONSUMABLE

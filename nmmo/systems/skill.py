@@ -402,3 +402,7 @@ class Alchemy(AmmunitionSkill):
 
   def update(self):
     self.harvest(material.Crystal)
+
+# Skill groupings
+COMBAT_SKILL = [Melee, Range, Mage]
+HARVEST_SKILL = [Fishing, Herbalism, Prospecting, Carving, Alchemy]

@@ -173,9 +173,8 @@ class Env(ParallelEnv):
   ############################################################################
   # Core API
 
-  # TODO: This doesn't conform to the PettingZoo API
-  # pylint: disable=arguments-renamed
-  def reset(self, map_id=None, seed=None, options=None,
+  def reset(self, seed=None, options=None,  # PettingZoo API args
+            map_id=None,
             make_task_fn: Callable=None,
             game: game_api.Game=None):
     '''OpenAI Gym API reset function
@@ -200,6 +199,12 @@ class Env(ParallelEnv):
         but finite horizon: ~1000 timesteps for small maps and
         5000+ timesteps for large maps
     '''
+    # If options are provided, override the kwargs
+    if options is not None:
+      map_id = options.get('map_id', None) or map_id
+      make_task_fn = options.get('make_task_fn', None) or make_task_fn
+      game = options.get('game', None) or game
+
     self.seed(seed)
     map_dict = self._load_map_file(map_id)
 

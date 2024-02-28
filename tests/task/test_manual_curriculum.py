@@ -4,9 +4,10 @@
 from typing import List
 
 import nmmo.lib.material as m
+import nmmo.systems.item as i
+import nmmo.systems.skill as s
 from nmmo.task.base_predicates import *
 from nmmo.task.task_api import OngoingTask
-from nmmo.task import constraint as c
 from nmmo.task.task_spec import TaskSpec, check_task_spec
 
 EVENT_NUMBER_GOAL = [3, 4, 5, 7, 9, 12, 15, 20, 30, 50]
@@ -17,11 +18,11 @@ LEVEL_GOAL = list(range(1, 10)) # TODO: get config
 AGENT_NUM_GOAL = [1, 2, 3, 4, 5] # competition team size: 8
 ITEM_NUM_GOAL = AGENT_NUM_GOAL
 TEAM_ITEM_GOAL = [1, 3, 5, 7, 10, 15, 20]
-SKILLS = c.combat_skills + c.harvest_skills
-COMBAT_STYLE = c.combat_skills
-ALL_ITEM = c.armour + c.weapons + c.tools + c.ammunition + c.consumables
-EQUIP_ITEM = c.armour + c.weapons + c.tools + c.ammunition
-HARVEST_ITEM = c.weapons + c.ammunition + c.consumables
+SKILLS = s.COMBAT_SKILL + s.HARVEST_SKILL
+COMBAT_STYLE = s.COMBAT_SKILL
+ALL_ITEM = i.ALL_ITEM
+EQUIP_ITEM = i.ARMOR + i.WEAPON + i.TOOL + i.AMMUNITION
+HARVEST_ITEM = i.WEAPON + i.AMMUNITION + i.CONSUMABLE
 
 task_spec: List[TaskSpec] = []
 
@@ -211,7 +212,7 @@ for item in EQUIP_ITEM:
                                   reward_to='team'))
 
 # consume items (ration, potion), evaluated based on the event log
-for item in c.consumables:
+for item in i.CONSUMABLE:
   for level in LEVEL_GOAL:
     # agent task
     for quantity in ITEM_NUM_GOAL:

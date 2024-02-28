@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, List, Optional, Tuple, Union, Iterable, Type, TYPE_CHECKING
+from typing import Callable, List, Optional, Union, Iterable, Type, TYPE_CHECKING
 from types import FunctionType
 from abc import ABC, abstractmethod
 import inspect
@@ -8,7 +8,6 @@ from numbers import Real
 from nmmo.core.config import Config
 from nmmo.task.group import Group, union
 from nmmo.task.game_state import GameState
-from nmmo.task.constraint import Constraint, GroupConstraint
 
 if TYPE_CHECKING:
   from nmmo.task.task_api import Task
@@ -22,7 +21,6 @@ class Predicate(ABC):
   def __init__(self,
                subject: Group,
                *args,
-               constraints: Optional[List[Tuple[str,Optional[Constraint]]]] = None,
                **kwargs):
     self.name = self._make_name(self.__class__.__name__, args, kwargs)
 
@@ -33,7 +31,6 @@ class Predicate(ABC):
 
     self._args = args
     self._kwargs = kwargs
-    self._constraints = constraints  # NOTE: not used
     self._config = None
     self._subject = subject
 
@@ -183,11 +180,8 @@ class PredicateOperator(Predicate):
     predicates = list(predicates)
     self._subject_argument = subject
     if subject is None:
-      try:
-        subject = union(*[p.subject
-                          for p in filter(lambda p: isinstance(p, Predicate), predicates)])
-      except AttributeError:
-        subject = GroupConstraint()
+      subject = union(*[p.subject
+                        for p in filter(lambda p: isinstance(p, Predicate), predicates)])
     super().__init__(subject, *predicates)
 
     for i, p in enumerate(predicates):
