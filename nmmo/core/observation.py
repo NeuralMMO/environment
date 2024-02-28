@@ -380,7 +380,7 @@ class Observation:
       ) <= self.config.COMBAT_MELEE_REACH
 
     attack_mask["Target"][:self.entities.len] = targetable & within_range
-    if np.any(attack_mask["Target"][:self.entities.len]):
+    if np.count_nonzero(attack_mask["Target"][:self.entities.len]):
       # Mask the no-op option, since there should be at least one allowed move
       # NOTE: this will make agents always attack if there is a valid target
       attack_mask["Target"][-1] = 0
