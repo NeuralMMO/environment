@@ -137,12 +137,12 @@ def set_seed_test_complex():
   profile_env_step(tasks=tasks)
 
 if __name__ == '__main__':
+  pr = cProfile.Profile()
+  pr.enable()
+  #set_seed_test_complex()
+  set_seed_test()
+  pr.disable()
   with open('profile.run','a', encoding="utf-8") as f:
-    pr = cProfile.Profile()
-    pr.enable()
-    #set_seed_test_complex()
-    set_seed_test()
-    pr.disable()
     s = io.StringIO()
     ps = pstats.Stats(pr,stream=s).sort_stats('tottime')
     ps.print_stats(100)

@@ -63,7 +63,7 @@ class NumpyTable(DataTable):
     self._data = data
 
   def is_empty(self) -> bool:
-    all_data_zero = np.sum(self._data)==0
+    all_data_zero = np.all(self._data == 0)
     # 0th row is reserved as padding, so # of free ids is _max_rows-1
     all_id_free = len(self._id_allocator.free) == self._max_rows-1
     return all_data_zero and all_id_free

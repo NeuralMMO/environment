@@ -123,7 +123,7 @@ class Terrain:
 
 def fractal_to_material(config, fractal, all_grass=False):
   size = config.MAP_SIZE
-  matl_map = np.zeros((size, size), dtype=object)
+  matl_map = np.zeros((size, size), dtype=np.int16)
   for y in range(size):
     for x in range(size):
       if all_grass:
@@ -156,23 +156,30 @@ def process_map_border(config, matl_map, l1=None):
   matl_map[edge & stone] = material.Foilage.index
   return matl_map
 
-def place_fish(tiles, mmin, mmax, np_random):
-  placed = False
-  allow = {Terrain.GRASS}
+def place_fish(tiles, mmin, mmax, np_random, num_fish):
+  placed = 0
 
+  # if USE_CYTHON:
+  #   water_loc = chp.tile_where(tiles, Terrain.WATER, mmin, mmax)
+  # else:
   water_loc = np.where(tiles == Terrain.WATER)
   water_loc = [(r, c) for r, c in zip(water_loc[0], water_loc[1])
-               if mmin < r < mmax and mmin < c < mmax]
+              if mmin < r < mmax and mmin < c < mmax]
+  if len(water_loc) < num_fish:
+    raise RuntimeError('Not enough water tiles to place fish.')
+
   np_random.shuffle(water_loc)
 
+  allow = {Terrain.GRASS}  # Fish should be placed adjacent to grass
   for r, c in water_loc:
     if tiles[r-1, c] in allow or tiles[r+1, c] in allow or \
        tiles[r, c-1] in allow or tiles[r, c+1] in allow:
       tiles[r, c] = Terrain.FISH
-      placed = True
+      placed += 1
+    if placed == num_fish:
       break
 
-  if not placed:
+  if placed < num_fish:
     raise RuntimeError('Could not find the water tile to place fish.')
 
 def uniform(config, tiles, mat, mmin, mmax, np_random):
@@ -220,7 +227,8 @@ def spawn_profession_resources(config, tiles, np_random=None):
 
   for _ in range(config.PROGRESSION_SPAWN_UNIFORMS):
     uniform(config, tiles, Terrain.HERB, mmin, mmax, np_random)
-    place_fish(tiles, mmin, mmax, np_random)
+  place_fish(tiles, mmin, mmax, np_random,
+             config.PROGRESSION_SPAWN_UNIFORMS)
 
 def try_add_tile(map_tiles, row, col, tile_to_add):
   if map_tiles[row, col] == Terrain.GRASS:

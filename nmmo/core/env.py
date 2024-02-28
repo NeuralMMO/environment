@@ -430,6 +430,9 @@ class Env(ParallelEnv):
       else:
         truncated[agent_id] = False
 
+    if self.realm.tick >= self.config.HORIZON:
+      self._alive_agents = []  # pettingzoo requires agents to be empty
+
     # Update the game stats, determine winners, etc.
     # Also, resurrect dead agents and/or spawn new npcs if the game allows it
     self.game.update(terminated, self._dead_this_tick, dead_npcs)

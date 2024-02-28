@@ -96,7 +96,7 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
 
     # teleport the npc -1 to agent 5's location
     change_spawn_pos(env.realm, -1, self.spawn_locs[5])
-    #env._compute_observations()
+    env._compute_observations()
 
     """ First tick actions """
     actions = {}

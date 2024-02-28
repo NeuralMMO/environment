@@ -36,7 +36,7 @@ class BasicObs:
 
   @property
   def len(self):
-    return len(self.ids)
+    return self.ids.shape[0]
 
   def id(self, i):
     return self.ids[i] if i < self.len else None
@@ -380,7 +380,7 @@ class Observation:
       ) <= self.config.COMBAT_MELEE_REACH
 
     attack_mask["Target"][:self.entities.len] = targetable & within_range
-    if sum(attack_mask["Target"][:self.entities.len]) > 0:
+    if np.any(attack_mask["Target"][:self.entities.len]):
       # Mask the no-op option, since there should be at least one allowed move
       # NOTE: this will make agents always attack if there is a valid target
       attack_mask["Target"][-1] = 0
