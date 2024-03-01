@@ -697,13 +697,13 @@ class Exchange:
   EXCHANGE_BASE_GOLD                  = 1
   '''Initial gold amount'''
 
-  EXCHANGE_LISTING_DURATION           = 5
+  EXCHANGE_LISTING_DURATION           = 3
   '''The number of ticks, during which the item is listed for sale'''
 
-  MARKET_N_OBS = 1024
+  MARKET_N_OBS = 384  # this should be proportion to PLAYER_N
   '''Number of distinct item observations'''
 
-  PRICE_N_OBS = 99 # make it different from PLAYER_N_OBS
+  PRICE_N_OBS = 99  # make it different from PLAYER_N_OBS
   '''Number of distinct price observations
      This also determines the maximum price one can set for an item
   '''
