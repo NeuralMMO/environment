@@ -29,8 +29,8 @@ class NPCManager(EntityGroup):
       if len(self.entities) >= config.NPC_N:
         break
 
-      if self.spawn_dangers:
-        danger = self.spawn_dangers.pop()
+      if len(self.spawn_dangers) > 0:
+        danger = self.spawn_dangers.pop(0)  # FIFO
         r, c   = combat.spawn(config, danger, self._np_random)
       else:
         center = config.MAP_CENTER
