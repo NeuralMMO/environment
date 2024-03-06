@@ -469,7 +469,7 @@ class Combat:
   '''Minimum proportion of damage to inflict on a target'''
 
   # NOTE: When using a custom function, include "self" as the first arg
-  COMBAT_DAMAGE_FORMULA = original_combat_damage_formula
+  COMBAT_DAMAGE_FORMULA = alt_combat_damage_formula
   '''Damage formula'''
 
   COMBAT_MELEE_DAMAGE                = 10
@@ -512,7 +512,7 @@ class Progression:
   PROGRESSION_EXP_THRESHOLD         = default_exp_threshold(90, PROGRESSION_LEVEL_MAX)
   '''A list of experience thresholds for each level'''
 
-  PROGRESSION_COMBAT_XP_SCALE       = 3
+  PROGRESSION_COMBAT_XP_SCALE       = 6
   '''Additional XP for each attack for skills Melee, Range, and Mage'''
 
   PROGRESSION_AMMUNITION_XP_SCALE   = 15
@@ -521,19 +521,19 @@ class Progression:
   PROGRESSION_CONSUMABLE_XP_SCALE   = 30
   '''Multiplier XP for each harvest for Fishing and Herbalism'''
 
-  PROGRESSION_MELEE_BASE_DAMAGE     = 20
+  PROGRESSION_MELEE_BASE_DAMAGE     = 10
   '''Base Melee attack damage'''
 
   PROGRESSION_MELEE_LEVEL_DAMAGE    = 5
   '''Bonus Melee attack damage per level'''
 
-  PROGRESSION_RANGE_BASE_DAMAGE     = 20
+  PROGRESSION_RANGE_BASE_DAMAGE     = 10
   '''Base Range attack damage'''
 
   PROGRESSION_RANGE_LEVEL_DAMAGE    = 5
   '''Bonus Range attack damage per level'''
 
-  PROGRESSION_MAGE_BASE_DAMAGE      = 20
+  PROGRESSION_MAGE_BASE_DAMAGE      = 10
   '''Base Mage attack damage '''
 
   PROGRESSION_MAGE_LEVEL_DAMAGE     = 5
@@ -579,13 +579,13 @@ class NPC:
   NPC_BASE_DEFENSE                    = 0
   '''Base NPC defense'''
 
-  NPC_LEVEL_DEFENSE                   = 15
+  NPC_LEVEL_DEFENSE                   = 8
   '''Bonus NPC defense per level'''
 
-  NPC_BASE_DAMAGE                     = 15
+  NPC_BASE_DAMAGE                     = 0
   '''Base NPC damage'''
 
-  NPC_LEVEL_DAMAGE                    = 15
+  NPC_LEVEL_DAMAGE                    = 8
   '''Bonus NPC damage per level'''
 
   NPC_ALLOW_ATTACK_OTHER_NPCS         = False
@@ -622,19 +622,19 @@ class Equipment:
   WEAPON_DROP_PROB = 0.025
   '''Chance of getting a weapon while harvesting ammunition'''
 
-  EQUIPMENT_WEAPON_BASE_DAMAGE         = 15
+  EQUIPMENT_WEAPON_BASE_DAMAGE         = 5
   '''Base weapon damage'''
 
-  EQUIPMENT_WEAPON_LEVEL_DAMAGE        = 15
+  EQUIPMENT_WEAPON_LEVEL_DAMAGE        = 5
   '''Added weapon damage per level'''
 
-  EQUIPMENT_AMMUNITION_BASE_DAMAGE     = 15
+  EQUIPMENT_AMMUNITION_BASE_DAMAGE     = 5
   '''Base ammunition damage'''
 
-  EQUIPMENT_AMMUNITION_LEVEL_DAMAGE    = 15
+  EQUIPMENT_AMMUNITION_LEVEL_DAMAGE    = 10
   '''Added ammunition damage per level'''
 
-  EQUIPMENT_TOOL_BASE_DEFENSE          = 30
+  EQUIPMENT_TOOL_BASE_DEFENSE          = 15
   '''Base tool defense'''
 
   EQUIPMENT_TOOL_LEVEL_DEFENSE         = 0
@@ -643,7 +643,7 @@ class Equipment:
   EQUIPMENT_ARMOR_BASE_DEFENSE         = 0
   '''Base armor defense'''
 
-  EQUIPMENT_ARMOR_LEVEL_DEFENSE        = 10
+  EQUIPMENT_ARMOR_LEVEL_DEFENSE        = 3
   '''Base equipment defense'''
 
 

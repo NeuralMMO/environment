@@ -204,6 +204,7 @@ class ScriptedTestTemplate(unittest.TestCase):
 
     # items to provide
     cls.init_gold = 5
+    # TODO: there should not be level 0 items
     cls.item_level = [0, 3] # 0 can be used, 3 cannot be used
     cls.item_sig = {}
 
