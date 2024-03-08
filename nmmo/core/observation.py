@@ -1,8 +1,5 @@
 # pylint: disable=no-member,c-extension-no-member
 from functools import lru_cache
-from copy import deepcopy
-from types import MappingProxyType
-
 import numpy as np
 
 from nmmo.core.tile import TileState
@@ -109,6 +106,9 @@ class GymObs:
     obs_shape = self.values[key].shape
     self.values[key][:values.shape[0], :] = values[:, :obs_shape[1]]
 
+  def export(self):
+    return self.values.copy()  # shallow copy
+
 class ActionTargets:
   no_op_keys = ["Direction", "Target", "InventoryItem", "MarketItem"]
   all_ones = ["Style", "Price", "Token"]
@@ -190,10 +190,10 @@ class Observation:
     self.habitable_tiles = None
     self.agent_in_combat = None
     self.gym_obs = GymObs(config, agent_id)
-    self.empty_obs = deepcopy(self.gym_obs.values)
+    self.empty_obs = GymObs(config, agent_id).export()
     self.action_targets = ActionTargets(config)
     if self.config.original["PROVIDE_ACTION_TARGETS"]:
-      self.empty_obs["ActionTargets"] = deepcopy(self.action_targets.values)
+      self.empty_obs["ActionTargets"] = ActionTargets(config).values
 
     self.vision_radius = self.config.PLAYER_VISION_RADIUS
     self.vision_diameter = self.config.PLAYER_VISION_DIAMETER
@@ -299,7 +299,7 @@ class Observation:
   def to_gym(self):
     '''Convert the observation to a format that can be used by OpenAI Gym'''
     if self.return_dummy_obs:
-      return MappingProxyType(self.empty_obs)  # NOTE: read-only
+      return self.empty_obs
     self.gym_obs.clear(self.current_tick)
     # NOTE: assume that all len(self.tiles) == self.config.MAP_N_OBS
     self.gym_obs.set_arr_values('Tile', self.tiles)
@@ -310,11 +310,12 @@ class Observation:
       self.gym_obs.set_arr_values('Market', self.market.values)
     if self.config.COMMUNICATION_SYSTEM_ENABLED:
       self.gym_obs.set_arr_values('Communication', self.comm.values)
-    if self.config.PROVIDE_ACTION_TARGETS:
-      self.gym_obs.values["ActionTargets"] = self._make_action_targets()
+    gym_obs = self.gym_obs.export()
 
-    # Making the gym obs read-only
-    return MappingProxyType(self.gym_obs.values)
+    if self.config.PROVIDE_ACTION_TARGETS:
+      gym_obs["ActionTargets"] = self._make_action_targets()
+
+    return gym_obs
 
   def _make_action_targets(self):
     self.action_targets.clear()
