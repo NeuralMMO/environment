@@ -298,7 +298,7 @@ class Env(ParallelEnv):
   def _map_task_to_agent(self):
     self.agent_task_map.clear()
     for agent_id in self.agents:
-      self.realm.players[agent_id].my_tasks = None
+      self.realm.players[agent_id].my_task = None
     for task in self.tasks:
       if task.embedding is None:
         task.set_embedding(self._dummy_task_embedding)

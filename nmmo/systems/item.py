@@ -318,6 +318,7 @@ class Ammunition(Equipment, Stack):
       # delete this empty item instance from the datastore
       self.destroy()
 
+    self.realm.event_log.record(EventCode.FIRE_AMMO, entity, item=self)
     return self.damage
 
 class Whetstone(Ammunition):
