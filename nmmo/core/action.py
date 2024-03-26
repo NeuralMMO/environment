@@ -6,6 +6,7 @@ from nmmo.lib import utils
 from nmmo.lib.utils import staticproperty
 from nmmo.systems.item import Stack
 from nmmo.lib.event_code import EventCode
+from nmmo.core.observation import Observation
 
 
 class NodeType(Enum):
@@ -45,7 +46,7 @@ class Node(metaclass=utils.IterableNameComparable):
   def N(cls, config):
     return len(cls.edges)
 
-  def deserialize(realm, entity, index: int, obs):
+  def deserialize(realm, entity, index: int, obs: Observation):
     return index
 
 class Fixed:
@@ -176,7 +177,7 @@ def deserialize_fixed_arg(arg, index):
     val = min(index, len(arg.edges)-1)
     return arg.edges[val]
 
-  # if index is not int, it"s probably already deserialized
+  # if index is not int, it's probably already deserialized
   if index not in arg.edges:
     return None # so that the action will be discarded
   return index
@@ -247,7 +248,7 @@ class Attack(Node):
     if entity.ent_id == target.ent_id or not target.alive:
       return None
 
-    #Can"t attack out of range
+    #Can't attack out of range
     if utils.linf_single(entity.pos, target.pos) > style.attack_range(config):
       return None
 
@@ -260,9 +261,6 @@ class Attack(Node):
 
     from nmmo.systems import combat
     dmg = combat.attack(realm, entity, target, style.skill)
-
-    # if style.freeze and dmg > 0:
-    #   target.status.freeze.update(config.COMBAT_FREEZE_TIME)
 
     # record the combat tick for both entities
     # players and npcs both have latest_combat_tick in EntityState
@@ -287,7 +285,7 @@ class Target(Node):
   def N(cls, config):
     return config.PLAYER_N_OBS + cls.noop_action
 
-  def deserialize(realm, entity, index: int, obs):
+  def deserialize(realm, entity, index: int, obs: Observation):
     if index >= len(obs.entities.ids):
       return None
     return realm.entity_or_none(obs.entities.ids[index])
@@ -329,7 +327,7 @@ class InventoryItem(Node):
   def N(cls, config):
     return config.INVENTORY_N_OBS + cls.noop_action
 
-  def deserialize(realm, entity, index: int, obs):
+  def deserialize(realm, entity, index: int, obs: Observation):
     if index >= len(obs.inventory.ids):
       return None
     return realm.items.get(obs.inventory.ids[index])
@@ -508,7 +506,7 @@ class MarketItem(Node):
   def N(cls, config):
     return config.MARKET_N_OBS + cls.noop_action
 
-  def deserialize(realm, entity, index: int, obs):
+  def deserialize(realm, entity, index: int, obs: Observation):
     if index >= len(obs.market.ids):
       return None
     return realm.items.get(obs.market.ids[index])
