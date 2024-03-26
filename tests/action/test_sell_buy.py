@@ -10,7 +10,7 @@ from scripted import baselines
 
 RANDOM_SEED = 985
 
-LOGFILE = 'tests/action/test_sell_buy.log'
+LOGFILE = None  # 'tests/action/test_sell_buy.log'
 
 class TestSellBuy(ScriptedTestTemplate):
   # pylint: disable=protected-access,multiple-statements,unsubscriptable-object,no-member
@@ -20,17 +20,15 @@ class TestSellBuy(ScriptedTestTemplate):
     super().setUpClass()
 
     # config specific to the tests here
-    cls.config.PLAYERS = [baselines.Melee, baselines.Range]
-    cls.config.PLAYER_N = 6
+    cls.config.set("PLAYERS", [baselines.Melee, baselines.Range])
+    cls.config.set("PLAYER_N", 6)
 
     cls.policy = { 1:'Melee', 2:'Range', 3:'Melee', 4:'Range', 5:'Melee', 6:'Range' }
     cls.ammo = { 1:Item.Whetstone, 2:Item.Arrow, 3:Item.Whetstone,
                  4:Item.Arrow, 5:Item.Whetstone, 6:Item.Arrow }
 
-    cls.config.LOG_VERBOSE = False
-    if cls.config.LOG_VERBOSE:
+    if LOGFILE:  # for debugging
       logging.basicConfig(filename=LOGFILE, level=logging.INFO)
-
 
   def test_sell_buy(self):
     # cannot list an item with 0 price --> impossible to do this
@@ -48,8 +46,7 @@ class TestSellBuy(ScriptedTestTemplate):
       for item_sig in extra_items:
         self.item_sig[ent_id].append(item_sig)
         provide_item(env.realm, ent_id, item_sig[0], item_sig[1], 1)
-
-    env.obs = env._compute_observations()
+    env._compute_observations()
 
     # check if the inventory is full
     for ent_id in [1, 2]:

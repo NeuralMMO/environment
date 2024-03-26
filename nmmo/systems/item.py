@@ -7,7 +7,7 @@ from typing import Dict
 
 from nmmo.datastore.serialized import SerializedState
 from nmmo.lib.colors import Tier
-from nmmo.lib.log import EventCode
+from nmmo.lib.event_code import EventCode
 
 # pylint: disable=no-member
 ItemState = SerializedState.subclass("Item", [
@@ -35,7 +35,7 @@ ItemState = SerializedState.subclass("Item", [
 # TODO: These limits should be defined in the config.
 ItemState.Limits = lambda config: {
   "id": (0, math.inf),
-  "type_id": (0, (config.ITEM_N + 1) if config.ITEM_SYSTEM_ENABLED else 0),
+  "type_id": (0, 99),
   "owner_id": (-math.inf, math.inf),
   "level": (0, 99),
   "capacity": (0, 99),
@@ -111,6 +111,8 @@ class Item(ItemState):
   def destroy(self):
     # NOTE: we may want to track the item lifecycle and
     #   and see how many high-level items are wasted
+    if self.config.EXCHANGE_SYSTEM_ENABLED:
+      self.realm.exchange.unlist_item(self)
     if self.owner_id.val in self.realm.players:
       self.realm.players[self.owner_id.val].inventory.remove(self)
     self.realm.items.pop(self.id.val, None)
@@ -182,19 +184,6 @@ class Equipment(Item):
 
     self.equipped.update(1)
     equip_slot.equip(self)
-
-    if self.config.LOG_MILESTONES and entity.is_player and self.config.LOG_VERBOSE:
-      for (label, level) in [
-        (f"{self.__class__.__name__}_Level", self.level.val),
-        ("Item_Level", entity.equipment.item_level),
-        ("Melee_Attack", entity.equipment.melee_attack),
-        ("Range_Attack", entity.equipment.range_attack),
-        ("Mage_Attack", entity.equipment.mage_attack),
-        ("Melee_Defense", entity.equipment.melee_defense),
-        ("Range_Defense", entity.equipment.range_defense),
-        ("Mage_Defense", entity.equipment.mage_defense)]:
-
-        self.realm.log_milestone(label, level, f'EQUIPMENT: {label} {level}')
 
   def _slot(self, entity):
     raise NotImplementedError
@@ -382,14 +371,7 @@ class Consumable(Item):
     assert self.listed_price == 0, "Listed item cannot be used"
     assert self._level(entity) >= self.level.val, "Entity's level is not sufficient to use the item"
 
-    self.realm.log_milestone(
-      f'Consumed_{self.__class__.__name__}', self.level.val,
-      f"PROF: Consumed {self.level.val} {self.__class__.__name__} "
-      f"by Entity level {entity.attack_level}",
-      tags={"player_id": entity.ent_id})
-
     self.realm.event_log.record(EventCode.CONSUME_ITEM, entity, item=self)
-
     self._apply_effects(entity)
     entity.inventory.remove(self)
     self.destroy()
@@ -422,3 +404,11 @@ class Potion(Consumable):
     entity.poultice_consumed += 1
     entity.poultice_level_consumed = max(
       entity.poultice_level_consumed, self.level.val)
+
+# Item groupings
+ARMOR = [Hat, Top, Bottom]
+WEAPON = [Spear, Bow, Wand]
+TOOL = [Rod, Gloves, Pickaxe, Axe, Chisel]
+AMMUNITION = [Whetstone, Arrow, Runes]
+CONSUMABLE = [Ration, Potion]
+ALL_ITEM = ARMOR + WEAPON + TOOL + AMMUNITION + CONSUMABLE

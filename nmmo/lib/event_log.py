@@ -7,7 +7,7 @@ import numpy as np
 from nmmo.datastore.serialized import SerializedState
 from nmmo.entity import Entity
 from nmmo.systems.item import Item
-from nmmo.lib.log import EventCode
+from nmmo.lib.event_code import EventCode
 
 # pylint: disable=no-member
 EventState = SerializedState.subclass("Event", [
@@ -37,16 +37,16 @@ EventState.Query = SimpleNamespace(
 # defining col synoyms for different event types
 ATTACK_COL_MAP = {
   'combat_style': EventAttr['type'],
-  'damage': EventAttr['number'] }
-
+  'damage': EventAttr['number']}
 ITEM_COL_MAP = {
   'item_type': EventAttr['type'],
   'quantity': EventAttr['number'],
-  'price': EventAttr['gold'] }
-
-LEVEL_COL_MAP = { 'skill': EventAttr['type'] }
-
-EXPLORE_COL_MAP = { 'distance': EventAttr['number'] }
+  'price': EventAttr['gold'],
+  'item_id': EventAttr['target_ent']}
+LEVEL_COL_MAP = {'skill': EventAttr['type']}
+EXPLORE_COL_MAP = {'distance': EventAttr['number']}
+TILE_COL_MAP = {'tile_row': EventAttr['number'],
+                'tile_col': EventAttr['gold']}
 
 
 class EventLogger(EventCode):
@@ -67,6 +67,7 @@ class EventLogger(EventCode):
     self.attr_to_col.update(ITEM_COL_MAP)
     self.attr_to_col.update(LEVEL_COL_MAP)
     self.attr_to_col.update(EXPLORE_COL_MAP)
+    self.attr_to_col.update(TILE_COL_MAP)
 
   def reset(self):
     EventState.State.table(self.datastore).reset()
@@ -99,10 +100,12 @@ class EventLogger(EventCode):
     if event_code == EventCode.SCORE_HIT:
       # kwargs['combat_style'] should be Skill.CombatSkill
       if ('combat_style' in kwargs and kwargs['combat_style'].SKILL_ID in [1, 2, 3]) & \
+         ('target' in kwargs and isinstance(kwargs['target'], Entity)) & \
          ('damage' in kwargs and kwargs['damage'] >= 0):
         log = self._create_event(entity, event_code)
         log.type.update(kwargs['combat_style'].SKILL_ID)
         log.number.update(kwargs['damage'])
+        log.target_ent.update(kwargs['target'].ent_id)
         return
 
     if event_code == EventCode.PLAYER_KILL:
@@ -110,23 +113,37 @@ class EventLogger(EventCode):
         target = kwargs['target']
         log = self._create_event(entity, event_code)
         log.target_ent.update(target.ent_id)
-
-        # CHECK ME: attack_level or "general" level?? need to clarify
         log.level.update(target.attack_level)
         return
 
+    if event_code == EventCode.LOOT_ITEM:
+      if ('item' in kwargs and isinstance(kwargs['item'], Item)) & \
+         ('target' in kwargs and isinstance(kwargs['target'], Entity)):
+        item = kwargs['item']
+        log = self._create_event(entity, event_code)
+        log.type.update(item.ITEM_TYPE_ID)
+        log.level.update(item.level.val)
+        log.number.update(item.quantity.val)
+        log.target_ent.update(item.id.val)
+        return
+
+    if event_code == EventCode.LOOT_GOLD:
+      if ('amount' in kwargs and kwargs['amount'] > 0) & \
+         ('target' in kwargs and isinstance(kwargs['target'], Entity)):
+        log = self._create_event(entity, event_code)
+        log.gold.update(kwargs['amount'])
+        log.target_ent.update(kwargs['target'].ent_id)
+        return
+
     if event_code in [EventCode.CONSUME_ITEM, EventCode.HARVEST_ITEM, EventCode.EQUIP_ITEM,
-                      EventCode.LOOT_ITEM]:
-      # CHECK ME: item types should be checked. For example,
-      #   Only Ration and Potion can be consumed
-      #   Only Ration, Potion, Whetstone, Arrow, Runes can be produced
-      #   The quantity should be 1 for all of these events
+                      EventCode.FIRE_AMMO]:
       if ('item' in kwargs and isinstance(kwargs['item'], Item)):
         item = kwargs['item']
         log = self._create_event(entity, event_code)
         log.type.update(item.ITEM_TYPE_ID)
         log.level.update(item.level.val)
         log.number.update(item.quantity.val)
+        log.target_ent.update(item.id.val)
         return
 
     if event_code in [EventCode.LIST_ITEM, EventCode.BUY_ITEM]:
@@ -138,9 +155,9 @@ class EventLogger(EventCode):
         log.level.update(item.level.val)
         log.number.update(item.quantity.val)
         log.gold.update(kwargs['price'])
+        log.target_ent.update(item.id.val)
         return
 
-    # NOTE: do we want to separate the source of income? from selling vs looting
     if event_code == EventCode.EARN_GOLD:
       if ('amount' in kwargs and kwargs['amount'] > 0):
         log = self._create_event(entity, event_code)
@@ -156,18 +173,27 @@ class EventLogger(EventCode):
         log.level.update(kwargs['level'])
         return
 
+    if event_code == EventCode.SEIZE_TILE:
+      if ('tile' in kwargs and isinstance(kwargs['tile'], tuple)):
+        log = self._create_event(entity, event_code)
+        log.number.update(kwargs['tile'][0])  # row
+        log.gold.update(kwargs['tile'][1])  # col
+        return
+
     # If reached here, then something is wrong
     # CHECK ME: The below should be commented out after debugging
     raise ValueError(f"Event code: {event_code}", kwargs)
 
   def update(self):
-    curr_tick = self.realm.tick + 1  # update happens before the tick update
+    curr_tick = self.realm.tick
     if curr_tick > self._last_tick:
       self._data_by_tick[curr_tick] = EventState.Query.by_tick(self.datastore, curr_tick)
       self._last_tick = curr_tick
 
   def get_data(self, event_code=None, agents: List[int]=None, tick: int=None) -> np.ndarray:
     if tick is not None:
+      if tick == -1:
+        tick = self._last_tick
       if tick not in self._data_by_tick:
         return self._empty_data
       event_data = self._data_by_tick[tick]

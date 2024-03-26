@@ -1,7 +1,9 @@
+# pylint: disable=no-member
 # import time
 import cProfile
 import io
 import pstats
+from tqdm import tqdm
 
 import nmmo
 from nmmo.core.config import (NPC, AllGameSystems, Combat, Communication,
@@ -25,16 +27,16 @@ def create_config(base, *systems):
 
   conf                    = type(name, systems, {})()
 
-  conf.TERRAIN_TRAIN_MAPS = 1
-  conf.TERRAIN_EVAL_MAPS  = 1
-  conf.IMMORTAL = True
+  conf.set("TERRAIN_TRAIN_MAPS", 1)
+  conf.set("TERRAIN_EVAL_MAPS", 1)
+  conf.set("IMMORTAL", True)
 
   return conf
 
 def benchmark_config(benchmark, base, nent, *systems):
   conf = create_config(base, *systems)
-  conf.PLAYER_N = nent
-  conf.PLAYERS = [baselines.Random]
+  conf.set("PLAYER_N", nent)
+  conf.set("PLAYERS", [baselines.Random])
 
   env = nmmo.Env(conf)
   env.reset()
@@ -47,7 +49,7 @@ def test_small_env_creation(benchmark):
 
 def test_small_env_reset(benchmark):
   config = Small()
-  config.PLAYERS = [baselines.Random]
+  config.set("PLAYERS", [baselines.Random])
   env = nmmo.Env(config)
   benchmark(lambda: env.reset(map_id=1))
 
@@ -110,18 +112,24 @@ def test_fps_all_med_100_pop(benchmark):
 
 def set_seed_test():
   random_seed = 5000
-  conf = create_config(Medium, Terrain, Resource, Combat, NPC)
-  conf.PLAYER_N = 10
-  conf.PLAYERS = [baselines.Random]
+  # conf = create_config(Medium, Terrain, Resource, Combat, NPC, Communication)
+  # conf.set("PLAYER_N", 7)
+  # conf.set("PLAYERS", [baselines.Random])
+  conf = nmmo.config.Default()
+  conf.set("TERRAIN_TRAIN_MAPS", 1)
+  conf.set("TERRAIN_EVAL_MAPS", 1)
+  conf.set("IMMORTAL", True)
+  conf.set("NPC_N", 128)
+  conf.set("USE_CYTHON", True)
+  conf.set("PROVIDE_DEATH_FOG_OBS", True)
 
   env = nmmo.Env(conf)
-
   env.reset(seed=random_seed)
-  for _ in range(1024):
+  for _ in tqdm(range(1024)):
     env.step({})
 
 def set_seed_test_complex():
-  tasks = nmmo_default_task(range(128))
+  tasks = nmmo_default_task(range(1, 129))
   tasks += make_same_task(CountEvent, range(128),
                           pred_kwargs={'event': 'EAT_FOOD', 'N': 10})
   tasks += make_same_task(FullyArmed, range(128),
@@ -129,14 +137,15 @@ def set_seed_test_complex():
   profile_env_step(tasks=tasks)
 
 if __name__ == '__main__':
+  pr = cProfile.Profile()
+  pr.enable()
+  #set_seed_test_complex()
+  set_seed_test()
+  pr.disable()
   with open('profile.run','a', encoding="utf-8") as f:
-    pr = cProfile.Profile()
-    pr.enable()
-    set_seed_test_complex()
-    pr.disable()
     s = io.StringIO()
     ps = pstats.Stats(pr,stream=s).sort_stats('tottime')
-    ps.print_stats()
+    ps.print_stats(100)
     f.write(s.getvalue())
 
 '''

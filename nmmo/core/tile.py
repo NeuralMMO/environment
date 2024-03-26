@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
 from nmmo.datastore.serialized import SerializedState
-from nmmo.lib import material
+from nmmo.lib import material, event_code
 
 # pylint: disable=no-member,protected-access
 TileState = SerializedState.subclass(
@@ -40,9 +40,16 @@ class Tile(TileState):
     self.state = None
     self.material = None
     self.depleted = False
-    self.tex = None
-
     self.entities = {}
+    self.seize_history = []
+
+  @property
+  def occupied(self):
+    # NOTE: ONLY players consider whether the tile is occupied or not
+    # NPCs can move into occupied tiles.
+    # Surprisingly, this has huge effect on training, so be careful.
+    # Tried this -- "sum(1 for ent_id in self.entities if ent_id > 0) > 0"
+    return len(self.entities) > 0
 
   @property
   def repr(self):
@@ -64,16 +71,26 @@ class Tile(TileState):
   def void(self):
     return self.material == material.Void
 
+  @property
+  def tex(self):
+    return self.state.tex
+
   def reset(self, mat, config, np_random):
     self._np_random = np_random # reset the RNG
-    self.state = mat(config)
+    self.entities = {}
+    self.seize_history.clear()
     self.material = mat(config)
+    self._respawn()
+
+  def set_depleted(self):
+    self.depleted = True
+    self.state = self.material.deplete
     self.material_id.update(self.state.index)
 
+  def _respawn(self):
     self.depleted = False
-    self.tex = self.material.tex
-
-    self.entities = {}
+    self.state = self.material
+    self.material_id.update(self.state.index)
 
   def add_entity(self, ent):
     assert ent.ent_id not in self.entities
@@ -81,23 +98,31 @@ class Tile(TileState):
 
   def remove_entity(self, ent_id):
     assert ent_id in self.entities
-    del self.entities[ent_id]
+    self.entities.pop(ent_id)
 
   def step(self):
-    if not self.depleted or self._np_random.random() > self.material.respawn:
+    if not self.depleted or self.material.respawn == 0:
       return
-
-    self.depleted = False
-    self.state = self.material
-    self.material_id.update(self.state.index)
+    if self._np_random.random() < self.material.respawn:
+      self._respawn()
 
   def harvest(self, deplete):
     assert not self.depleted, f'{self.state} is depleted'
     assert self.state in material.Harvestable, f'{self.state} not harvestable'
-
     if deplete:
-      self.depleted = True
-      self.state = self.material.deplete(self.config)
-      self.material_id.update(self.state.index)
-
+      self.set_depleted()
     return self.material.harvest()
+
+  def update_seize(self):
+    if len(self.entities) != 1:  # only one entity can seize a tile
+      return
+    ent_id, entity = list(self.entities.items())[0]
+    if ent_id < 0:  # not counting npcs
+      return
+    team_members = entity.my_task.assignee  # NOTE: only one task per player
+    if self.seize_history and self.seize_history[-1][0] in team_members:
+      # no need to add another entry if the last entry is from the same team (incl. self)
+      return
+    self.seize_history.append((ent_id, self.realm.tick))
+    if self.realm.event_log:
+      self.realm.event_log.record(event_code.EventCode.SEIZE_TILE, entity, tile=self.pos)

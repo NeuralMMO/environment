@@ -1,14 +1,12 @@
-# CHECK ME: Should these be fixed as well?
 # pylint: disable=no-method-argument,unused-argument,no-self-argument,no-member
-
 from enum import Enum, auto
 import numpy as np
-from nmmo.core.observation import Observation
 
 from nmmo.lib import utils
 from nmmo.lib.utils import staticproperty
 from nmmo.systems.item import Stack
-from nmmo.lib.log import EventCode
+from nmmo.lib.event_code import EventCode
+from nmmo.core.observation import Observation
 
 
 class NodeType(Enum):
@@ -48,7 +46,7 @@ class Node(metaclass=utils.IterableNameComparable):
   def N(cls, config):
     return len(cls.edges)
 
-  def deserialize(realm, entity, index, obs: Observation):
+  def deserialize(realm, entity, index: int, obs: Observation):
     return index
 
 class Fixed:
@@ -76,7 +74,7 @@ class Action(Node):
       action.init(config)
       for args in action.edges: # pylint: disable=not-an-iterable
         args.init(config)
-        if not 'edges' in args.__dict__:
+        if not "edges" in args.__dict__:
           continue
         for arg in args.edges:
           arguments.append(arg)
@@ -92,7 +90,7 @@ class Action(Node):
   # pylint: disable=invalid-overridden-method
   @classmethod
   def edges(cls, config):
-    '''List of valid actions'''
+    """List of valid actions"""
     edges = [Move]
     if config.COMBAT_SYSTEM_ENABLED:
       edges.append(Attack)
@@ -124,12 +122,15 @@ class Move(Node):
        realm.map.tiles[r_new, c_new].impassible:
       return
 
+    # ALLOW_MOVE_INTO_OCCUPIED_TILE only applies to players, NOT npcs
+    if entity.is_player and not realm.config.ALLOW_MOVE_INTO_OCCUPIED_TILE and \
+       realm.map.tiles[r_new, c_new].occupied:
+      return
+
     if entity.status.freeze > 0:
       return
 
-    entity.row.update(r_new)
-    entity.col.update(c_new)
-
+    entity.set_pos(r_new, c_new)
     realm.map.tiles[r, c].remove_entity(ent_id)
     realm.map.tiles[r_new, c_new].add_entity(entity)
 
@@ -165,7 +166,7 @@ class Direction(Node):
   def edges():
     return [North, South, East, West, Stay]
 
-  def deserialize(realm, entity, index, obs: Observation):
+  def deserialize(realm, entity, index: int, obs):
     return deserialize_fixed_arg(Direction, index)
 
 # a quick helper function
@@ -243,8 +244,8 @@ class Attack(Node):
       target.history.time_alive < immunity:
       return None
 
-    #Check if self targeted
-    if entity.ent_id == target.ent_id:
+    #Check if self targeted or target already dead
+    if entity.ent_id == target.ent_id or not target.alive:
       return None
 
     #Can't attack out of range
@@ -253,16 +254,13 @@ class Attack(Node):
 
     #Execute attack
     entity.history.attack = {}
-    entity.history.attack['target'] = target.ent_id
-    entity.history.attack['style'] = style.__name__
+    entity.history.attack["target"] = target.ent_id
+    entity.history.attack["style"] = style.__name__
     target.attacker = entity
     target.attacker_id.update(entity.ent_id)
 
     from nmmo.systems import combat
     dmg = combat.attack(realm, entity, target, style.skill)
-
-    if style.freeze and dmg > 0:
-      target.status.freeze.update(config.COMBAT_FREEZE_TIME)
 
     # record the combat tick for both entities
     # players and npcs both have latest_combat_tick in EntityState
@@ -277,7 +275,7 @@ class Style(Node):
   def edges():
     return [Melee, Range, Mage]
 
-  def deserialize(realm, entity, index, obs: Observation):
+  def deserialize(realm, entity, index: int, obs):
     return deserialize_fixed_arg(Style, index)
 
 class Target(Node):
@@ -511,7 +509,6 @@ class MarketItem(Node):
   def deserialize(realm, entity, index: int, obs: Observation):
     if index >= len(obs.market.ids):
       return None
-
     return realm.items.get(obs.market.ids[index])
 
 class Buy(Node):
@@ -532,7 +529,7 @@ class Buy(Node):
     assert entity.alive, "Dead entity cannot act"
     assert entity.is_player, "Npcs cannot buy an item"
     assert item.quantity.val > 0, "Item quantity cannot be 0" # indicates item leak
-    assert item.equipped.val == 0, 'Listed item must not be equipped'
+    assert item.equipped.val == 0, "Listed item must not be equipped"
 
     if not realm.config.EXCHANGE_SYSTEM_ENABLED:
       return
@@ -601,8 +598,8 @@ class Sell(Node):
 def init_discrete(values):
   classes = []
   for i in values:
-    name = f'Discrete_{i}'
-    cls  = type(name, (object,), {'val': i})
+    name = f"Discrete_{i}"
+    cls  = type(name, (object,), {"val": i})
     classes.append(cls)
 
   return classes
@@ -628,7 +625,7 @@ class Price(Node):
   def edges():
     return Price.classes
 
-  def deserialize(realm, entity, index, obs: Observation):
+  def deserialize(realm, entity, index: int, obs):
     return deserialize_fixed_arg(Price, index)
 
 class Token(Node):
@@ -636,13 +633,13 @@ class Token(Node):
 
   @classmethod
   def init(cls, config):
-    Token.classes = init_discrete(range(config.COMMUNICATION_NUM_TOKENS))
+    Token.classes = init_discrete(range(1, config.COMMUNICATION_NUM_TOKENS+1))
 
   @staticproperty
   def edges():
     return Token.classes
 
-  def deserialize(realm, entity, index, obs: Observation):
+  def deserialize(realm, entity, index: int, obs):
     return deserialize_fixed_arg(Token, index)
 
 class Comm(Node):

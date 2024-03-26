@@ -1,19 +1,18 @@
 from __future__ import annotations
-
-import logging
 from collections import defaultdict
 from typing import Dict
+import numpy as np
 
 import nmmo
-from nmmo.core.log_helper import LogHelper
 from nmmo.core.map import Map
 from nmmo.core.tile import TileState
-from nmmo.core.action import Action, Buy
+from nmmo.core.action import Action, Buy, Comm
 from nmmo.entity.entity import EntityState
-from nmmo.entity.entity_manager import NPCManager, PlayerManager
+from nmmo.entity.entity_manager import PlayerManager
+from nmmo.entity.npc_manager import NPCManager
 from nmmo.datastore.numpy_datastore import NumpyDatastore
 from nmmo.systems.exchange import Exchange
-from nmmo.systems.item import Item, ItemState
+from nmmo.systems.item import ItemState
 from nmmo.lib.event_log import EventLogger, EventState
 from nmmo.render.replay_helper import ReplayHelper
 
@@ -37,22 +36,17 @@ class Realm:
 
     Action.hook(config)
 
-    # Generate maps if they do not exist
-    # NOTE: Map generation interferes with determinism.
-    #   To ensure determinism, provide seed to env.reset()
-    config.MAP_GENERATOR(config).generate_all_maps(self._np_random)
-
     self.datastore = NumpyDatastore()
     for s in [TileState, EntityState, ItemState, EventState]:
       self.datastore.register_object_type(s._name, s.State.num_attributes)
 
     self.tick = None # to use as a "reset" checker
-    self.exchange = None
 
     # Load the world file
     self.map = Map(config, self, self._np_random)
+    self.fog_map = np.zeros((config.MAP_SIZE, config.MAP_SIZE), dtype=np.float16)
 
-    self.log_helper = LogHelper.create(self)
+    # Event logger
     self.event_log = EventLogger(self)
 
     # Entity handlers
@@ -62,51 +56,50 @@ class Realm:
     # Global item registry
     self.items = {}
 
+    # Global item exchange
+    self.exchange = Exchange(self)
+
     # Replay helper
     self._replay_helper = None
 
     # Initialize actions
     nmmo.Action.init(config)
 
-  def reset(self, np_random, map_id: int = None):
-    """Reset the environment and load the specified map
-
-    Args:
-        idx: Map index to load
-    """
+  def reset(self, np_random, map_dict,
+            custom_spawn=False,
+            seize_targets=None,
+            delete_dead_player=True):
+    """Reset the sub-systems and load the provided map"""
     self._np_random = np_random
-    self.log_helper.reset()
-    self.event_log.reset()
-
-    map_id = map_id or self._np_random.integers(self.config.MAP_N) + 1
-    self.map.reset(map_id, self._np_random)
     self.tick = 0
+    self.update_fog_map(reset=True)
+    #self.event_log.reset()
+    self.items.clear()
+    self.exchange.reset()
+    if self._replay_helper is not None:
+      self._replay_helper.reset()
+
+    # Load the map np array into the map, tiles and reset
+    self.map.reset(map_dict, self._np_random, seize_targets)
 
     # EntityState and ItemState tables must be empty after players/npcs.reset()
-    self.players.reset(self._np_random)
+    self.players.reset(self._np_random, delete_dead_player)
     self.npcs.reset(self._np_random)
     assert EntityState.State.table(self.datastore).is_empty(), \
         "EntityState table is not empty"
-    # TODO: fix the item leak, then uncomment the below -- print out the table?
-    # assert ItemState.State.table(self.datastore).is_empty(), \
-    #     "ItemState table is not empty"
+    assert ItemState.State.table(self.datastore).is_empty(), \
+        "ItemState table is not empty"
 
     # DataStore id allocator must be reset to be deterministic
     EntityState.State.table(self.datastore).reset()
     ItemState.State.table(self.datastore).reset()
 
-    self.players.spawn()
-    self.npcs.spawn()
+    self.event_log.reset()  # reset this last for debugging
 
-    # Global item exchange
-    self.exchange = Exchange(self)
-
-    # Global item registry
-    Item.INSTANCE_ID = 0
-    self.items = {}
-
-    if self._replay_helper is not None:
-      self._replay_helper.reset()
+    if custom_spawn is False:
+      # NOTE: custom spawning npcs and agents can be done outside, after reset()
+      self.npcs.default_spawn()
+      self.players.spawn()
 
   def packet(self):
     """Client packet"""
@@ -122,7 +115,7 @@ class Realm:
 
   @property
   def num_players(self):
-    """Number of player agents"""
+    """Number of alive player agents"""
     return len(self.players.entities)
 
   def entity(self, ent_id):
@@ -150,7 +143,7 @@ class Realm:
         dead: List of dead agents
     """
     # Prioritize actions
-    npc_actions = self.npcs.actions(self)
+    npc_actions = self.npcs.actions()
     merged = defaultdict(list)
     prioritized(actions, merged)
     prioritized(npc_actions, merged)
@@ -179,36 +172,52 @@ class Realm:
       # ent_id, (atn, args) = merged[priority][0]
       for ent_id, (atn, args) in merged[priority]:
         ent = self.entity(ent_id)
-        if ent.alive:
+        if (ent.alive and not ent.status.frozen) or \
+           (ent.is_recon and priority == Comm.priority):  # recons can always comm
           atn.call(self, ent, *args)
-    dead = self.players.cull()
-    self.npcs.cull()
+    dead_players = self.players.cull()
+    dead_npcs = self.npcs.cull()
 
-    # Update map
+    self.tick += 1
+
+    # These require the updated tick
     self.map.step()
-    self.exchange.step(self.tick)
-    self.log_helper.update(dead)
+    self.update_fog_map()
+    self.exchange.step()
     self.event_log.update()
     if self._replay_helper is not None:
       self._replay_helper.update()
 
-    self.tick += 1
+    return dead_players, dead_npcs
 
-    return dead
+  def update_fog_map(self, reset=False):
+    fog_start_tick = self.config.DEATH_FOG_ONSET
+    if fog_start_tick is None:
+      return
 
-  def log_milestone(self, category: str, value: float, message: str = None, tags: Dict = None):
-    self.log_helper.log_milestone(category, value)
-    self.log_helper.log_event(category, value)
+    fog_speed = self.config.DEATH_FOG_SPEED
+    center = self.config.MAP_SIZE // 2
+    safe = self.config.DEATH_FOG_FINAL_SIZE
 
-    if self.config.LOG_VERBOSE:
-      # TODO: more general handling of tags, if necessary
-      if tags and 'player_id' in tags:
-        logging.info("Milestone (Player %d): %s %s %s", tags['player_id'], category, value, message)
-      else:
-        logging.info("Milestone: %s %s %s", category, value, message)
+    if reset:
+      dist = -self.config.MAP_BORDER
+      for i in range(center):
+        l, r = i, self.config.MAP_SIZE - i
+        # positive value represents the poison strength
+        # negative value represents the shortest distance to poison area
+        self.fog_map[l:r, l:r] = -dist
+        dist += 1
+      # mark the safe area
+      self.fog_map[center-safe:center+safe+1, center-safe:center+safe+1] = -self.config.MAP_SIZE
+      return
+
+    # consider the map border so that the fog can hit the border at fog_start_tick
+    if self.tick >= fog_start_tick:
+      self.fog_map += fog_speed
+      # mark the safe area
+      self.fog_map[center-safe:center+safe+1, center-safe:center+safe+1] = -self.config.MAP_SIZE
 
   def record_replay(self, replay_helper: ReplayHelper) -> ReplayHelper:
     self._replay_helper = replay_helper
     self._replay_helper.set_realm(self)
-
     return replay_helper

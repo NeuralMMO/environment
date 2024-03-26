@@ -9,7 +9,6 @@ from nmmo.task.predicate_api import make_predicate, Predicate
 from nmmo.task.task_api import Task, OngoingTask, HoldDurationTask
 from nmmo.task.task_spec import TaskSpec, make_task_from_spec
 from nmmo.task.group import Group
-from nmmo.task.constraint import ScalarConstraint
 from nmmo.task.base_predicates import (
     TickGE, AllMembersWithinRange, StayAlive, HoardGold
 )
@@ -137,14 +136,6 @@ class TestTaskAPI(unittest.TestCase):
       "(OR_(AND_(Success_(0,2))_(NOT_(OR_(Failure_(0,))_(Fake_(2,)_1_Hat_Melee))))_"+\
       "(SUB_(ADD_(MUL_(Failure_(0,))_(Fake_(2,)_1_Hat_Melee))_0.3)_0.4))")
 
-  def test_constraint(self):
-    mock_gs = MockGameState()
-    scalar = ScalarConstraint(low=-10,high=10)
-    for _ in range(10):
-      self.assertTrue(scalar.sample(mock_gs.config)<10)
-      self.assertTrue(scalar.sample(mock_gs.config)>=-10)
-
-
   def test_task_api_with_predicate(self):
     # pylint: disable=no-value-for-parameter,no-member
     fake_pred_cls = make_predicate(Fake)
@@ -218,8 +209,8 @@ class TestTaskAPI(unittest.TestCase):
     team_ids= list(teams.keys())
 
     config = ScriptedAgentTestConfig()
-    config.PLAYERS =[Sleeper]
-    config.IMMORTAL = True
+    config.set("PLAYERS", [Sleeper])
+    config.set("IMMORTAL", True)
 
     env = Env(config)
     env.reset(make_task_fn=lambda: make_task_from_spec(teams, [task_spec]))
@@ -249,7 +240,7 @@ class TestTaskAPI(unittest.TestCase):
                        env.realm.players[1].pos)
 
     for tick in range(goal_tick+2):
-      _, rewards, _, infos = env.step({})
+      _, rewards, _, _, infos = env.step({})
 
       if tick < 10:
         target_reward = 1.0 if env.realm.tick == goal_tick else 1/goal_tick
@@ -292,7 +283,7 @@ class TestTaskAPI(unittest.TestCase):
   def test_completed_tasks_in_info(self):
     # pylint: disable=no-value-for-parameter,no-member
     config = ScriptedAgentTestConfig()
-    config.ALLOW_MULTI_TASKS_PER_AGENT = True
+    config.set("ALLOW_MULTI_TASKS_PER_AGENT", True)
     env = Env(config)
 
     # make predicate class from function
@@ -313,7 +304,7 @@ class TestTaskAPI(unittest.TestCase):
 
     # tasks are all instantiated with the agent ids
     env.reset(make_task_fn=lambda: test_tasks)
-    _, _, _, infos = env.step({})
+    _, _, _, _, infos = env.step({})
 
     # agent 1: assigned only task 1, which is always True
     self.assertEqual(infos[1]["task"][env.tasks[0].name]["reward"], 1.0)

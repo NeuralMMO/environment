@@ -1,6 +1,8 @@
 from itertools import chain
 
 from setuptools import find_packages, setup
+from Cython.Build import cythonize
+import numpy as np
 
 REPO_URL = "https://github.com/neuralmmo/environment"
 
@@ -35,19 +37,19 @@ setup(
     'scipy==1.10.0',
     'pytest==7.3.0',
     'pytest-benchmark==3.4.1',
-    'autobahn==19.3.3',
-    'Twisted==19.2.0',
     'vec-noise==1.1.4',
     'imageio==2.23.0',
     'ordered-set==4.1.0',
-    'pettingzoo==1.19.0',
-    'gym==0.23.0',
+    'pettingzoo==1.24.1',
+    'gymnasium==0.29.1',
     'pylint==2.16.0',
-    'psutil==5.9.3',
-    'py==1.11.0',
+    'psutil<6',
     'tqdm<5',
-    'dill==0.3.6',
+    'py==1.11.0',
+    'dill<0.4',
   ],
+  ext_modules = cythonize(["nmmo/lib/cython_helper.pyx"]),
+  include_dirs=[np.get_include()],
   extras_require=extra,
   python_requires=">=3.7",
   license="MIT",

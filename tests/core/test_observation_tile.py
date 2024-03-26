@@ -38,13 +38,14 @@ class TestObservationTile(unittest.TestCase):
     self.assertEqual(len(Action.Token.edges), self.config.COMMUNICATION_NUM_TOKENS)
 
   def test_obs_tile_correctness(self):
-    obs = self.env._compute_observations()
     center = self.config.PLAYER_VISION_RADIUS
     tile_dim = self.config.PLAYER_VISION_DIAMETER
+    self.env._compute_observations()
+    obs = self.env.obs
 
     # pylint: disable=inconsistent-return-statements
     def correct_tile(agent_obs: Observation, r_delta, c_delta):
-      agent = agent_obs.agent()
+      agent = agent_obs.agent
       if (0 <= agent.row + r_delta < self.config.MAP_SIZE) & \
         (0 <= agent.col + c_delta < self.config.MAP_SIZE):
         r_cond = (agent_obs.tiles[:,TileState.State.attr_name_to_col["row"]] == agent.row+r_delta)
@@ -59,7 +60,7 @@ class TestObservationTile(unittest.TestCase):
       row_map = agent_obs.tiles[:,TileAttr['row']].reshape(tile_dim,tile_dim)
       col_map = agent_obs.tiles[:,TileAttr['col']].reshape(tile_dim,tile_dim)
       mat_map = agent_obs.tiles[:,TileAttr['material_id']].reshape(tile_dim,tile_dim)
-      agent = agent_obs.agent()
+      agent = agent_obs.agent
       self.assertEqual(agent.row, row_map[center,center])
       self.assertEqual(agent.col, col_map[center,center])
       self.assertEqual(agent_obs.tile(0,0).material_id, mat_map[center,center])
@@ -95,7 +96,8 @@ class TestObservationTile(unittest.TestCase):
     # get tile map, to bypass the expensive tile window query
     tile_map = TileState.Query.get_map(self.env.realm.datastore, self.config.MAP_SIZE)
 
-    obs = self.env._compute_observations()
+    self.env._compute_observations()
+    obs = self.env.obs
     for agent_id in self.env.realm.players:
       self.assertTrue(np.array_equal(correct_visible_tile(self.env.realm, agent_id),
                                      obs[agent_id].tiles))
@@ -120,12 +122,13 @@ class TestObservationTile(unittest.TestCase):
           np.abs(entities[:,EntityAttr["col"]] - agent_col)
         ) <= attack_range
 
-    obs = self.env._compute_observations()
+    self.env._compute_observations()
+    obs = self.env.obs
     attack_range = self.config.COMBAT_MELEE_REACH
 
     for agent_obs in obs.values():
       entities = agent_obs.entities.values
-      agent = agent_obs.agent()
+      agent = agent_obs.agent
       self.assertTrue(np.array_equal(
         correct_within_range(entities, attack_range, agent.row, agent.col),
         simple_within_range(entities, attack_range, agent.row, agent.col)))
@@ -179,37 +182,6 @@ class TestObservationTile(unittest.TestCase):
       lambda: where_in_1d_with_index(event_data, [1, 2, 3], event_index),
       number=1000, globals=globals()))
 
-  def test_habitable(self):
-    from nmmo.systems.ai.move import habitable as habitable_impl
-    realm_map = self.env.realm.map
-    realm_tiles= self.env.realm.map.tiles
-    ent = self.env.realm.npcs[-1]
-    np_random = self.env._np_random
-
-    def habitable_ref(tiles, ent, np_random):
-      r, c  = ent.pos
-      cands = []
-      if tiles[r-1, c].habitable:
-        cands.append(Action.North)
-      if tiles[r+1, c].habitable:
-        cands.append(Action.South)
-      if tiles[r, c-1].habitable:
-        cands.append(Action.West)
-      if tiles[r, c+1].habitable:
-        cands.append(Action.East)
-
-      if len(cands) == 0:
-        return Action.North
-
-      return np_random.choice(cands)
-
-    print('---test_habitable---')
-    print('reference:', timeit(
-      lambda: habitable_ref(realm_tiles, ent, np_random),
-      number=1000, globals=globals()))
-    print('habitable_impl:', timeit(
-      lambda: habitable_impl(realm_map, ent, np_random),
-      number=1000, globals=globals()))
 
 if __name__ == '__main__':
   unittest.main()

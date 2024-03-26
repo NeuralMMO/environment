@@ -32,8 +32,11 @@ class NumpyTable(DataTable):
   def where_neq(self, col: int, value):
     return self._data[self._data[:,col] != value]
 
+  def where_gt(self, col: int, value):
+    return self._data[self._data[:,col] > value]
+
   def where_in(self, col: int, values: List):
-    return self._data[np.isin(self._data[:,col], values)]
+    return self._data[np.in1d(self._data[:,col], values)]
 
   def window(self, row_idx: int, col_idx: int, row: int, col: int, radius: int):
     return self._data[(
@@ -60,7 +63,7 @@ class NumpyTable(DataTable):
     self._data = data
 
   def is_empty(self) -> bool:
-    all_data_zero = np.sum(self._data)==0
+    all_data_zero = np.all(self._data == 0)
     # 0th row is reserved as padding, so # of free ids is _max_rows-1
     all_id_free = len(self._id_allocator.free) == self._max_rows-1
     return all_data_zero and all_id_free

@@ -6,7 +6,7 @@ import vec_noise
 from imageio.v2 import imread, imsave
 from scipy import stats
 
-from nmmo import material
+from nmmo.lib import material, seeding, utils
 
 
 def sharp(noise):
@@ -24,9 +24,9 @@ class Save:
 
   @staticmethod
   def fractal(terrain, path):
-    '''Render raw noise fractal to png'''
-    frac = (256*terrain).astype(np.uint8)
-    imsave(path, frac)
+    '''Save fractal to both png and npy'''
+    imsave(os.path.join(path, 'fractal.png'), (256*terrain).astype(np.uint8))
+    np.save(os.path.join(path, 'fractal.npy'), terrain.astype(np.float16))
 
   @staticmethod
   def as_numpy(mats, path):
@@ -73,10 +73,7 @@ class Terrain:
       val[:, :, idx] = vec_noise.snoise2(seed*size + freq*X, idx*size + freq*Y)
 
     #Compute L1 distance
-    x      = np.abs(np.arange(size) - size//2)
-    X, Y   = np.meshgrid(x, x)
-    data   = np.stack((X, Y), -1)
-    l1     = np.max(abs(data), -1)
+    l1     = utils.l1_map(size)
 
     #Interpolation Weights
     rrange = np.linspace(-1, 1, 2*octaves-1)
@@ -118,47 +115,71 @@ class Terrain:
     val = std * val / np.std(val)
     val = 0.5 + np.clip(val, -1, 1)/2
 
-    #Threshold to materials
-    matl = np.zeros((size, size), dtype=object)
-    for y in range(size):
-      for x in range(size):
-        v = val[y, x]
-        if v <= config.TERRAIN_WATER:
-          mat = Terrain.WATER
-        elif v <= config.TERRAIN_GRASS:
-          mat = Terrain.GRASS
-        elif v <= config.TERRAIN_FOILAGE:
-          mat = Terrain.FOILAGE
-        else:
-          mat = Terrain.STONE
-        matl[y, x] = mat
-
-    # Void and grass border
-    matl[l1 > size/2 - border]   = Terrain.VOID
-    matl[l1 == size//2 - border] = Terrain.GRASS
-
-    edge  = l1 == size//2 - border - 1
-    stone = (matl == Terrain.STONE) | (matl == Terrain.WATER)
-    matl[edge & stone] = Terrain.FOILAGE
+    # Transform fractal noise to terrain
+    matl = fractal_to_material(config, val)
+    matl = process_map_border(config, matl, l1)
 
     return val, matl, interpolaters
 
-def place_fish(tiles, np_random):
-  placed = False
-  allow = {Terrain.GRASS}
+def fractal_to_material(config, fractal, all_grass=False):
+  size = config.MAP_SIZE
+  matl_map = np.zeros((size, size), dtype=np.int16)
+  for y in range(size):
+    for x in range(size):
+      if all_grass:
+        matl_map[y, x] = Terrain.GRASS
+        continue
 
+      v = fractal[y, x]
+      if v <= config.TERRAIN_WATER:
+        mat = Terrain.WATER
+      elif v <= config.TERRAIN_GRASS:
+        mat = Terrain.GRASS
+      elif v <= config.TERRAIN_FOILAGE:
+        mat = Terrain.FOILAGE
+      else:
+        mat = Terrain.STONE
+      matl_map[y, x] = mat
+  return matl_map
+
+def process_map_border(config, matl_map, l1=None):
+  size = config.MAP_SIZE
+  border = config.MAP_BORDER
+  if l1 is None:
+    l1 = utils.l1_map(size)
+
+  # Void and grass border
+  matl_map[l1 > size/2 - border] = material.Void.index
+  matl_map[l1 == size//2 - border] = material.Grass.index
+  edge = l1 == size//2 - border - 1
+  stone = (matl_map == material.Stone.index) | (matl_map == material.Water.index)
+  matl_map[edge & stone] = material.Foilage.index
+  return matl_map
+
+def place_fish(tiles, mmin, mmax, np_random, num_fish):
+  placed = 0
+
+  # if USE_CYTHON:
+  #   water_loc = chp.tile_where(tiles, Terrain.WATER, mmin, mmax)
+  # else:
   water_loc = np.where(tiles == Terrain.WATER)
-  water_loc = list(zip(water_loc[0], water_loc[1]))
+  water_loc = [(r, c) for r, c in zip(water_loc[0], water_loc[1])
+              if mmin < r < mmax and mmin < c < mmax]
+  if len(water_loc) < num_fish:
+    raise RuntimeError('Not enough water tiles to place fish.')
+
   np_random.shuffle(water_loc)
 
+  allow = {Terrain.GRASS}  # Fish should be placed adjacent to grass
   for r, c in water_loc:
     if tiles[r-1, c] in allow or tiles[r+1, c] in allow or \
        tiles[r, c-1] in allow or tiles[r, c+1] in allow:
       tiles[r, c] = Terrain.FISH
-      placed = True
+      placed += 1
+    if placed == num_fish:
       break
 
-  if not placed:
+  if placed < num_fish:
     raise RuntimeError('Could not find the water tile to place fish.')
 
 def uniform(config, tiles, mat, mmin, mmax, np_random):
@@ -206,7 +227,34 @@ def spawn_profession_resources(config, tiles, np_random=None):
 
   for _ in range(config.PROGRESSION_SPAWN_UNIFORMS):
     uniform(config, tiles, Terrain.HERB, mmin, mmax, np_random)
-    place_fish(tiles, np_random)
+  place_fish(tiles, mmin, mmax, np_random,
+             config.PROGRESSION_SPAWN_UNIFORMS)
+
+def try_add_tile(map_tiles, row, col, tile_to_add):
+  if map_tiles[row, col] == Terrain.GRASS:
+    map_tiles[row, col] = tile_to_add
+    return True
+  return False
+
+def scatter_extra_resources(config, tiles, np_random=None,
+                            density_factor=6):
+  if np_random is None:
+    np_random = np.random
+  center = config.MAP_CENTER
+  mmin = config.MAP_BORDER + 1
+  mmax = config.MAP_SIZE - config.MAP_BORDER - 1
+
+  water_to_add, water_added = (center//density_factor)**2, 0
+  food_to_add, food_added  = (center//density_factor)**2, 0
+  while True:
+    if water_added >= water_to_add and food_added >= food_to_add:
+      break
+    r, c = tuple(np_random.integers(mmin, mmax, size=(2,)))
+    if water_added < water_to_add:
+      water_added += 1 if try_add_tile(tiles, r, c, Terrain.WATER) else 0
+    if food_added < food_to_add:
+      food_added += 1 if try_add_tile(tiles, r, c, Terrain.FOILAGE) else 0
+
 
 class MapGenerator:
   '''Procedural map generation'''
@@ -227,12 +275,13 @@ class MapGenerator:
       setattr(Terrain, key.upper(), mat.index)
     self.textures = lookup
 
-  def generate_all_maps(self, np_random=None):
+  def generate_all_maps(self, seed=None):
     '''Generates NMAPS maps according to generate_map
 
     Provides additional utilities for saving to .npy and rendering png previews'''
 
     config = self.config
+    np_random, _ = seeding.np_random(seed)
 
     #Only generate if maps are not cached
     path_maps = os.path.join(config.PATH_CWD, config.PATH_MAPS)
@@ -258,10 +307,10 @@ class MapGenerator:
 
       #Save/render
       Save.as_numpy(tiles, path)
+      Save.fractal(terrain, path)
       if config.MAP_GENERATE_PREVIEWS:
         b = config.MAP_BORDER
         tiles = [e[b:-b+1] for e in tiles][b:-b+1]
-        Save.fractal(terrain, path+'/fractal.png')
         Save.render(tiles, self.textures, path+'/map.png')
 
   def generate_map(self, idx, np_random=None):
