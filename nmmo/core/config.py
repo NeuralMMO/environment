@@ -391,7 +391,7 @@ class Terrain:
   TERRAIN_DISABLE_STONE        = False
   '''Disable stone (obstacle) tiles'''
 
-  TERRAIN_SCATTER_EXTRA_RESOURCES = False
+  TERRAIN_SCATTER_EXTRA_RESOURCES = True
   '''Whether to scatter extra food, water on the map.
      Only works when MAP_RESET_FROM_FRACTAL is True'''
 
