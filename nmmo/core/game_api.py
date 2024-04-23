@@ -4,8 +4,8 @@ from typing import Dict, List
 import dill
 import numpy as np
 
-from nmmo.task import task_api, task_spec
-from nmmo.lib import team_helper
+from nmmo.task import task_api, task_spec, base_predicates
+from nmmo.lib import team_helper, utils
 
 GAME_MODE = ["agent_training", "team_training", "team_battle"]
 
@@ -267,10 +267,24 @@ class TeamBattle(TeamGameTemplate):
   """Game setting for team battle"""
   game_mode = "team_battle"
 
+  def __init__(self, env, sampling_weight=None):
+    super().__init__(env, sampling_weight)
+    self.task_embedding = utils.get_hash_embedding(base_predicates.TickGE,
+                                                   self.config.TASK_EMBED_DIM)
+
+  def is_compatible(self):
+    return True
+
   def _define_tasks(self):
-    sampled_spec = self._get_cand_team_tasks(num_tasks=1)[0]
+    # NOTE: Teams can win by eliminating all other teams,
+    # or fully cooperating to survive for the entire episode
+    survive_task = task_spec.TaskSpec(
+      eval_fn=base_predicates.TickGE,
+      eval_fn_kwargs={"num_tick": self.config.HORIZON},
+      reward_to="team",
+      embedding=self.task_embedding,)
     return task_spec.make_task_from_spec(self.config.TEAMS,
-                                         [sampled_spec] * len(self.config.TEAMS))
+                                         [survive_task] * len(self.config.TEAMS))
 
   def _check_winners(self, terminated):
     # A team is won, when their task is completed first or only one team remains

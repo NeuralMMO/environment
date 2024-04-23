@@ -12,7 +12,7 @@ class RacetoCenter(Game):
   def __init__(self, env, sampling_weight=None):
     super().__init__(env, sampling_weight)
 
-    self._map_size = 32  # determines the difficulty
+    self._map_size = 40  # determines the difficulty
     self.adaptive_difficulty = True
     self.num_game_won = 1  # at the same map size, threshold to increase the difficulty
     self.step_size = 8
