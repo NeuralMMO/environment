@@ -33,9 +33,9 @@ class Sandwich(TeamBattle):
   @property
   def teams(self):
     team_size = self.config.PLAYER_N // self.num_teams
-    teams = {f"Team{i}": list(range((i-1)*team_size+1, i*team_size+1))
+    teams = {i: list(range((i-1)*team_size+1, i*team_size+1))
              for i in range(1, self.num_teams)}
-    teams[f"Team{self.num_teams}"] = \
+    teams[self.num_teams] = \
       list(range((self.num_teams-1)*team_size+1, self.config.PLAYER_N+1))
     return teams
 
@@ -77,6 +77,7 @@ class Sandwich(TeamBattle):
     self.config.set_for_episode("MAP_RESET_FROM_FRACTAL", True)
     self.config.set_for_episode("TERRAIN_WATER", 0.1)
     self.config.set_for_episode("TERRAIN_FOILAGE", 0.9)
+    self.config.set_for_episode("TERRAIN_SCATTER_EXTRA_RESOURCES", False)
     self.config.set_for_episode("TERRAIN_RESET_TO_GRASS", self._grass_map)
     # Activate death fog from the onset
     self.config.set_for_episode("DEATH_FOG_ONSET", 1)
