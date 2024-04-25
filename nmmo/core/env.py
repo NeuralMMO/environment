@@ -219,7 +219,7 @@ class Env(ParallelEnv):
       self.game = game
       self.game.reset(self._np_random, map_dict)
       self.tasks = self.game.tasks
-    elif self.curriculum_file_path is not None:
+    elif self.curriculum_file_path is not None or self.game_packs is not None:
       # Assume training -- pick a random game from the game packs
       self.game = self.default_game
       if self.game_packs:
