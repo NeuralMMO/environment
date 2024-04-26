@@ -101,6 +101,8 @@ class TeamLoader(spawn.SequentialLoader):
     elif not isinstance(candidate_spawn_pos[0], list):
       # candidate_spawn_pos for teams should be List[List]
       candidate_spawn_pos = [[pos] for pos in candidate_spawn_pos]
+
+    np_random.shuffle(candidate_spawn_pos)
     self.candidate_spawn_pos = [RefillPopper(pos_list, np_random)
                                 for pos_list in candidate_spawn_pos]
 
