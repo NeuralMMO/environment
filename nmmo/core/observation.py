@@ -7,7 +7,7 @@ from nmmo.entity.entity import EntityState
 from nmmo.systems.item import ItemState
 import nmmo.systems.item as item_system
 from nmmo.core import action
-from nmmo.lib import material, utils
+from nmmo.lib import material
 import nmmo.lib.cython_helper as chp
 
 ROW_DELTA = np.array([-1, 1, 0, 0], dtype=np.int64)
@@ -451,12 +451,14 @@ class Observation:
     give_mask["InventoryItem"][:self.inventory.len] = not_equipped & not_listed
 
     # Give Target
-    entities_pos = self.entities.values[:,[EntityState.State.attr_name_to_col["row"],
-                                           EntityState.State.attr_name_to_col["col"]]]
-    same_tile = utils.linf(entities_pos, (self.agent.row, self.agent.col)) == 0
+    # NOTE: Allow give to entities within visual range. So no distance check is needed
+    # entities_pos = self.entities.values[:,[EntityState.State.attr_name_to_col["row"],
+    #                                        EntityState.State.attr_name_to_col["col"]]]
+    # same_tile = utils.linf(entities_pos, (self.agent.row, self.agent.col)) == 0
+
     not_me = self.entities.ids != self.agent_id
     player = (self.entities.values[:,EntityState.State.attr_name_to_col["npc_type"]] == 0)
-    give_mask["Target"][:self.entities.len] = same_tile & player & not_me
+    give_mask["Target"][:self.entities.len] = player & not_me
 
   def _make_sell_mask(self, sell_mask):
     # empty inventory -- nothing to sell
@@ -474,12 +476,13 @@ class Observation:
       return
 
     # GiveGold Target
-    entities_pos = self.entities.values[:,[EntityState.State.attr_name_to_col["row"],
-                                           EntityState.State.attr_name_to_col["col"]]]
-    same_tile = utils.linf(entities_pos, (self.agent.row, self.agent.col)) == 0
+    # NOTE: Allow give to entities within visual range. So no distance check is needed
+    # entities_pos = self.entities.values[:,[EntityState.State.attr_name_to_col["row"],
+    #                                        EntityState.State.attr_name_to_col["col"]]]
+    # same_tile = utils.linf(entities_pos, (self.agent.row, self.agent.col)) == 0
     not_me = self.entities.ids != self.agent_id
     player = (self.entities.values[:,EntityState.State.attr_name_to_col["npc_type"]] == 0)
-    give_mask["Target"][:self.entities.len] = same_tile & player & not_me
+    give_mask["Target"][:self.entities.len] = player & not_me
 
     # GiveGold Amount (Price)
     gold = int(self.agent.gold)

@@ -436,8 +436,11 @@ class Give(Node):
 
     if not (config.ITEM_ALLOW_GIFT and
             entity.ent_id != target.ent_id and                      # but not self
-            target.is_player and
-            entity.pos == target.pos):               # the same tile
+            target.is_player):
+      return
+
+    # NOTE: allow give within the visual range
+    if utils.linf_single(entity.pos, target.pos) > config.PLAYER_VISION_RADIUS:
       return
 
     if not target.inventory.space:
@@ -484,8 +487,11 @@ class GiveGold(Node):
 
     if not (config.ITEM_ALLOW_GIFT and
             entity.ent_id != target.ent_id and                      # but not self
-            target.is_player and
-            entity.pos == target.pos):                              # the same tile
+            target.is_player):
+      return
+
+    # NOTE: allow give within the visual range
+    if utils.linf_single(entity.pos, target.pos) > config.PLAYER_VISION_RADIUS:
       return
 
     if not isinstance(amount, int):
