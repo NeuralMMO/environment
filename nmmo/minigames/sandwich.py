@@ -1,4 +1,6 @@
 import time
+import numpy as np
+
 from nmmo.core.game_api import TeamBattle
 from nmmo.task import task_spec
 from nmmo.task.base_predicates import SeizeCenter
@@ -16,13 +18,13 @@ def secure_order(pos, radius=5):
 
 class Sandwich(TeamBattle):
   required_systems = ["TERRAIN", "COMBAT", "NPC", "COMMUNICATION"]
-  num_teams = 4
+  num_teams = 8
 
   def __init__(self, env, sampling_weight=None):
     super().__init__(env, sampling_weight)
 
-    self.map_size = 60
-    self._inner_npc_num = 4  # determines the difficulty
+    self.map_size = 80
+    self._inner_npc_num = 2  # determines the difficulty
     self._outer_npc_num = None  # these npcs rally to the center
     self.npc_step_size = 2
     self.adaptive_difficulty = True
@@ -96,17 +98,23 @@ class Sandwich(TeamBattle):
       if sum(last_results) >= self.num_game_won:
         self._inner_npc_num += self.npc_step_size
 
+  def _generate_spawn_locs(self):
+    center = self.config.MAP_SIZE // 2
+    radius = self.map_size // 4
+    angles = np.linspace(0, 2*np.pi, self.num_teams, endpoint=False)
+    return [(center + int(radius*np.cos(a)), center + int(radius*np.sin(a))) for a in angles]
+
   def _set_realm(self, map_dict):
     self.realm.reset(self._np_random, map_dict, custom_spawn=True, seize_targets=["center"])
     # team spawn requires custom spawning
-    spawn_locs = list(self.realm.map.quad_centers.values())  # 4 centers of each quadrant
+    spawn_locs = self._generate_spawn_locs()
     team_loader = team_helper.TeamLoader(self.config, self._np_random, spawn_locs)
     self.realm.players.spawn(team_loader)
 
     # spawn NPCs
     npc_manager = self.realm.npcs
     center = self.config.MAP_SIZE // 2
-    offset = self.config.MAP_CENTER // 6
+    offset = self.config.MAP_CENTER // 8
     for i in range(self.num_teams):
       r, c = spawn_locs[i]
       if r < center:
