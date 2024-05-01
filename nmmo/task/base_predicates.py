@@ -282,7 +282,7 @@ def SeizeTile(gs: GameState, subject: Group, row: int, col: int, num_ticks: int,
     return 0.0
   target_tile = (row, col)
 
-  # if subject seized the center tile, start counting ticks
+  # When the subject seizes the target tile
   if target_tile in gs.seize_status and gs.seize_status[target_tile][0] in subject.agents:
     seize_duration = gs.current_tick - gs.seize_status[target_tile][1]
     return norm(progress_bonus + (1.0-progress_bonus)*seize_duration/num_ticks)
@@ -299,7 +299,14 @@ def SeizeTile(gs: GameState, subject: Group, row: int, col: int, num_ticks: int,
     coords = np.hstack([r.reshape(-1,1), c.reshape(-1,1)])
     # NOTE: subject can be multiple agents (e.g., team), so taking the minimum
     dists = np.min(utils.linf(coords, target_tile))
-  return norm(progress_bonus*(1.0 - dists/max_dist))
+
+  seize_penalty = 0
+  # Other team has seized the tile, so receiving the penalty
+  if target_tile in gs.seize_status:
+    seize_duration = gs.current_tick - gs.seize_status[target_tile][1]
+    seize_penalty = seize_duration / num_ticks
+
+  return norm(progress_bonus*(1.0 - dists/max_dist) - seize_penalty)
 
 def SeizeCenter(gs: GameState, subject: Group, num_ticks: int,
                 progress_bonus = 0.3):
