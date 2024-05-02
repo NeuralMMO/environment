@@ -118,6 +118,10 @@ class Realm:
     """Number of alive player agents"""
     return len(self.players.entities)
 
+  @property
+  def seize_status(self):
+    return self.map.seize_status
+
   def entity(self, ent_id):
     e = self.entity_or_none(ent_id)
     assert e is not None, f"Entity {ent_id} does not exist"

@@ -242,8 +242,11 @@ class NPC(entity.Entity):
       lvl     = level - np_random.random()
       ilvl    = int(5 * lvl)
 
-      offense = int(config.NPC_BASE_DAMAGE + lvl*config.NPC_LEVEL_DAMAGE)
-      defense = int(config.NPC_BASE_DEFENSE + lvl*config.NPC_LEVEL_DEFENSE)
+      level_damage = config.NPC_LEVEL_DAMAGE * config.NPC_LEVEL_MULTIPLIER
+      level_defense = config.NPC_LEVEL_DEFENSE * config.NPC_LEVEL_MULTIPLIER
+
+      offense = int(config.NPC_BASE_DAMAGE + lvl * level_damage)
+      defense = int(config.NPC_BASE_DEFENSE + lvl * level_defense)
 
       ent.equipment = Equipment(ilvl, offense, offense, offense, defense, defense, defense)
 

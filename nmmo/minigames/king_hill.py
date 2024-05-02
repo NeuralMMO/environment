@@ -19,7 +19,7 @@ class KingoftheHill(TeamBattle):
 
     self._seize_duration = 10  # determines the difficulty
     self.dur_step_size = 10
-    self.max_seize_duration = 100
+    self.max_seize_duration = 500
     self.adaptive_difficulty = True
     self.num_game_won = 1  # at the same duration, threshold to increase the difficulty
     self.map_size = 40
@@ -96,7 +96,36 @@ class KingoftheHill(TeamBattle):
     return 0.0
 
   def _check_winners(self, terminated):
-    return self._who_completed_task()
+    assert self.config.TEAMS is not None, "Team battle mode requires TEAMS to be defined"
+    winners = self._who_completed_task()
+    if winners is not None:
+      return winners
+
+    if len(self.realm.seize_status) == 0:
+      return None
+
+    seize_results = list(self.realm.seize_status.values())
+
+    # Time's up, and a team has seized the center
+    if self.realm.tick == self.config.HORIZON:
+      winners = []
+      # Declare the latest seizing agent as the winner
+      for agent_id, _ in seize_results:
+        winners += self.tasks[agent_id].assignee
+      return winners
+
+    # Only one team remains and they have seized the center
+    current_teams = self._check_remaining_teams()
+    if len(current_teams) == 1:
+      winning_team = list(current_teams.keys())[0]
+      team_members = self.config.TEAMS[winning_team]
+      for agent_id, _ in seize_results:
+        # Check if the agent is in the winning team
+        if agent_id in team_members:
+          return team_members
+
+    # No team has seized the center
+    return None
 
   @staticmethod
   def test(env, horizon=30, seed=0):

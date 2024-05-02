@@ -588,6 +588,9 @@ class NPC:
   NPC_LEVEL_DAMAGE                    = 8
   '''Bonus NPC damage per level'''
 
+  NPC_LEVEL_MULTIPLIER                = 1.0
+  '''Multiplier for NPC level damage and defense, for easier difficulty tuning'''
+
   NPC_ALLOW_ATTACK_OTHER_NPCS         = False
   '''Whether NPCs can attack other NPCs'''
 

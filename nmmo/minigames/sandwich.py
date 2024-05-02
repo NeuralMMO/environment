@@ -1,17 +1,10 @@
 import time
 import numpy as np
 
-from nmmo.core.game_api import TeamBattle
+from nmmo.core.game_api import TeamBattle, team_survival_task
 from nmmo.task import task_spec
-from nmmo.task.base_predicates import SeizeCenter
 from nmmo.lib import team_helper
 
-
-def seize_task(num_ticks):
-  return task_spec.TaskSpec(
-    eval_fn=SeizeCenter,
-    eval_fn_kwargs={"num_ticks": num_ticks},
-    reward_to="team")
 
 def secure_order(pos, radius=5):
   return {"secure": {"position": pos, "radius": radius}}
@@ -105,7 +98,7 @@ class Sandwich(TeamBattle):
     return [(center + int(radius*np.cos(a)), center + int(radius*np.sin(a))) for a in angles]
 
   def _set_realm(self, map_dict):
-    self.realm.reset(self._np_random, map_dict, custom_spawn=True, seize_targets=["center"])
+    self.realm.reset(self._np_random, map_dict, custom_spawn=True)
     # team spawn requires custom spawning
     spawn_locs = self._generate_spawn_locs()
     team_loader = team_helper.TeamLoader(self.config, self._np_random, spawn_locs)
@@ -133,10 +126,6 @@ class Sandwich(TeamBattle):
                            lambda r, c: npc_manager.spawn_npc(
                               r, c, name="NPC5", order={"rally": (center,center)}))
 
-  def _define_tasks(self):
-    spec_list = [seize_task(self.seize_duration)] * len(self.teams)
-    return task_spec.make_task_from_spec(self.teams, spec_list)
-
   def _process_dead_npcs(self, dead_npcs):
     npc_manager = self.realm.npcs
     target_num = min(self.realm.num_players, self.inner_npc_num) // 2
@@ -149,9 +138,6 @@ class Sandwich(TeamBattle):
       npc_manager.area_spawn(r_min, r_max, c_min, c_max, num_spawn,
                              lambda r, c: npc_manager.spawn_npc(
                                r, c, name="NPC5", order={"rally": (center,center)}))
-
-  def _check_winners(self, terminated):  # pylint: disable=unused-argument
-    return self._who_completed_task()
 
   @property
   def winning_score(self):
@@ -177,7 +163,6 @@ class Sandwich(TeamBattle):
     assert config.NPC_DEFAULT_REFILL_DEAD_NPCS is False
     assert config.EQUIPMENT_SYSTEM_ENABLED is False  # equipment is used to set npc stats
     assert config.ALLOW_MOVE_INTO_OCCUPIED_TILE is False
-    assert env.realm.map.seize_targets == [(config.MAP_SIZE//2, config.MAP_SIZE//2)]
 
     start_time = time.time()
     for _ in range(horizon):
@@ -200,6 +185,6 @@ if __name__ == "__main__":
   # performance test
   from tests.testhelpers import profile_env_step
   test_tasks = task_spec.make_task_from_spec(test_config.TEAMS,
-                                        [seize_task(30)]*len(test_config.TEAMS))
+                                        [team_survival_task(30)]*len(test_config.TEAMS))
   profile_env_step(tasks=test_tasks)
   # env._compute_rewards(): 0.1768564050034911

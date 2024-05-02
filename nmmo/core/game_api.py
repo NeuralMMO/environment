@@ -263,6 +263,13 @@ class TeamTraining(TeamGameTemplate):
     sampled_spec = self._get_cand_team_tasks(len(self.config.TEAMS))
     return task_spec.make_task_from_spec(self.config.TEAMS, sampled_spec)
 
+def team_survival_task(num_tick, embedding=None):
+  return task_spec.TaskSpec(
+    eval_fn=base_predicates.TickGE,
+    eval_fn_kwargs={"num_tick": num_tick},
+    reward_to="team",
+    embedding=embedding)
+
 class TeamBattle(TeamGameTemplate):
   """Game setting for team battle"""
   game_mode = "team_battle"
@@ -278,22 +285,14 @@ class TeamBattle(TeamGameTemplate):
   def _define_tasks(self):
     # NOTE: Teams can win by eliminating all other teams,
     # or fully cooperating to survive for the entire episode
-    survive_task = task_spec.TaskSpec(
-      eval_fn=base_predicates.TickGE,
-      eval_fn_kwargs={"num_tick": self.config.HORIZON},
-      reward_to="team",
-      embedding=self.task_embedding,)
+    survive_task = team_survival_task(self.config.HORIZON, self.task_embedding)
     return task_spec.make_task_from_spec(self.config.TEAMS,
                                          [survive_task] * len(self.config.TEAMS))
 
   def _check_winners(self, terminated):
     # A team is won, when their task is completed first or only one team remains
     assert self.config.TEAMS is not None, "Team battle mode requires TEAMS to be defined"
-    current_teams = {}
-    for team_id, team in self.config.TEAMS.items():
-      alive_members = [agent_id for agent_id in team if agent_id in self.realm.players]
-      if len(alive_members) > 0:
-        current_teams[team_id] = alive_members
+    current_teams = self._check_remaining_teams()
     if len(current_teams) == 1:
       winner_team = list(current_teams.keys())[0]
       return self.config.TEAMS[winner_team]
@@ -301,3 +300,11 @@ class TeamBattle(TeamGameTemplate):
     # Return all assignees who completed their tasks
     # Assuming the episode gets ended externally
     return self._who_completed_task()
+
+  def _check_remaining_teams(self):
+    current_teams = {}
+    for team_id, team in self.config.TEAMS.items():
+      alive_members = [agent_id for agent_id in team if agent_id in self.realm.players]
+      if len(alive_members) > 0:
+        current_teams[team_id] = alive_members
+    return current_teams
