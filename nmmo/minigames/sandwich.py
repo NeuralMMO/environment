@@ -22,7 +22,7 @@ class Sandwich(TeamBattle):
     self.npc_step_size = 2
     self.adaptive_difficulty = True
     self.num_game_won = 2  # at the same duration, threshold to increase the difficulty
-    self.max_npc_num = 20
+    self.max_npc_num = self.config.PLAYER_N // self.num_teams
     self.survival_crit = 500  # to win, agents must survive this long
     self._grass_map = False
 
