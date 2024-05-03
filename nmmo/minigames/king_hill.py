@@ -114,7 +114,7 @@ class KingoftheHill(TeamBattle):
         for task in self.tasks:
           if agent_id in task.assignee:
             winners += task.assignee
-      return winners
+      return winners or None
 
     # Only one team remains and they have seized the center
     current_teams = self._check_remaining_teams()
