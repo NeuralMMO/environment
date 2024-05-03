@@ -111,7 +111,9 @@ class KingoftheHill(TeamBattle):
       winners = []
       # Declare the latest seizing agent as the winner
       for agent_id, _ in seize_results:
-        winners += self.tasks[agent_id].assignee
+        for task in self.tasks:
+          if agent_id in task.assignee:
+            winners += task.assignee
       return winners
 
     # Only one team remains and they have seized the center
