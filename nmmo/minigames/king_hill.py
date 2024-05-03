@@ -19,7 +19,7 @@ class KingoftheHill(TeamBattle):
 
     self._seize_duration = 10  # determines the difficulty
     self.dur_step_size = 10
-    self.max_seize_duration = 500
+    self.max_seize_duration = 200
     self.adaptive_difficulty = True
     self.num_game_won = 2  # at the same duration, threshold to increase the difficulty
     self.map_size = 40
