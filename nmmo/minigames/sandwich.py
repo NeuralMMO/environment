@@ -22,7 +22,7 @@ class Sandwich(TeamBattle):
     self.npc_step_size = 2
     self.adaptive_difficulty = True
     self.num_game_won = 2  # at the same duration, threshold to increase the difficulty
-    self.game_length_crit = 400 # if the game is longer than this, increase the difficulty
+    self.survival_crit = 500  # to win, agents must survive this long
     self._grass_map = False
 
   @property
@@ -88,8 +88,7 @@ class Sandwich(TeamBattle):
        and self.history[-1]["result"]:  # the last game was won
       last_results = [r["result"] for r in self.history
                       if r["inner_npc_num"] == self.inner_npc_num]
-      if sum(last_results) >= self.num_game_won \
-         and self.history[-1]["winning_tick"] > self.game_length_crit:
+      if sum(last_results) >= self.num_game_won:
         # Increase the npc num, when there were only few npcs left at the end
         self._inner_npc_num += self.npc_step_size
 
@@ -150,6 +149,12 @@ class Sandwich(TeamBattle):
     # No one succeeded
     return 0.0
 
+  def _check_winners(self, terminated):
+    # Basic survival criteria
+    if self.realm.tick < self.survival_crit:
+      return None
+    return super()._check_winners(terminated)
+
   @staticmethod
   def test(env, horizon=30, seed=0):
     game = Sandwich(env)
@@ -175,7 +180,7 @@ class Sandwich(TeamBattle):
     org_inner_npc_num = game.inner_npc_num
     for result in [False]*7 + [True]*game.num_game_won:
       game.history.append(
-        {"result": result, "inner_npc_num": game.inner_npc_num, "winning_tick": 500})
+        {"result": result, "inner_npc_num": game.inner_npc_num})
       game._determine_difficulty()  # pylint: disable=protected-access
     assert game.inner_npc_num == (org_inner_npc_num + game.npc_step_size)
 
