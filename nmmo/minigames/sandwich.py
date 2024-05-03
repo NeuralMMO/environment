@@ -22,7 +22,7 @@ class Sandwich(TeamBattle):
     self.npc_step_size = 2
     self.adaptive_difficulty = True
     self.num_game_won = 2  # at the same duration, threshold to increase the difficulty
-    self.seize_duration = 30
+    self.remaining_npc_crit = 10
     self._grass_map = False
 
   @property
@@ -88,7 +88,9 @@ class Sandwich(TeamBattle):
        and self.history[-1]["result"]:  # the last game was won
       last_results = [r["result"] for r in self.history
                       if r["inner_npc_num"] == self.inner_npc_num]
-      if sum(last_results) >= self.num_game_won:
+      if sum(last_results) >= self.num_game_won \
+         and self.history[-1]["current_npc"] <= self.remaining_npc_crit:
+        # Increase the npc num, when there were only few npcs left at the end
         self._inner_npc_num += self.npc_step_size
 
   def _generate_spawn_locs(self):
@@ -138,6 +140,7 @@ class Sandwich(TeamBattle):
       npc_manager.area_spawn(r_min, r_max, c_min, c_max, num_spawn,
                              lambda r, c: npc_manager.spawn_npc(
                                r, c, name="NPC5", order={"rally": (center,center)}))
+    self.history[-1]["current_npc"] = len(npc_manager)
 
   @property
   def winning_score(self):
@@ -172,7 +175,8 @@ class Sandwich(TeamBattle):
     # Test if the difficulty increases
     org_inner_npc_num = game.inner_npc_num
     for result in [False]*7 + [True]*game.num_game_won:
-      game.history.append({"result": result, "inner_npc_num": game.inner_npc_num})
+      game.history.append(
+        {"result": result, "inner_npc_num": game.inner_npc_num, "current_npc": 9})
       game._determine_difficulty()  # pylint: disable=protected-access
     assert game.inner_npc_num == (org_inner_npc_num + game.npc_step_size)
 
