@@ -22,6 +22,7 @@ class Sandwich(TeamBattle):
     self.npc_step_size = 2
     self.adaptive_difficulty = True
     self.num_game_won = 2  # at the same duration, threshold to increase the difficulty
+    self.max_npc_num = 20
     self.survival_crit = 500  # to win, agents must survive this long
     self._grass_map = False
 
@@ -77,7 +78,7 @@ class Sandwich(TeamBattle):
     # Activate death fog from the onset
     self.config.set_for_episode("DEATH_FOG_ONSET", 1)
     self.config.set_for_episode("DEATH_FOG_SPEED", 1/8)
-    self.config.set_for_episode("DEATH_FOG_FINAL_SIZE", 6)
+    self.config.set_for_episode("DEATH_FOG_FINAL_SIZE", 3)
     # Enable +1 hp per tick
     self.config.set_for_episode("PLAYER_HEALTH_INCREMENT", 1)
     self._determine_difficulty()  # sets the seize duration
@@ -91,6 +92,7 @@ class Sandwich(TeamBattle):
       if sum(last_results) >= self.num_game_won:
         # Increase the npc num, when there were only few npcs left at the end
         self._inner_npc_num += self.npc_step_size
+        self._inner_npc_num = min(self._inner_npc_num, self.max_npc_num)
 
   def _generate_spawn_locs(self):
     center = self.config.MAP_SIZE // 2
