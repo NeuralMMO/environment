@@ -60,7 +60,7 @@ class KingoftheHill(TeamBattle):
     # Activate death fog
     self.config.set_for_episode("DEATH_FOG_ONSET", 32)
     self.config.set_for_episode("DEATH_FOG_SPEED", 1/6)
-    self.config.set_for_episode("DEATH_FOG_FINAL_SIZE", 12)
+    self.config.set_for_episode("DEATH_FOG_FINAL_SIZE", 7)
 
     self._determine_difficulty()  # sets the seize duration
 
