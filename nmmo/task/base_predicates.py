@@ -277,7 +277,7 @@ def AllMembersWithinRange(gs: GameState, subject: Group, dist: int):
   return (max_dist_score + r_sd_score + c_sd_score) / 3.0
 
 def SeizeTile(gs: GameState, subject: Group, row: int, col: int, num_ticks: int,
-              progress_bonus = 0.3):
+              progress_bonus = 0.4, seize_bonus = 0.3):
   if not any(subject.health > 0):  # subject should be alive
     return 0.0
   target_tile = (row, col)
@@ -285,7 +285,8 @@ def SeizeTile(gs: GameState, subject: Group, row: int, col: int, num_ticks: int,
   # When the subject seizes the target tile
   if target_tile in gs.seize_status and gs.seize_status[target_tile][0] in subject.agents:
     seize_duration = gs.current_tick - gs.seize_status[target_tile][1]
-    return norm(progress_bonus + (1.0-progress_bonus)*seize_duration/num_ticks)
+    hold_bonus = (1.0 - progress_bonus - seize_bonus) * seize_duration/num_ticks
+    return norm(progress_bonus + seize_bonus + hold_bonus)
 
   # motivate agents to seize the target tile
   #max_dist = utils.linf_single(target_tile, gs.spawn_pos[subject.agents[0]])
@@ -300,13 +301,7 @@ def SeizeTile(gs: GameState, subject: Group, row: int, col: int, num_ticks: int,
     # NOTE: subject can be multiple agents (e.g., team), so taking the minimum
     dists = np.min(utils.linf(coords, target_tile))
 
-  seize_penalty = 0
-  # Other team has seized the tile, so receiving the penalty
-  if target_tile in gs.seize_status:
-    seize_duration = gs.current_tick - gs.seize_status[target_tile][1]
-    seize_penalty = seize_duration / num_ticks
-
-  return norm(progress_bonus*(1.0 - dists/max_dist) - seize_penalty)
+  return norm(progress_bonus * (1.0 - dists/max_dist))
 
 def SeizeCenter(gs: GameState, subject: Group, num_ticks: int,
                 progress_bonus = 0.3):
