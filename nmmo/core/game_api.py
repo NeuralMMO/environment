@@ -177,6 +177,10 @@ class AgentTraining(Game):
   """Game setting for agent training tasks"""
   game_mode = "agent_training"
 
+  @property
+  def winning_score(self):
+    return 0.0
+
   def is_compatible(self):
     try:
       assert self.config.COMBAT_SYSTEM_ENABLED, "Combat system must be enabled"
