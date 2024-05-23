@@ -45,7 +45,6 @@ class Env(ParallelEnv):
     self.possible_agents = self.config.POSSIBLE_AGENTS
     self._alive_agents = None
     self._current_agents = None
-    self._dead_agents = set()
     self._dead_this_tick = None
     self.scripted_agents = set()
 
@@ -240,7 +239,6 @@ class Env(ParallelEnv):
 
     # Reset the agent vars
     self._alive_agents = self.possible_agents
-    self._dead_agents.clear()
     self._dead_this_tick = {}
     self._map_task_to_agent()
     self._current_agents = self.possible_agents  # tracking alive + dead_this_tick
@@ -421,19 +419,12 @@ class Env(ParallelEnv):
     self._current_agents = list(set(self._alive_agents + list(self._dead_this_tick.keys())))
 
     terminated = {}
-    truncated = {}
     for agent_id in self._current_agents:
       if agent_id in self._dead_this_tick:
-        self._dead_agents.add(agent_id)
         # NOTE: Even though players can be resurrected, the time of death must be marked.
         terminated[agent_id] = True
       else:
         terminated[agent_id] = False
-
-      if self.realm.tick >= self.config.HORIZON:
-        truncated[agent_id] = agent_id not in self._dead_agents
-      else:
-        truncated[agent_id] = False
 
     if self.realm.tick >= self.config.HORIZON:
       self._alive_agents = []  # pettingzoo requires agents to be empty
@@ -441,6 +432,14 @@ class Env(ParallelEnv):
     # Update the game stats, determine winners, etc.
     # Also, resurrect dead agents and/or spawn new npcs if the game allows it
     self.game.update(terminated, self._dead_this_tick, dead_npcs)
+
+    # Some games do additional player cull during update(), so process truncated here
+    truncated = {}
+    for agent_id in self._current_agents:
+      if self.realm.tick >= self.config.HORIZON:
+        truncated[agent_id] = agent_id in self.realm.players
+      else:
+        truncated[agent_id] = False
 
     # Store the observations, since actions reference them
     self._compute_observations()

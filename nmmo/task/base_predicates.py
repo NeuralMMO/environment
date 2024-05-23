@@ -323,3 +323,12 @@ def SeizeQuadCenter(gs: GameState, subject: Group, num_ticks: int, quadrant: str
   else:
     raise ValueError(f"Invalid quadrant {quadrant}")
   return SeizeTile(gs, subject, row, col, num_ticks, progress_bonus)
+
+def ProtectLeader(gs, subject, target_protect: int, target_destroy: Iterable[int]):
+  """target_destory is not used for reward, but used as info for the reward wrapper"""
+  # Failed to protect the leader
+  if target_protect not in gs.alive_agents:
+    return 0
+
+  # Reward each tick the target is alive
+  return gs.current_tick / gs.config.HORIZON

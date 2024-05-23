@@ -66,6 +66,12 @@ class TeamHelper:
         if foe_team_id != team_id:
           all_foes += self.teams[foe_team_id]
       return all_foes
+    if target == "all_foe_leaders":
+      leaders = []
+      for foe_team_id in self.team_list:
+        if foe_team_id != team_id:
+          leaders.append(self.teams[foe_team_id][0])
+      return leaders
     return None
 
 class RefillPopper:

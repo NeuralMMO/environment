@@ -183,7 +183,6 @@ class AgentTraining(Game):
 
   def is_compatible(self):
     try:
-      assert self.config.COMBAT_SYSTEM_ENABLED, "Combat system must be enabled"
       # Check is the curriculum file exists and opens
       with open(self.config.CURRICULUM_FILE_PATH, "rb") as f:
         dill.load(f) # a list of TaskSpec
@@ -209,8 +208,7 @@ class TeamGameTemplate(Game):
 
   def is_compatible(self):
     try:
-      assert self.config.COMBAT_SYSTEM_ENABLED, "Combat system must be enabled"
-      assert self.config.TEAMS is not None, "Team training mode requires TEAMS to be defined"
+      assert self.config.TEAMS is not None, "Team game requires TEAMS to be defined"
       num_agents = sum(len(v) for v in self.config.TEAMS.values())
       assert self.config.PLAYER_N == num_agents,\
         "PLAYER_N must match the number of agents in TEAMS"
@@ -284,6 +282,11 @@ class TeamBattle(TeamGameTemplate):
                                                    self.config.TASK_EMBED_DIM)
 
   def is_compatible(self):
+    assert self.config.are_systems_enabled(["COMBAT"]), "Combat system must be enabled"
+    assert self.config.TEAMS is not None, "Team battle mode requires TEAMS to be defined"
+    num_agents = sum(len(v) for v in self.config.TEAMS.values())
+    assert self.config.PLAYER_N == num_agents,\
+      "PLAYER_N must match the number of agents in TEAMS"
     return True
 
   def _define_tasks(self):
@@ -295,7 +298,6 @@ class TeamBattle(TeamGameTemplate):
 
   def _check_winners(self, terminated):
     # A team is won, when their task is completed first or only one team remains
-    assert self.config.TEAMS is not None, "Team battle mode requires TEAMS to be defined"
     current_teams = self._check_remaining_teams()
     if len(current_teams) == 1:
       winner_team = list(current_teams.keys())[0]
@@ -312,3 +314,40 @@ class TeamBattle(TeamGameTemplate):
       if len(alive_members) > 0:
         current_teams[team_id] = alive_members
     return current_teams
+
+class ProtectTheKing(TeamBattle):
+  def __init__(self, env, sampling_weight=None):
+    super().__init__(env, sampling_weight)
+    self.team_helper = team_helper.TeamHelper(self.config.TEAMS)
+    self.task_embedding = utils.get_hash_embedding(base_predicates.ProtectLeader,
+                                                   self.config.TASK_EMBED_DIM)
+
+  def _define_tasks(self):
+    protect_task = task_spec.TaskSpec(
+      eval_fn=base_predicates.ProtectLeader,
+      eval_fn_kwargs={
+        "target_protect": "my_team_leader",
+        "target_destroy": "all_foe_leaders",
+      },
+      reward_to="team"
+    )
+    return task_spec.make_task_from_spec(self.config.TEAMS,
+                                         [protect_task] * len(self.config.TEAMS))
+
+  def update(self, terminated, dead_players, dead_npcs):
+    # If a team's leader is dead, the whole team is dead
+    for team_id, members in self.config.TEAMS.items():
+      if self.team_helper.get_target_agent(team_id, "my_team_leader") in dead_players:
+        for agent_id in members:
+          if agent_id in self.realm.players:
+            self.realm.players[agent_id].health.update(0)
+
+    # Addition dead players cull
+    for agent in [agent for agent in self.realm.players.values() if not agent.alive]:
+      agent_id = agent.ent_id
+      self.realm.players.dead_this_tick[agent_id] = agent
+      self.realm.players.cull_entity(agent)
+      agent.datastore_record.delete()
+      terminated[agent_id] = True
+
+    super().update(terminated, dead_players, dead_npcs)
