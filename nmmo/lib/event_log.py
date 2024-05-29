@@ -241,7 +241,6 @@ def extract_event_key(event_row):
   if event_code in [
     EventCode.EAT_FOOD,
     EventCode.DRINK_WATER,
-    EventCode.PLAYER_KILL,
     EventCode.GO_FARTHEST,
     EventCode.AGENT_CULLED,
   ]:
@@ -249,6 +248,7 @@ def extract_event_key(event_row):
 
   if event_code in [
     EventCode.SCORE_HIT,
+    EventCode.FIRE_AMMO,
     EventCode.LEVEL_UP,
     EventCode.HARVEST_ITEM,
     EventCode.CONSUME_ITEM,
@@ -257,5 +257,8 @@ def extract_event_key(event_row):
     EventCode.BUY_ITEM,
   ]:
     return (event_code, event_row[EventAttr['type']])
+
+  if event_code == EventCode.PLAYER_KILL:
+    return (event_code, int(event_row[EventAttr['target_ent']] > 0))  # if target is agent or npc
 
   return None
