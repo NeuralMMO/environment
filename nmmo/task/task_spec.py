@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from typing import Iterable, Dict, List, Union, Type
 from types import FunctionType
 from copy import deepcopy
+from tqdm import tqdm
 
 import numpy as np
 
@@ -31,9 +32,8 @@ from nmmo.lib.team_helper import TeamHelper
 """
 
 REWARD_TO = ["agent", "team"]
-VALID_TARGET = ["left_team", "left_team_leader",
-                "right_team", "right_team_leader",
-                "my_team_leader", "all_foes"]
+VALID_TARGET = ["left_team", "left_team_leader", "right_team", "right_team_leader",
+                "my_team_leader", "all_foes", "all_foe_leaders"]
 
 @dataclass
 class TaskSpec:
@@ -45,6 +45,7 @@ class TaskSpec:
   sampling_weight: float = 1.0
   embedding: np.ndarray = None
   predicate: Predicate = None
+  tags: List[str] = field(default_factory=list)
 
   def __post_init__(self):
     if self.predicate is None:
@@ -100,15 +101,18 @@ def make_task_from_spec(assign_to: Union[Iterable[int], Dict],
     task_kwargs = deepcopy(task_spec[idx].task_kwargs)
     task_kwargs["embedding"] = task_spec[idx].embedding # to pass to task_cls
     task_kwargs["spec_name"] = task_spec[idx].name
+    task_kwargs["reward_to"] = task_spec[idx].reward_to
+    task_kwargs["tags"] = task_spec[idx].tags
     predicate = task_spec[idx].predicate
 
     # reserve "target" for relative agent mapping
-    if "target" in pred_fn_kwargs:
-      target = pred_fn_kwargs.pop("target")
-      assert target in VALID_TARGET, "Invalid target"
+    target_keys = [key for key in pred_fn_kwargs.keys() if key.startswith("target")]
+    for key in target_keys:
+      target_keyword = pred_fn_kwargs.pop(key)
+      assert target_keyword in VALID_TARGET, "Invalid target"
       # translate target to specific agent ids using team_helper
-      target = team_helper.get_target_agent(team_id, target)
-      pred_fn_kwargs["target"] = target
+      target_ent = team_helper.get_target_agent(team_id, target_keyword)
+      pred_fn_kwargs[key] = target_ent
 
     # handle some special cases and instantiate the predicate first
     if pred_fn is not None and isinstance(pred_fn, FunctionType):
@@ -119,8 +123,8 @@ def make_task_from_spec(assign_to: Union[Iterable[int], Dict],
     if (pred_fn in [bp.AllDead]) or \
        (pred_fn in [bp.StayAlive] and "target" in pred_fn_kwargs):
       # use the target as the predicate subject
-      pred_fn_kwargs.pop("target") # remove target
-      predicate = pred_cls(Group(target), **pred_fn_kwargs)
+      target_ent = pred_fn_kwargs.pop("target") # remove target
+      predicate = pred_cls(Group(target_ent), **pred_fn_kwargs)
 
     # create the task
     if reward_to == "team":
@@ -146,12 +150,14 @@ def make_task_from_spec(assign_to: Union[Iterable[int], Dict],
   return tasks
 
 # pylint: disable=bare-except,cell-var-from-loop
-def check_task_spec(spec_list: List[TaskSpec]) -> List[Dict]:
+def check_task_spec(spec_list: List[TaskSpec], debug=False) -> List[Dict]:
   teams = {0: [1, 2, 3], 3: [4, 5], 7: [6, 7], 11: [8, 9], 14: [10, 11]}
   config = nmmo.config.Default()
+  config.set("PLAYER_N", 11)
+  config.set("TEAMS", teams)
   env = nmmo.Env(config)
   results = []
-  for single_spec in spec_list:
+  for single_spec in tqdm(spec_list):
     result = {"spec_name": single_spec.name}
     try:
       env.reset(make_task_fn=lambda: make_task_from_spec(teams, [single_spec]))
@@ -160,6 +166,7 @@ def check_task_spec(spec_list: List[TaskSpec]) -> List[Dict]:
       result["runnable"] = True
     except:
       result["runnable"] = False
-
+      if debug:
+        raise
     results.append(result)
   return results

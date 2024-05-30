@@ -5,7 +5,7 @@ import nmmo
 from nmmo.core.config import (AllGameSystems, Combat, Communication,
                               Equipment, Exchange, Item, Medium, Profession,
                               Progression, Resource, Small, Terrain)
-from nmmo.render.render_client import WebsocketRenderer
+from nmmo.render.render_client import DummyRenderer
 from nmmo.render.replay_helper import FileReplayHelper
 from scripted import baselines
 
@@ -54,7 +54,7 @@ if __name__ == '__main__':
   replay_helper = FileReplayHelper()
 
   # the renderer is external to the env, so need to manually initiate it
-  renderer = WebsocketRenderer()
+  renderer = DummyRenderer()
 
   for conf_name, config in conf_dict.items():
     env = nmmo.Env(config)

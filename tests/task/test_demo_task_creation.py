@@ -3,7 +3,7 @@ import unittest
 from tests.testhelpers import ScriptedAgentTestConfig
 
 from nmmo.core.env import Env
-from nmmo.lib.log import EventCode
+from nmmo.lib.event_code import EventCode
 from nmmo.systems import skill
 from nmmo.task import predicate_api as p
 from nmmo.task import task_api as t
@@ -84,7 +84,7 @@ class TestDemoTask(unittest.TestCase):
 
     # Test rollout
     config = ScriptedAgentTestConfig()
-    config.ALLOW_MULTI_TASKS_PER_AGENT = True
+    config.set("ALLOW_MULTI_TASKS_PER_AGENT", True)
     env = Env(config)
 
     # Creating and testing "team" tasks
@@ -105,7 +105,7 @@ class TestDemoTask(unittest.TestCase):
 
     # Run the environment with these tasks
     #   check rewards and infos for the task info
-    obs, rewards, dones, infos = rollout(env, team_tasks)
+    obs, rewards, terminated, truncated, infos = rollout(env, team_tasks)
 
     # Creating and testing the same task for all agents
     # i.e, each agent gets evaluated and rewarded individually
@@ -118,7 +118,7 @@ class TestDemoTask(unittest.TestCase):
 
     # Run the environment with these tasks
     #   check rewards and infos for the task info
-    obs, rewards, dones, infos = rollout(env, same_tasks)
+    obs, rewards, terminated, truncated, infos = rollout(env, same_tasks)
 
     # DONE
 
@@ -164,13 +164,13 @@ class TestDemoTask(unittest.TestCase):
     # Agent 1 kills 1 - reward .06 + .1
     # Agent 2 kills 2 - reward .12 + .1
     # Agent 3 kills 0 - reward 0
-    _, rewards, _, _ = env.step({})
+    _, rewards, _, _, _ = env.step({})
     self.assertEqual(rewards[1], 0.16)
     self.assertEqual(rewards[2], 0.22)
     self.assertEqual(rewards[3], 0)
 
     # No reward when no changes
-    _, rewards, _, _ = env.step({})
+    _, rewards, _, _, _ = env.step({})
     self.assertEqual(rewards[1], 0)
     self.assertEqual(rewards[2], 0)
     self.assertEqual(rewards[3], 0)
@@ -200,11 +200,11 @@ class TestDemoTask(unittest.TestCase):
     env.realm.event_log.record(code, players[1], target=players[2])
     env.realm.event_log.record(code, players[1], target=players[3])
 
-    _, rewards, _, _ = env.step({})
+    _, rewards, _, _, _ = env.step({})
     self.assertAlmostEqual(rewards[1], 0.8*2/7 + 1.1*1/3)
 
     for _ in range(2):
-      _, _, _, infos = env.step({})
+      _, _, _, _, infos = env.step({})
 
     # 0.8*2/7 + 1.1 > 1, but the progress is maxed at 1
     self.assertEqual(infos[1]['task'][env.tasks[0].name]['progress'], 1.0)

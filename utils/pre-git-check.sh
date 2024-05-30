@@ -28,7 +28,7 @@ for file in $files; do
   fi
 done
 
-if ! pylint --jobs=$cores --recursive=y nmmo tests; then
+if ! pylint --recursive=y nmmo tests; then
   echo "Lint failed. Exiting."
   exit 1
 fi

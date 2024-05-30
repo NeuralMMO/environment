@@ -27,7 +27,7 @@ class TestTaskSystemPerf(unittest.TestCase):
       # check tasks
       for agent_id in agent_list:
         if test_mode is None:
-          self.assertTrue('StayAlive' in tasks[agent_id-1].name) # default task
+          self.assertTrue('TickGE' in tasks[agent_id-1].name) # default task
         if test_mode != 'no_task':
           self.assertTrue(f'assignee:({agent_id},)' in tasks[agent_id-1].name)
 

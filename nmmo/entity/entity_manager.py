@@ -1,11 +1,9 @@
 from collections.abc import Mapping
 from typing import Dict
 
-from nmmo.entity.entity import Entity
-from nmmo.entity.npc import NPC
+from nmmo.entity.entity import Entity, EntityState
 from nmmo.entity.player import Player
-from nmmo.lib import spawn
-from nmmo.systems import combat
+from nmmo.lib import spawn, event_code
 
 
 class EntityGroup(Mapping):
@@ -14,9 +12,11 @@ class EntityGroup(Mapping):
     self.realm = realm
     self.config = realm.config
     self._np_random = np_random
+    self._entity_table = EntityState.Query.table(self.datastore)
 
     self.entities: Dict[int, Entity] = {}
     self.dead_this_tick: Dict[int, Entity] = {}
+    self._delete_dead_entity = True  # is default
 
   def __len__(self):
     return len(self.entities)
@@ -41,8 +41,9 @@ class EntityGroup(Mapping):
   def packet(self):
     return {k: v.packet() for k, v in self.corporeal.items()}
 
-  def reset(self, np_random):
+  def reset(self, np_random, delete_dead_entity=True):
     self._np_random = np_random # reset the RNG
+    self._delete_dead_entity = delete_dead_entity
     for ent in self.entities.values():
       # destroy the items
       if self.config.ITEM_SYSTEM_ENABLED:
@@ -50,113 +51,54 @@ class EntityGroup(Mapping):
           item.destroy()
       ent.datastore_record.delete()
 
-    self.entities = {}
-    self.dead_this_tick = {}
+    self.entities.clear()
+    self.dead_this_tick.clear()
 
-  def spawn(self, entity):
+  def spawn_entity(self, entity):
     pos, ent_id = entity.pos, entity.id.val
     self.realm.map.tiles[pos].add_entity(entity)
     self.entities[ent_id] = entity
 
+  def cull_entity(self, entity):
+    pos, ent_id = entity.pos, entity.id.val
+    self.realm.map.tiles[pos].remove_entity(ent_id)
+    self.entities.pop(ent_id)
+    # destroy the remaining items (of starved/dehydrated players)
+    #    of the agents who don't go through receive_damage()
+    if self.config.ITEM_SYSTEM_ENABLED:
+      for item in list(entity.inventory.items):
+        item.destroy()
+    if ent_id > 0:
+      self.realm.event_log.record(event_code.EventCode.AGENT_CULLED, entity)
+
   def cull(self):
-    self.dead_this_tick = {}
-    for ent_id in list(self.entities):
-      player = self.entities[ent_id]
-      if not player.alive:
-        r, c  = player.pos
-        ent_id = player.ent_id
-        self.dead_this_tick[ent_id] = player
-
-        self.realm.map.tiles[r, c].remove_entity(ent_id)
-
-        # destroy the remaining items (of starved/dehydrated players)
-        #    of the agents who don't go through receive_damage()
-        if self.config.ITEM_SYSTEM_ENABLED:
-          for item in list(player.inventory.items):
-            item.destroy()
-
-        self.entities[ent_id].datastore_record.delete()
-        del self.entities[ent_id]
-
+    self.dead_this_tick.clear()
+    for ent in [ent for ent in self.entities.values() if not ent.alive]:
+      self.dead_this_tick[ent.ent_id] = ent
+      self.cull_entity(ent)
+      if self._delete_dead_entity:
+        ent.datastore_record.delete()
     return self.dead_this_tick
 
   def update(self, actions):
+    # # batch updates
+    # # time_alive, damage are from entity.py, History.update()
+    # ent_idx = self._entity_table[:, EntityState.State.attr_name_to_col["id"]] != 0
+    # self._entity_table[ent_idx, EntityState.State.attr_name_to_col["time_alive"]] += 1
+    # self._entity_table[ent_idx, EntityState.State.attr_name_to_col["damage"]] = 0
+    # # freeze from entity.py, Status.update()
+    # freeze_idx = self._entity_table[:, EntityState.State.attr_name_to_col["freeze"]] > 0
+    # self._entity_table[freeze_idx, EntityState.State.attr_name_to_col["freeze"]] -= 1
+
     for entity in self.entities.values():
       entity.update(self.realm, actions)
 
-
-class NPCManager(EntityGroup):
-  def __init__(self, realm, np_random):
-    super().__init__(realm, np_random)
-    self.next_id = -1
-    self.spawn_dangers = []
-
-  def reset(self, np_random):
-    super().reset(np_random)
-    self.next_id = -1
-    self.spawn_dangers = []
-
-  def spawn(self):
-    config = self.config
-
-    if not config.NPC_SYSTEM_ENABLED:
-      return
-
-    for _ in range(config.NPC_SPAWN_ATTEMPTS):
-      if len(self.entities) >= config.NPC_N:
-        break
-
-      if self.spawn_dangers:
-        danger = self.spawn_dangers[-1]
-        r, c   = combat.spawn(config, danger, self._np_random)
-      else:
-        center = config.MAP_CENTER
-        border = self.config.MAP_BORDER
-        # pylint: disable=unbalanced-tuple-unpacking
-        r, c   = self._np_random.integers(border, center+border, 2).tolist()
-
-      npc = NPC.spawn(self.realm, (r, c), self.next_id, self._np_random)
-      if npc:
-        super().spawn(npc)
-        self.next_id -= 1
-
-    if self.spawn_dangers:
-      self.spawn_dangers.pop()
-
-  def cull(self):
-    for entity in super().cull().values():
-      self.spawn_dangers.append(entity.spawn_danger)
-
-    # refill npcs to target config.NPC_N, within config.NPC_SPAWN_ATTEMPTS
-    self.spawn()
-
-  def actions(self, realm):
-    actions = {}
-    for idx, entity in self.entities.items():
-      actions[idx] = entity.decide(realm)
-    return actions
-
 class PlayerManager(EntityGroup):
-  def __init__(self, realm, np_random):
-    super().__init__(realm, np_random)
-    self.loader_class = self.realm.config.PLAYER_LOADER
-    self._agent_loader: spawn.SequentialLoader = None
-    self.spawned = None
+  def spawn(self, agent_loader: spawn.SequentialLoader = None):
+    if agent_loader is None:
+      agent_loader = self.config.PLAYER_LOADER(self.config, self._np_random)
 
-  def reset(self, np_random):
-    super().reset(np_random)
-    self._agent_loader = self.loader_class(self.config, self._np_random)
-    self.spawned = set()
-
-  def spawn_individual(self, r, c, idx, resilient=False):
-    agent = next(self._agent_loader)
-    agent = agent(self.config, idx)
-    player = Player(self.realm, (r, c), agent, resilient)
-    super().spawn(player)
-    self.spawned.add(idx)
-
-  def spawn(self):
-    # Check and assign the constant heal flag
+    # Check and assign the reslient flag
     resilient_flag = [False] * self.config.PLAYER_N
     if self.config.RESOURCE_SYSTEM_ENABLED:
       num_resilient = round(self.config.RESOURCE_RESILIENT_POPULATION * self.config.PLAYER_N)
@@ -165,15 +107,14 @@ class PlayerManager(EntityGroup):
       self._np_random.shuffle(resilient_flag)
 
     # Spawn the players
-    idx = 0
-    while idx < self.config.PLAYER_N:
-      idx += 1
-      r, c = self._agent_loader.get_spawn_position(idx)
+    for agent_id in self.config.POSSIBLE_AGENTS:
+      r, c = agent_loader.get_spawn_position(agent_id)
 
-      if idx in self.entities:
+      if agent_id in self.entities:
         continue
 
-      if idx in self.spawned:
-        continue
-
-      self.spawn_individual(r, c, idx, resilient_flag[idx-1])
+      # NOTE: put spawn_individual() here. Is a separate function necessary?
+      agent = next(agent_loader)  # get agent cls from config.PLAYERS
+      agent = agent(self.config, agent_id)
+      player = Player(self.realm, (r, c), agent, resilient_flag[agent_id-1])
+      super().spawn_entity(player)

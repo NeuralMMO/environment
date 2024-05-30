@@ -4,20 +4,36 @@ from __future__ import annotations
 import os
 import sys
 import logging
+import re
 
 import nmmo
 from nmmo.core.agent import Agent
 from nmmo.core.terrain import MapGenerator
 from nmmo.lib import utils, material, spawn
 
+CONFIG_ATTR_PATTERN = r"^[A-Z_]+$"
+GAME_SYSTEMS = ["TERRAIN", "RESOURCE", "COMBAT", "NPC", "PROGRESSION", "ITEM",
+                "EQUIPMENT", "PROFESSION", "EXCHANGE", "COMMUNICATION"]
+
+# These attributes are critical for trainer and must not change from the initial values
+OBS_ATTRS = set(["MAX_HORIZON", "PLAYER_N", "MAP_N_OBS", "PLAYER_N_OBS", "TASK_EMBED_DIM",
+                 "ITEM_INVENTORY_CAPACITY", "MARKET_N_OBS", "PRICE_N_OBS",
+                 "COMMUNICATION_NUM_TOKENS", "COMMUNICATION_N_OBS", "PROVIDE_ACTION_TARGETS",
+                 "PROVIDE_DEATH_FOG_OBS", "PROVIDE_NOOP_ACTION_TARGET"])
+IMMUTABLE_ATTRS = set(["USE_CYTHON", "CURRICULUM_FILE_PATH", "PLAYER_VISION_RADIUS", "MAP_SIZE",
+                       "PLAYER_BASE_HEALTH", "RESOURCE_BASE", "PROGRESSION_LEVEL_MAX"])
+
+
 class Template(metaclass=utils.StaticIterable):
   def __init__(self):
-    self.data = {}
-    cls       = type(self)
+    self._data = {}
+    cls = type(self)
 
-    #Set defaults from static properties
-    for k, v in cls:
-      self.set(k, v)
+    # Set defaults from static properties
+    for attr in dir(cls):
+      val = getattr(cls, attr)
+      if re.match(CONFIG_ATTR_PATTERN, attr) and not isinstance(val, property):
+        self._data[attr] = val
 
   def override(self, **kwargs):
     for k, v in kwargs.items():
@@ -32,34 +48,35 @@ class Template(metaclass=utils.StaticIterable):
       except AttributeError:
         logging.error('Cannot set attribute: %s to %s', str(k), str(v))
         sys.exit()
-    self.data[k] = v
+    self._data[k] = v
 
   # pylint: disable=bad-builtin
   def print(self):
     key_len = 0
-    for k in self.data:
+    for k in self._data:
       key_len = max(key_len, len(k))
 
     print('Configuration')
-    for k, v in self.data.items():
+    for k, v in self._data.items():
       print(f'   {k:{key_len}s}: {v}')
 
   def items(self):
-    return self.data.items()
+    return self._data.items()
 
   def __iter__(self):
-    for k in self.data:
+    for k in self._data:
       yield k
 
   def keys(self):
-    return self.data.keys()
+    return self._data.keys()
 
   def values(self):
-    return self.data.values()
+    return self._data.values()
 
 def validate(config):
   err = 'config.Config is a base class. Use config.{Small, Medium Large}'''
   assert isinstance(config, Config), err
+  assert config.HORIZON < config.MAX_HORIZON, 'HORIZON must be <= MAX_HORIZON'
 
   if not config.TERRAIN_SYSTEM_ENABLED:
     err = 'Invalid Config: {} requires Terrain'
@@ -78,56 +95,18 @@ def validate(config):
 
 
 class Config(Template):
-  '''An environment configuration object
-
-  Global constants are defined as static class variables. You can override
-  any Config variable using standard CLI syntax (e.g. --NENT=128).
-
-  The default config as of v1.5 uses 1024x1024 maps with up to 2048 agents
-  and 1024 NPCs. It is suitable to time horizons of 8192+ steps. For smaller
-  experiments, consider the SmallMaps config.
-
-  Notes:
-    We use Google Fire internally to replace standard manual argparse
-    definitions for each Config property. This means you can subclass
-    Config to add new static attributes -- CLI definitions will be
-    generated automatically.
-  '''
+  '''An environment configuration object'''
+  env_initialized = False
 
   def __init__(self):
     super().__init__()
+    self._attr_to_reset = []
 
     # TODO: Come up with a better way
     # to resolve mixin MRO conflicts
-    if not hasattr(self, 'TERRAIN_SYSTEM_ENABLED'):
-      self.TERRAIN_SYSTEM_ENABLED = False
-
-    if not hasattr(self, 'RESOURCE_SYSTEM_ENABLED'):
-      self.RESOURCE_SYSTEM_ENABLED = False
-
-    if not hasattr(self, 'COMBAT_SYSTEM_ENABLED'):
-      self.COMBAT_SYSTEM_ENABLED = False
-
-    if not hasattr(self, 'NPC_SYSTEM_ENABLED'):
-      self.NPC_SYSTEM_ENABLED = False
-
-    if not hasattr(self, 'PROGRESSION_SYSTEM_ENABLED'):
-      self.PROGRESSION_SYSTEM_ENABLED = False
-
-    if not hasattr(self, 'ITEM_SYSTEM_ENABLED'):
-      self.ITEM_SYSTEM_ENABLED = False
-
-    if not hasattr(self, 'EQUIPMENT_SYSTEM_ENABLED'):
-      self.EQUIPMENT_SYSTEM_ENABLED = False
-
-    if not hasattr(self, 'PROFESSION_SYSTEM_ENABLED'):
-      self.PROFESSION_SYSTEM_ENABLED = False
-
-    if not hasattr(self, 'EXCHANGE_SYSTEM_ENABLED'):
-      self.EXCHANGE_SYSTEM_ENABLED = False
-
-    if not hasattr(self, 'COMMUNICATION_SYSTEM_ENABLED'):
-      self.COMMUNICATION_SYSTEM_ENABLED = False
+    for system in GAME_SYSTEMS:
+      if not hasattr(self, f'{system}_SYSTEM_ENABLED'):
+        self.set(f'{system}_SYSTEM_ENABLED', False)
 
     if __debug__:
       validate(self)
@@ -138,23 +117,89 @@ class Config(Template):
     for attr in deprecated_attrs:
       assert not hasattr(self, attr), f'{attr} has been deprecated or renamed'
 
+  @property
+  def original(self):
+    return self._data
+
+  def reset(self):
+    '''Reset all attributes changed during the episode'''
+    for attr in self._attr_to_reset:
+      setattr(self, attr, self.original[attr])
+
+  def set(self, k, v):
+    assert self.env_initialized is False, 'Cannot set config attr after env init'
+    super().set(k, v)
+
+  def set_for_episode(self, k, v):
+    '''Set a config property for the current episode'''
+    assert hasattr(self, k), f'Invalid config property: {k}'
+    assert k not in OBS_ATTRS, f'Cannot change OBS config {k} during the episode'
+    assert k not in IMMUTABLE_ATTRS, f'Cannot change {k} during the episode'
+    # Cannot turn on a game system that was not enabled when the env was created
+    if k.endswith('_SYSTEM_ENABLED') and self._data[k] is False and v is True:
+      raise AssertionError(f'Cannot turn on {k} because it was not enabled during env init')
+
+    # Change only the attribute and keep the original value in the data dict
+    setattr(self, k, v)
+    self._attr_to_reset.append(k)
+
+  @property
+  def enabled_systems(self):
+    '''Return a list of the enabled systems from Env.__init__()'''
+    return [k[:-len('_SYSTEM_ENABLED')]
+            for k, v in self._data.items() if k.endswith('_SYSTEM_ENABLED') and v is True]
+
+  @property
+  def system_states(self):
+    '''Return a one-hot encoding of each system enabled/disabled,
+       which can be used as an observation and changed from episode to episode'''
+    return [int(getattr(self, f'{system}_SYSTEM_ENABLED')) for system in GAME_SYSTEMS]
+
+  def are_systems_enabled(self, systems):  # systems is a list of strings
+    '''Check if all provided systems are enabled'''
+    return all(s.upper() in self.enabled_systems for s in systems)
+
+  def toggle_systems(self, target_systems):  # systems is a list of strings
+    '''Activate only the provided game systems and turn off the others'''
+    target_systems = [s.upper() for s in target_systems]
+    for system in target_systems:
+      assert system in self.enabled_systems, f'Invalid game system: {system}'
+      self.set_for_episode(f'{system}_SYSTEM_ENABLED', True)
+
+    for system in self.enabled_systems:
+      if system not in target_systems:
+        self.set_for_episode(f'{system}_SYSTEM_ENABLED', False)
 
   ############################################################################
   ### Meta-Parameters
-  def game_system_enabled(self, name) -> bool:
-    return hasattr(self, name)
-
-  PROVIDE_ACTION_TARGETS       = True
-  '''Provide action targets mask'''
-
-  PROVIDE_NOOP_ACTION_TARGET   = True
-  '''Provide a no-op option for each action'''
-
   PLAYERS                      = [Agent]
   '''Player classes from which to spawn'''
 
+  @property
+  def PLAYER_POLICIES(self):
+    '''Number of player policies'''
+    return len(self.PLAYERS)
+
+  PLAYER_N                     = None
+  '''Maximum number of players spawnable in the environment'''
+
+  @property
+  def POSSIBLE_AGENTS(self):
+    '''List of possible agents to spawn'''
+    return list(range(1, self.PLAYER_N + 1))
+
+  # TODO: CHECK if there could be 100+ entities within one's vision
+  PLAYER_N_OBS                 = 100
+  '''Number of distinct agent observations'''
+
+  MAX_HORIZON = 2**15 - 1  # this is arbitrary
+  '''Maximum number of steps the environment can run for'''
+
   HORIZON = 1024
   '''Number of steps before the environment resets'''
+
+  GAME_PACKS = None
+  '''List of game packs to load and sample: [(game class, sampling weight)]'''
 
   CURRICULUM_FILE_PATH = None
   '''Path to a curriculum task file containing a list of task specs for training'''
@@ -165,38 +210,31 @@ class Config(Template):
   ALLOW_MULTI_TASKS_PER_AGENT = False
   '''Whether to allow multiple tasks per agent'''
 
+  PROVIDE_ACTION_TARGETS       = True
+  '''Provide action targets mask'''
+
+  PROVIDE_NOOP_ACTION_TARGET   = True
+  '''Provide a no-op option for each action'''
+
+  PROVIDE_DEATH_FOG_OBS = False
+  '''Provide death fog observation'''
+
+  ALLOW_MOVE_INTO_OCCUPIED_TILE = True
+  '''Whether agents can move into tiles occupied by other agents/npcs
+     However, this does not apply to spawning'''
+
+
   ############################################################################
-  ### Population Parameters
-  LOG_VERBOSE                  = False
-  '''Whether to log server messages or just stats'''
+  ### System/debug Parameters
+  USE_CYTHON = True
+  '''Whether to use cython modules for performance'''
 
-  LOG_ENV                      = False
-  '''Whether to log env steps (expensive)'''
-
-  LOG_MILESTONES               = True
-  '''Whether to log server-firsts (semi-expensive)'''
-
-  LOG_EVENTS                   = True
-  '''Whether to log events (semi-expensive)'''
-
-  LOG_FILE                     = None
-  '''Where to write logs (defaults to console)'''
+  IMMORTAL = False
+  '''Debug parameter: prevents agents from dying except by void'''
 
 
   ############################################################################
   ### Player Parameters
-  PLAYER_N                     = None
-  '''Maximum number of players spawnable in the environment'''
-
-  # TODO: CHECK if there could be 100+ entities within one's vision
-  PLAYER_N_OBS                 = 100
-  '''Number of distinct agent observations'''
-
-  @property
-  def PLAYER_POLICIES(self):
-    '''Number of player policies'''
-    return len(self.PLAYERS)
-
   PLAYER_BASE_HEALTH           = 100
   '''Initial agent health'''
 
@@ -208,34 +246,27 @@ class Config(Template):
     '''Size of the square tile crop visible to an agent'''
     return 2*self.PLAYER_VISION_RADIUS + 1
 
-  PLAYER_DEATH_FOG             = None
+  PLAYER_HEALTH_INCREMENT      = 0
+  '''The amount to increment health by 1 per tick for players, like npcs'''
+
+  DEATH_FOG_ONSET              = None
   '''How long before spawning death fog. None for no death fog'''
 
-  PLAYER_DEATH_FOG_SPEED       = 1
+  DEATH_FOG_SPEED              = 1
   '''Number of tiles per tick that the fog moves in'''
 
-  PLAYER_DEATH_FOG_FINAL_SIZE  = 8
+  DEATH_FOG_FINAL_SIZE         = 8
   '''Number of tiles from the center that the fog stops'''
 
   PLAYER_LOADER                = spawn.SequentialLoader
   '''Agent loader class specifying spawn sampling'''
 
-  PLAYER_SPAWN_TEAMMATE_DISTANCE = 1
-  '''Buffer tiles between teammates at spawn'''
-
-  @property
-  def PLAYER_TEAM_SIZE(self):
-    if __debug__:
-      assert not self.PLAYER_N % len(self.PLAYERS)
-    return self.PLAYER_N // len(self.PLAYERS)
 
   ############################################################################
-  ### Debug Parameters
-  IMMORTAL = False
-  '''Debug parameter: prevents agents from dying except by void'''
+  ### Team Parameters
+  TEAMS                        = None  # Dict[Any, List[int]]
+  '''A dictionary of team assignments: key is team_id, value is a list of agent_ids'''
 
-  RESET_ON_DEATH = False
-  '''Debug parameter: whether to reset the environment whenever an agent dies'''
 
   ############################################################################
   ### Map Parameters
@@ -250,21 +281,25 @@ class Config(Template):
     '''Number of distinct tile observations'''
     return int(self.PLAYER_VISION_DIAMETER ** 2)
 
-  MAP_CENTER                   = None
-  '''Size of each map (number of tiles along each side)'''
+  MAP_SIZE                     = None
+  '''Size of the whole map, including the center and borders'''
 
-  MAP_BORDER                   = 16
-  '''Number of void border tiles surrounding each side of the map'''
+  MAP_CENTER                   = None
+  '''Size of each map (number of tiles along each side), where agents can move around'''
 
   @property
-  def MAP_SIZE(self):
-    return int(self.MAP_CENTER + 2*self.MAP_BORDER)
+  def MAP_BORDER(self):
+    '''Number of background, void border tiles surrounding each side of the map'''
+    return int((self.MAP_SIZE - self.MAP_CENTER) // 2)
 
   MAP_GENERATOR                = MapGenerator
   '''Specifies a user map generator. Uses default generator if unspecified.'''
 
   MAP_FORCE_GENERATION         = True
   '''Whether to regenerate and overwrite existing maps'''
+
+  MAP_RESET_FROM_FRACTAL       = True
+  '''Whether to regenerate the map from the fractal source'''
 
   MAP_GENERATE_PREVIEWS        = False
   '''Whether map generation should also save .png previews (slow + large file size)'''
@@ -293,8 +328,8 @@ class Config(Template):
   PATH_MAP_SUFFIX          = 'map{}/map.npy'
   '''Map file name'''
 
-  PATH_MAP_SUFFIX          = 'map{}/map.npy'
-  '''Map file name'''
+  PATH_FRACTAL_SUFFIX      = 'map{}/fractal.npy'
+  '''Fractal file name'''
 
 
 ############################################################################
@@ -335,6 +370,16 @@ class Terrain:
   TERRAIN_FOILAGE              = 0.85
   '''Noise threshold for foilage (food tile)'''
 
+  TERRAIN_RESET_TO_GRASS       = False
+  '''Whether to make all tiles grass.
+     Only works when MAP_RESET_FROM_FRACTAL is True'''
+
+  TERRAIN_DISABLE_STONE        = False
+  '''Disable stone (obstacle) tiles'''
+
+  TERRAIN_SCATTER_EXTRA_RESOURCES = True
+  '''Whether to scatter extra food, water on the map.
+     Only works when MAP_RESET_FROM_FRACTAL is True'''
 
 class Resource:
   '''Resource Game System'''
@@ -378,6 +423,15 @@ class Resource:
   '''Fraction of health restored per tick when above half food+water'''
 
 
+# NOTE: Included self to be picklable (in torch.save) since lambdas are not picklable
+def original_combat_damage_formula(self, offense, defense, multiplier, minimum_proportion):
+  # pylint: disable=unused-argument
+  return int(multiplier * (offense * (15 / (15 + defense))))
+
+def alt_combat_damage_formula(self, offense, defense, multiplier, minimum_proportion):
+  # pylint: disable=unused-argument
+  return int(max(multiplier * offense - defense, offense * minimum_proportion))
+
 class Combat:
   '''Combat Game System'''
 
@@ -387,6 +441,9 @@ class Combat:
   COMBAT_SPAWN_IMMUNITY              = 20
   '''Agents older than this many ticks cannot attack agents younger than this many ticks'''
 
+  COMBAT_ALLOW_FLEXIBLE_STYLE        = True
+  '''Whether to allow agents to attack with any style in a given turn''' 
+
   COMBAT_STATUS_DURATION             = 3
   '''Combat status lasts for this many ticks after the last combat event.
      Combat events include both attacking and being attacked.'''
@@ -394,32 +451,35 @@ class Combat:
   COMBAT_WEAKNESS_MULTIPLIER         = 1.5
   '''Multiplier for super-effective attacks'''
 
-  def COMBAT_DAMAGE_FORMULA(self, offense, defense, multiplier):
-    '''Damage formula'''
-    return int(multiplier * (offense * (15 / (15 + defense))))
+  COMBAT_MINIMUM_DAMAGE_PROPORTION   = 0.25
+  '''Minimum proportion of damage to inflict on a target'''
 
-  COMBAT_MELEE_DAMAGE                = 30
+  # NOTE: When using a custom function, include "self" as the first arg
+  COMBAT_DAMAGE_FORMULA = alt_combat_damage_formula
+  '''Damage formula'''
+
+  COMBAT_MELEE_DAMAGE                = 10
   '''Melee attack damage'''
 
   COMBAT_MELEE_REACH                 = 3
   '''Reach of attacks using the Melee skill'''
 
-  COMBAT_RANGE_DAMAGE                = 30
+  COMBAT_RANGE_DAMAGE                = 10
   '''Range attack damage'''
 
   COMBAT_RANGE_REACH                 = 3
   '''Reach of attacks using the Range skill'''
 
-  COMBAT_MAGE_DAMAGE                 = 30
+  COMBAT_MAGE_DAMAGE                 = 10
   '''Mage attack damage'''
 
   COMBAT_MAGE_REACH                  = 3
   '''Reach of attacks using the Mage skill'''
 
 
-def default_exp_threshold(max_level):
+def default_exp_threshold(base_exp, max_level):
   import math
-  additional_exp_per_level = [round(90*math.sqrt(lvl))
+  additional_exp_per_level = [round(base_exp * math.sqrt(lvl))
                               for lvl in range(1, max_level+1)]
   return [sum(additional_exp_per_level[:lvl]) for lvl in range(max_level)]
 
@@ -435,10 +495,10 @@ class Progression:
   PROGRESSION_LEVEL_MAX             = 10
   '''Max skill level'''
 
-  PROGRESSION_EXP_THRESHOLD         = default_exp_threshold(PROGRESSION_LEVEL_MAX)
+  PROGRESSION_EXP_THRESHOLD         = default_exp_threshold(90, PROGRESSION_LEVEL_MAX)
   '''A list of experience thresholds for each level'''
 
-  PROGRESSION_COMBAT_XP_SCALE       = 3
+  PROGRESSION_COMBAT_XP_SCALE       = 6
   '''Additional XP for each attack for skills Melee, Range, and Mage'''
 
   PROGRESSION_AMMUNITION_XP_SCALE   = 15
@@ -447,19 +507,19 @@ class Progression:
   PROGRESSION_CONSUMABLE_XP_SCALE   = 30
   '''Multiplier XP for each harvest for Fishing and Herbalism'''
 
-  PROGRESSION_MELEE_BASE_DAMAGE     = 20
+  PROGRESSION_MELEE_BASE_DAMAGE     = 10
   '''Base Melee attack damage'''
 
   PROGRESSION_MELEE_LEVEL_DAMAGE    = 5
   '''Bonus Melee attack damage per level'''
 
-  PROGRESSION_RANGE_BASE_DAMAGE     = 20
+  PROGRESSION_RANGE_BASE_DAMAGE     = 10
   '''Base Range attack damage'''
 
   PROGRESSION_RANGE_LEVEL_DAMAGE    = 5
   '''Bonus Range attack damage per level'''
 
-  PROGRESSION_MAGE_BASE_DAMAGE      = 20
+  PROGRESSION_MAGE_BASE_DAMAGE      = 10
   '''Base Mage attack damage '''
 
   PROGRESSION_MAGE_LEVEL_DAMAGE     = 5
@@ -480,6 +540,9 @@ class NPC:
 
   NPC_N                               = None
   '''Maximum number of NPCs spawnable in the environment'''
+
+  NPC_DEFAULT_REFILL_DEAD_NPCS        = True
+  '''Whether to refill dead NPCs'''
 
   NPC_SPAWN_ATTEMPTS                  = 25
   '''Number of NPC spawn attempts per tick'''
@@ -502,14 +565,20 @@ class NPC:
   NPC_BASE_DEFENSE                    = 0
   '''Base NPC defense'''
 
-  NPC_LEVEL_DEFENSE                   = 15
+  NPC_LEVEL_DEFENSE                   = 8
   '''Bonus NPC defense per level'''
 
-  NPC_BASE_DAMAGE                     = 15
+  NPC_BASE_DAMAGE                     = 0
   '''Base NPC damage'''
 
-  NPC_LEVEL_DAMAGE                    = 15
+  NPC_LEVEL_DAMAGE                    = 8
   '''Bonus NPC damage per level'''
+
+  NPC_LEVEL_MULTIPLIER                = 1.0
+  '''Multiplier for NPC level damage and defense, for easier difficulty tuning'''
+
+  NPC_ALLOW_ATTACK_OTHER_NPCS         = False
+  '''Whether NPCs can attack other NPCs'''
 
 
 class Item:
@@ -542,19 +611,19 @@ class Equipment:
   WEAPON_DROP_PROB = 0.025
   '''Chance of getting a weapon while harvesting ammunition'''
 
-  EQUIPMENT_WEAPON_BASE_DAMAGE         = 15
+  EQUIPMENT_WEAPON_BASE_DAMAGE         = 5
   '''Base weapon damage'''
 
-  EQUIPMENT_WEAPON_LEVEL_DAMAGE        = 15
+  EQUIPMENT_WEAPON_LEVEL_DAMAGE        = 5
   '''Added weapon damage per level'''
 
-  EQUIPMENT_AMMUNITION_BASE_DAMAGE     = 15
+  EQUIPMENT_AMMUNITION_BASE_DAMAGE     = 5
   '''Base ammunition damage'''
 
-  EQUIPMENT_AMMUNITION_LEVEL_DAMAGE    = 15
+  EQUIPMENT_AMMUNITION_LEVEL_DAMAGE    = 10
   '''Added ammunition damage per level'''
 
-  EQUIPMENT_TOOL_BASE_DEFENSE          = 30
+  EQUIPMENT_TOOL_BASE_DEFENSE          = 15
   '''Base tool defense'''
 
   EQUIPMENT_TOOL_LEVEL_DEFENSE         = 0
@@ -563,7 +632,7 @@ class Equipment:
   EQUIPMENT_ARMOR_BASE_DEFENSE         = 0
   '''Base armor defense'''
 
-  EQUIPMENT_ARMOR_LEVEL_DEFENSE        = 10
+  EQUIPMENT_ARMOR_LEVEL_DEFENSE        = 3
   '''Base equipment defense'''
 
 
@@ -603,8 +672,8 @@ class Profession:
   PROFESSION_FISH_RESPAWN             = 0.02
   '''Probability that a harvested fish tile will regenerate each tick'''
 
-  @staticmethod
-  def PROFESSION_CONSUMABLE_RESTORE(level):
+  def PROFESSION_CONSUMABLE_RESTORE(self, level):
+    '''Amount of food/water restored by consuming a consumable item'''
     return 50 + 5*level
 
 
@@ -617,13 +686,13 @@ class Exchange:
   EXCHANGE_BASE_GOLD                  = 1
   '''Initial gold amount'''
 
-  EXCHANGE_LISTING_DURATION           = 5
+  EXCHANGE_LISTING_DURATION           = 3
   '''The number of ticks, during which the item is listed for sale'''
 
-  MARKET_N_OBS = 1024
+  MARKET_N_OBS = 384  # this should be proportion to PLAYER_N
   '''Number of distinct item observations'''
 
-  PRICE_N_OBS = 99 # make it different from PLAYER_N_OBS
+  PRICE_N_OBS = 99  # make it different from PLAYER_N_OBS
   '''Number of distinct price observations
      This also determines the maximum price one can set for an item
   '''
@@ -632,11 +701,13 @@ class Exchange:
 class Communication:
   '''Exchange Game System'''
 
-  COMMUNICATION_SYSTEM_ENABLED             = True
+  COMMUNICATION_SYSTEM_ENABLED         = True
   '''Game system flag'''
 
-  # CHECK ME: When do we actually use this?
-  COMMUNICATION_NUM_TOKENS                 = 50
+  COMMUNICATION_N_OBS                  = 32
+  '''Number of players that share the same communication obs, i.e. the same team'''
+
+  COMMUNICATION_NUM_TOKENS             = 127
   '''Number of distinct COMM tokens'''
 
 
@@ -656,6 +727,7 @@ class Small(Config):
   PLAYER_N                     = 64
 
   MAP_PREVIEW_DOWNSCALE        = 4
+  MAP_SIZE                     = 64
   MAP_CENTER                   = 32
 
   TERRAIN_LOG_INTERPOLATE_MIN  = 0
@@ -678,6 +750,7 @@ class Medium(Config):
   PLAYER_N                     = 128
 
   MAP_PREVIEW_DOWNSCALE        = 16
+  MAP_SIZE                     = 160
   MAP_CENTER                   = 128
 
   NPC_N                        = 128
@@ -698,6 +771,7 @@ class Large(Config):
   PLAYER_N                     = 1024
 
   MAP_PREVIEW_DOWNSCALE        = 64
+  MAP_SIZE                     = 1056
   MAP_CENTER                   = 1024
 
   NPC_N                        = 1024

@@ -15,7 +15,7 @@ from nmmo.core.observation import Observation
 from nmmo.task.group import Group
 from nmmo.entity.entity import EntityState
 from nmmo.lib.event_log import EventState, ATTACK_COL_MAP, ITEM_COL_MAP, LEVEL_COL_MAP
-from nmmo.lib.log import EventCode
+from nmmo.lib.event_code import EventCode
 from nmmo.systems.item import ItemState
 from nmmo.core.tile import TileState
 
@@ -44,16 +44,18 @@ class GameState:
   event_data: np.ndarray # a copied, whole Event log table
   event_index: Dict[int, Iterable]
 
+  # status of the seize target tiles (row, col) -> (ent_id, tick)
+  seize_status: Dict[Tuple[int, int], Tuple[int, int]]
+
   cache_result: MutableMapping # cache for general memoization
   _group_view: List[GroupView] = field(default_factory=list) # cache for GroupView
 
   # add helper functions below
   @functools.lru_cache
   def entity_or_none(self, ent_id):
-    flt_ent = self.entity_data[:, EntityAttr['id']] == ent_id
-    if np.any(flt_ent):
-      return EntityState.parse_array(self.entity_data[flt_ent][0])
-    return None
+    if ent_id not in self.entity_index:
+      return None
+    return EntityState.parse_array(self.entity_data[self.entity_index[ent_id]][0])
 
   def where_in_id(self, data_type, subject: Iterable[int]):
     k = (data_type, subject)
@@ -162,7 +164,7 @@ class TileView(ArrayView):
     super().__init__(TileAttr, 'tile', gs, subject, arr)
 
   def get_attribute(self, attr) -> np.ndarray:
-    return [o[:, self._mapping[attr]]for o in self._arr]
+    return [o[:, self._mapping[attr]] for o in self._arr]
 
 class EventCodeView(ArrayView):
   def __init__(self,
@@ -275,6 +277,7 @@ class GameStateGenerator:
       item_index = precompute_index(item_data, ItemAttr["owner_id"]),
       event_data = event_data,
       event_index = precompute_index(event_data, EventAttr['ent_id']),
+      seize_status = realm.seize_status,
       cache_result = {}
     )
 

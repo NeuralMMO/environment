@@ -111,14 +111,7 @@ class ScriptedAgentTestConfig(nmmo.config.Small, nmmo.config.AllGameSystems):
 
   __test__ = False
 
-  LOG_ENV = True
-
-  LOG_MILESTONES = True
-  LOG_EVENTS = False
-  LOG_VERBOSE = False
-
-  PLAYER_DEATH_FOG = 5
-
+  DEATH_FOG_ONSET = 5
   PLAYERS = [
     baselines.Fisher, baselines.Herbalist,
     baselines.Prospector,baselines.Carver, baselines.Alchemist,
@@ -178,8 +171,7 @@ def change_spawn_pos(realm: Realm, ent_id: int, new_pos):
   realm.map.tiles[old_pos].remove_entity(ent_id)
 
   # set to new pos
-  entity.row.update(new_pos[0])
-  entity.col.update(new_pos[1])
+  entity.set_pos(*new_pos)
   entity.spawn_pos = new_pos
   realm.map.tiles[new_pos].add_entity(entity)
 
@@ -197,10 +189,10 @@ class ScriptedTestTemplate(unittest.TestCase):
   def setUpClass(cls):
     # only use Combat agents
     cls.config = ScriptedAgentTestConfig()
-    cls.config.PROVIDE_ACTION_TARGETS = True
+    cls.config.set("PROVIDE_ACTION_TARGETS", True)
 
-    cls.config.PLAYERS = [baselines.Melee, baselines.Range, baselines.Mage]
-    cls.config.PLAYER_N = 3
+    cls.config.set("PLAYERS", [baselines.Melee, baselines.Range, baselines.Mage])
+    cls.config.set("PLAYER_N", 3)
     #cls.config.IMMORTAL = True
 
     # set up agents to test ammo use
@@ -212,6 +204,7 @@ class ScriptedTestTemplate(unittest.TestCase):
 
     # items to provide
     cls.init_gold = 5
+    # TODO: there should not be level 0 items
     cls.item_level = [0, 3] # 0 can be used, 3 cannot be used
     cls.item_sig = {}
 
@@ -230,7 +223,7 @@ class ScriptedTestTemplate(unittest.TestCase):
     config = deepcopy(self.config)
 
     if remove_immunity:
-      config.COMBAT_SPAWN_IMMUNITY = 0
+      config.set("COMBAT_SPAWN_IMMUNITY", 0)
 
     env = ScriptedAgentTestEnv(config, seed=random_seed)
     env.reset()
@@ -261,7 +254,7 @@ class ScriptedTestTemplate(unittest.TestCase):
         tile.material_id.update(Material.Grass.index)
         tile.state = Material.Grass(env.config)
 
-    env.obs = env._compute_observations()
+    env._compute_observations()
 
     if check_assert:
       self._check_default_asserts(env)
@@ -385,9 +378,9 @@ class ScriptedTestTemplate(unittest.TestCase):
 # pylint: disable=unnecessary-lambda,bad-builtin
 def profile_env_step(action_target=True, tasks=None, condition=None):
   config = nmmo.config.Default()
-  config.PLAYERS = [baselines.Sleeper] # the scripted agents doing nothing
-  config.IMMORTAL = True # otherwise the agents will die
-  config.PROVIDE_ACTION_TARGETS = action_target
+  config.set("PLAYERS", [baselines.Sleeper])  # the scripted agents doing nothing
+  config.set("IMMORTAL", True)  # otherwise the agents will die
+  config.set("PROVIDE_ACTION_TARGETS", action_target)
   env = nmmo.Env(config, seed=0)
   if tasks is None:
     tasks = []
@@ -395,7 +388,7 @@ def profile_env_step(action_target=True, tasks=None, condition=None):
   for _ in range(3):
     env.step({})
 
-  env.obs = env._compute_observations()
+  env._compute_observations()
   obs = deepcopy(env.obs)
 
   test_func = [

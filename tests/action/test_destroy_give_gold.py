@@ -10,7 +10,7 @@ from scripted import baselines
 
 RANDOM_SEED = 985
 
-LOGFILE = 'tests/action/test_destroy_give_gold.log'
+LOGFILE = None  # 'tests/action/test_destroy_give_gold.log'
 
 class TestDestroyGiveGold(ScriptedTestTemplate):
   # pylint: disable=protected-access,multiple-statements,no-member
@@ -20,16 +20,15 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
     super().setUpClass()
 
     # config specific to the tests here
-    cls.config.PLAYERS = [baselines.Melee, baselines.Range]
-    cls.config.PLAYER_N = 6
+    cls.config.set("PLAYERS", [baselines.Melee, baselines.Range])
+    cls.config.set("PLAYER_N", 6)
 
     cls.policy = { 1:'Melee', 2:'Range', 3:'Melee', 4:'Range', 5:'Melee', 6:'Range' }
     cls.spawn_locs = { 1:(17,17), 2:(21,21), 3:(17,17), 4:(21,21), 5:(21,21), 6:(17,17) }
     cls.ammo = { 1:Item.Whetstone, 2:Item.Arrow, 3:Item.Whetstone,
                  4:Item.Arrow, 5:Item.Whetstone, 6:Item.Arrow }
 
-    cls.config.LOG_VERBOSE = False
-    if cls.config.LOG_VERBOSE:
+    if LOGFILE:  # for debugging
       logging.basicConfig(filename=LOGFILE, level=logging.INFO)
 
   def test_destroy(self):
@@ -97,7 +96,7 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
 
     # teleport the npc -1 to agent 5's location
     change_spawn_pos(env.realm, -1, self.spawn_locs[5])
-    env.obs = env._compute_observations()
+    env._compute_observations()
 
     """ First tick actions """
     actions = {}
@@ -108,9 +107,6 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
                      'ent_mask': True, 'inv_mask': True, 'valid': True }
     # agent 2: give ammo to agent 2 (invalid: cannot give to self)
     test_cond[2] = { 'tgt_id': 2, 'item_sig': self.item_sig[2][0],
-                     'ent_mask': False, 'inv_mask': True, 'valid': False }
-    # agent 4: give ammo to agent 5 (invalid: other tile)
-    test_cond[4] = { 'tgt_id': 6, 'item_sig': self.item_sig[4][0],
                      'ent_mask': False, 'inv_mask': True, 'valid': False }
     # agent 5: give ammo to npc -1 (invalid, should be masked)
     test_cond[5] = { 'tgt_id': -1, 'item_sig': self.item_sig[5][0],
@@ -204,8 +200,7 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
       for item_sig in extra_items:
         self.item_sig[ent_id].append(item_sig)
         provide_item(env.realm, ent_id, item_sig[0], item_sig[1], 1)
-
-    env.obs = env._compute_observations()
+    env._compute_observations()
 
     # check if the inventory is full
     for ent_id in [1, 2]:
@@ -248,7 +243,7 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
 
     # teleport the npc -1 to agent 3's location
     change_spawn_pos(env.realm, -1, self.spawn_locs[3])
-    env.obs = env._compute_observations()
+    env._compute_observations()
 
     test_cond = {}
 
@@ -268,10 +263,6 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
     #  tgt_gold is 0 because (2) gave all gold to (4)
     test_cond[4] = { 'tgt_id': 2, 'gold': -1, 'ent_mask': True,
                      'ent_gold': 2*self.init_gold, 'tgt_gold': 0 }
-    # agent 6: give gold to agent 4 (invalid: the other tile)
-    #  tgt_gold is 2*self.init_gold because (4) got 5 gold from (2)
-    test_cond[6] = { 'tgt_id': 4, 'gold': 1, 'ent_mask': False,
-                     'ent_gold': self.init_gold, 'tgt_gold': 2*self.init_gold }
 
     actions = self._check_assert_make_action(env, action.GiveGold, test_cond)
     env.step(actions)

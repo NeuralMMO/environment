@@ -4,12 +4,14 @@ import numpy as np
 import nmmo
 from nmmo.datastore.numpy_datastore import NumpyDatastore
 from nmmo.systems.item import Hat, Top, ItemState
+from nmmo.systems.exchange import Exchange
 
 class MockRealm:
   def __init__(self):
     self.config = nmmo.config.Default()
     self.datastore = NumpyDatastore()
     self.items = {}
+    self.exchange = Exchange(self)
     self.datastore.register_object_type("Item", ItemState.State.num_attributes)
     self.players = {}
 
@@ -22,12 +24,13 @@ class TestItem(unittest.TestCase):
     self.assertTrue(ItemState.Query.by_id(realm.datastore, hat_1.id.val) is not None)
     self.assertEqual(hat_1.type_id.val, Hat.ITEM_TYPE_ID)
     self.assertEqual(hat_1.level.val, 1)
-    self.assertEqual(hat_1.mage_defense.val, 10)
+    self.assertEqual(hat_1.mage_defense.val, realm.config.EQUIPMENT_ARMOR_LEVEL_DEFENSE)
 
     hat_2 = Hat(realm, 10)
     self.assertTrue(ItemState.Query.by_id(realm.datastore, hat_2.id.val) is not None)
     self.assertEqual(hat_2.level.val, 10)
-    self.assertEqual(hat_2.melee_defense.val, 100)
+    self.assertEqual(hat_2.melee_defense.val,
+                     hat_2.level.val * realm.config.EQUIPMENT_ARMOR_LEVEL_DEFENSE)
 
     self.assertDictEqual(realm.items, {hat_1.id.val: hat_1, hat_2.id.val: hat_2})
 

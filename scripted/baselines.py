@@ -317,7 +317,7 @@ class Scripted(nmmo.Scripted):
     self.actions = {}
 
     self.ob = observation
-    self.me = observation.agent()
+    self.me = observation.agent
 
     # combat level
     self.me.level = max(self.me.melee_level, self.me.range_level, self.me.mage_level)
@@ -344,10 +344,10 @@ class Scripted(nmmo.Scripted):
 
     # When to run from death fog in BR configs
     self.fog_criterion = None
-    if self.config.PLAYER_DEATH_FOG is not None:
+    if self.config.DEATH_FOG_ONSET is not None:
       time_alive = self.me.time_alive
-      start_running = time_alive > self.config.PLAYER_DEATH_FOG - 64
-      run_now = time_alive % max(1, int(1 / self.config.PLAYER_DEATH_FOG_SPEED))
+      start_running = time_alive > self.config.DEATH_FOG_ONSET - 64
+      run_now = time_alive % max(1, int(1 / self.config.DEATH_FOG_SPEED))
       self.fog_criterion = start_running and run_now
 
 

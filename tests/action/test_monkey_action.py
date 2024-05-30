@@ -74,7 +74,7 @@ class TestMonkeyAction(unittest.TestCase):
   # NOTE: this can also be used for sweeping random seeds
   def rollout_with_seed(config, seed, use_str_key=False):
     env = ScriptedAgentTestEnv(config)
-    obs = env.reset(seed=seed)
+    obs, _ = env.reset(seed=seed)
 
     for _ in tqdm(range(TEST_HORIZON)):
       # sample random actions for each player
@@ -82,7 +82,7 @@ class TestMonkeyAction(unittest.TestCase):
       for ent_id in env.realm.players:
         ent_atns = make_random_actions(config, obs[ent_id])
         actions[ent_id] = filter_item_actions(ent_atns, use_str_key)
-      obs, _, _, _ = env.step(actions)
+      obs, _, _, _, _ = env.step(actions)
 
   def test_monkey_action(self):
     try:

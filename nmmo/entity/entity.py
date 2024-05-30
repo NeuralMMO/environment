@@ -1,13 +1,10 @@
-
 import math
 from types import SimpleNamespace
-
 import numpy as np
 
-from nmmo.core.config import Config
 from nmmo.datastore.serialized import SerializedState
 from nmmo.systems import inventory
-from nmmo.lib.log import EventCode
+from nmmo.lib.event_code import EventCode
 
 # pylint: disable=no-member
 EntityState = SerializedState.subclass(
@@ -56,13 +53,13 @@ EntityState = SerializedState.subclass(
 EntityState.Limits = lambda config: {
   **{
     "id": (-math.inf, math.inf),
-    "npc_type": (0, 4),
+    "npc_type": (-1, 3),  # -1 for immortal
     "row": (0, config.MAP_SIZE-1),
     "col": (0, config.MAP_SIZE-1),
     "damage": (0, math.inf),
     "time_alive": (0, math.inf),
-    "freeze": (0, 3),
-    "item_level": (0, 5*config.NPC_LEVEL_MAX),
+    "freeze": (0, math.inf),
+    "item_level": (0, math.inf),
     "attacker_id": (-np.inf, math.inf),
     "latest_combat_tick": (0, math.inf),
     "health": (0, config.PLAYER_BASE_HEALTH),
@@ -95,6 +92,10 @@ EntityState.Limits = lambda config: {
   } if config.PROGRESSION_SYSTEM_ENABLED else {}),
 }
 
+EntityState.State.comm_attr_map = {name: EntityState.State.attr_name_to_col[name]
+                                   for name in ["id", "row", "col", "message"]}
+CommAttr = np.array(list(EntityState.State.comm_attr_map.values()), dtype=np.int64)
+
 EntityState.Query = SimpleNamespace(
   # Whole table
   table=lambda ds: ds.table("Entity").where_neq(
@@ -113,7 +114,12 @@ EntityState.Query = SimpleNamespace(
     EntityState.State.attr_name_to_col["row"],
     EntityState.State.attr_name_to_col["col"],
     r, c, radius),
+
+  # Communication obs
+  comm_obs=lambda ds: ds.table("Entity").where_gt(
+    EntityState.State.attr_name_to_col["id"], 0)[:, CommAttr]
 )
+
 
 class Resources:
   def __init__(self, ent, config):
@@ -129,8 +135,8 @@ class Resources:
       self.water.update(config.RESOURCE_BASE)
       self.food.update(config.RESOURCE_BASE)
 
-  def update(self):
-    if not self.config.RESOURCE_SYSTEM_ENABLED:
+  def update(self, immortal=False):
+    if not self.config.RESOURCE_SYSTEM_ENABLED or immortal:
       return
 
     regen = self.config.RESOURCE_HEALTH_RESTORE_FRACTION
@@ -162,22 +168,29 @@ class Resources:
   def packet(self):
     data = {}
     data['health'] = { 'val': self.health.val, 'max': self.config.PLAYER_BASE_HEALTH }
-    data['food'] = { 'val': self.food.val, 'max': self.config.RESOURCE_BASE }
-    data['water'] = { 'val': self.water.val, 'max': self.config.RESOURCE_BASE }
+    data['food'] = data['water'] = { 'val': 0, 'max': 0 }
+    if self.config.RESOURCE_SYSTEM_ENABLED:
+      data['food'] = { 'val': self.food.val, 'max': self.config.RESOURCE_BASE }
+      data['water'] = { 'val': self.water.val, 'max': self.config.RESOURCE_BASE }
     return data
+
 
 class Status:
   def __init__(self, ent):
     self.freeze = ent.freeze
 
   def update(self):
-    if self.freeze.val > 0:
+    if self.frozen:
       self.freeze.decrement(1)
 
   def packet(self):
     data = {}
     data['freeze'] = self.freeze.val
     return data
+
+  @property
+  def frozen(self):
+    return self.freeze.val > 0
 
 
 # NOTE: History.packet() is actively used in visulazing attacks
@@ -214,7 +227,6 @@ class History:
     data['timeAlive'] = self.time_alive.val
     data['damage_inflicted'] = self.damage_inflicted
     data['damage_received'] = self.damage_received
-
     if self.attack is not None:
       data['attack'] = self.attack
 
@@ -245,20 +257,18 @@ class Entity(EntityState):
     super().__init__(realm.datastore, EntityState.Limits(realm.config))
 
     self.realm = realm
-    self.config: Config = realm.config
+    self.config = realm.config
     # TODO: do not access realm._np_random directly
     #   related to the whole NPC, scripted logic
     # pylint: disable=protected-access
     self._np_random = realm._np_random
-
     self.policy = name
-    self.entity_id = entity_id
     self.repr = None
-
     self.name = name + str(entity_id)
 
-    self.row.update(pos[0])
-    self.col.update(pos[1])
+    self._pos = None
+    self.set_pos(*pos)
+    self.ent_id = entity_id
     self.id.update(entity_id)
 
     self.vision = self.config.PLAYER_VISION_RADIUS
@@ -267,6 +277,8 @@ class Entity(EntityState):
     self.target = None
     self.closest = None
     self.spawn_pos = pos
+    self._immortal = False  # used for testing/player recon
+    self._recon = False
 
     # Submodules
     self.status = Status(self)
@@ -274,9 +286,9 @@ class Entity(EntityState):
     self.resources = Resources(self, self.config)
     self.inventory = inventory.Inventory(realm, self)
 
-  @property
-  def ent_id(self):
-    return self.id.val
+  # @property
+  # def ent_id(self):
+  #   return self.id.val
 
   def packet(self):
     data = {}
@@ -285,17 +297,17 @@ class Entity(EntityState):
     data['inventory'] = self.inventory.packet()
     data['alive'] = self.alive
     data['base'] = {
-      'r': self.row.val,
-      'c': self.col.val,
+      'r': self.pos[0],
+      'c': self.pos[1],
       'name': self.name,
       'level': self.attack_level,
-      'item_level': self.item_level.val,
-    }
-
+      'item_level': self.item_level.val,}
     return data
 
   def update(self, realm, actions):
     '''Update occurs after actions, e.g. does not include history'''
+    self._pos = None
+
     if self.history.damage == 0:
       self.attacker = None
       self.attacker_id.update(0)
@@ -341,14 +353,22 @@ class Entity(EntityState):
 
   @property
   def pos(self):
-    return self.row.val, self.col.val
+    if self._pos is None:
+      self._pos = (self.row.val, self.col.val)
+    return self._pos
+
+  def set_pos(self, row, col):
+    self._pos = (row, col)
+    self.row.update(row)
+    self.col.update(col)
 
   @property
   def alive(self):
-    if self.resources.health.empty:
-      return False
+    return self.resources.health.val > 0
 
-    return True
+  @property
+  def immortal(self):
+    return self._immortal
 
   @property
   def is_player(self) -> bool:
@@ -359,11 +379,14 @@ class Entity(EntityState):
     return False
 
   @property
+  def is_recon(self):
+    return self._recon
+
+  @property
   def attack_level(self) -> int:
     melee = self.skills.melee.level.val
     ranged = self.skills.range.level.val
     mage = self.skills.mage.level.val
-
     return int(max(melee, ranged, mage))
 
   @property
@@ -371,5 +394,4 @@ class Entity(EntityState):
     # NOTE: the initial latest_combat_tick is 0, and valid values are greater than 0
     if not self.config.COMBAT_SYSTEM_ENABLED or self.latest_combat_tick.val == 0:
       return False
-
     return (self.realm.tick - self.latest_combat_tick.val) < self.config.COMBAT_STATUS_DURATION

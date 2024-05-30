@@ -23,16 +23,16 @@ class TestDeterminism(unittest.TestCase):
     # also test get_direction, which was added for speed optimization
     self.assertTrue(np.array_equal(np_random_1._dir_seq, np_random_2._dir_seq))
 
-    print('---test_np_random_get_direction---')
-    print('np_random.integers():', timeit(lambda: np_random_1.integers(0,4),
+    print("---test_np_random_get_direction---")
+    print("np_random.integers():", timeit(lambda: np_random_1.integers(0,4),
                                           number=100000, globals=globals()))
-    print('np_random.get_direction():', timeit(lambda: np_random_1.get_direction(),
+    print("np_random.get_direction():", timeit(lambda: np_random_1.get_direction(),
                                                 number=100000, globals=globals()))
 
   def test_map_determinism(self):
     config = nmmo.config.Default()
-    config.MAP_FORCE_GENERATION = True
-    config.TERRAIN_FLIP_SEED = False
+    config.set("MAP_FORCE_GENERATION", True)
+    config.set("TERRAIN_FLIP_SEED", False)
 
     map_generator = config.MAP_GENERATOR(config)
     np_random1, _ = seeding.np_random(RANDOM_SEED)
@@ -46,8 +46,8 @@ class TestDeterminism(unittest.TestCase):
 
     # test flip seed
     config2 = nmmo.config.Default()
-    config2.MAP_FORCE_GENERATION = True
-    config2.TERRAIN_FLIP_SEED = True
+    config2.set("MAP_FORCE_GENERATION", True)
+    config2.set("TERRAIN_FLIP_SEED", True)
 
     map_generator2 = config2.MAP_GENERATOR(config2)
     np_random2, _ = seeding.np_random(RANDOM_SEED)
@@ -61,20 +61,20 @@ class TestDeterminism(unittest.TestCase):
 
     # config to always generate new maps, to test map determinism
     config1 = ScriptedAgentTestConfig()
-    setattr(config1, 'MAP_FORCE_GENERATION', True)
-    setattr(config1, 'PATH_MAPS', 'maps/det1')
-    setattr(config1, 'RESOURCE_RESILIENT_POPULATION', 0.2)  # uses np_random
+    config1.set("MAP_FORCE_GENERATION", True)
+    config1.set("PATH_MAPS", "maps/det1")
+    config1.set("RESOURCE_RESILIENT_POPULATION", 0.2)  # uses np_random
     config2 = ScriptedAgentTestConfig()
-    setattr(config2, 'MAP_FORCE_GENERATION', True)
-    setattr(config2, 'PATH_MAPS', 'maps/det2')
-    setattr(config2, 'RESOURCE_RESILIENT_POPULATION', 0.2)
+    config2.set("MAP_FORCE_GENERATION", True)
+    config2.set("PATH_MAPS", "maps/det2")
+    config2.set("RESOURCE_RESILIENT_POPULATION", 0.2)
 
     # to create the same maps, seed must be provided
     env1 = ScriptedAgentTestEnv(config1, seed=RANDOM_SEED)
     env2 = ScriptedAgentTestEnv(config2, seed=RANDOM_SEED)
     envs = [env1, env2]
 
-    init_obs = [env.reset(seed=RANDOM_SEED+1) for env in envs]
+    init_obs = [env.reset(seed=RANDOM_SEED+1)[0] for env in envs]
 
     self.assertTrue(observations_are_equal(init_obs[0], init_obs[0])) # sanity check
     self.assertTrue(observations_are_equal(init_obs[0], init_obs[1]),
@@ -91,5 +91,5 @@ class TestDeterminism(unittest.TestCase):
                     f"The multi-env determinism failed. Seed: {RANDOM_SEED}.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   unittest.main()

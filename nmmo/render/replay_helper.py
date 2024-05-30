@@ -2,8 +2,9 @@ import os
 import json
 import logging
 import lzma
-import pickle
 from typing import Dict
+
+import dill
 
 from .render_utils import np_encoder, patch_packet
 
@@ -33,12 +34,17 @@ class FileReplayHelper(ReplayHelper):
     self.packets = None
     self.map = None
     self._i = 0
+    self._agent_task = None
 
   def reset(self):
     self.packets = []
     self.map = None
     self._i = 0
     self.update() # to capture the initial packet
+    self._agent_task = {
+      agent_id: agent.my_task.name
+      for agent_id, agent in self._realm.players.items()
+    }
 
   def __len__(self):
     return len(self.packets)
@@ -67,12 +73,24 @@ class FileReplayHelper(ReplayHelper):
     if "config" in packet:
       del packet["config"]
 
+    # Include the attributes that the web client refers
+    packet["config"] = {
+      "PLAYER_DEATH_FOG": self._realm.config.DEATH_FOG_ONSET,
+      "PLAYER_DEATH_FOG_FINAL_SIZE": self._realm.config.DEATH_FOG_FINAL_SIZE,
+      "PLAYER_DEATH_FOG_SPEED": self._realm.config.DEATH_FOG_SPEED,
+    }
+
     return packet
 
+  # NOTE: Added data for analysis
   def _metadata(self) -> Dict:
     return {
+      'config': self._realm.config.original,  # returns config Dict
+      'task': self._agent_task,
+      'tick': self._realm.tick,  # agents that don't have AGENT_CULL (91) event are alive
       'event_log': self._realm.event_log.get_data(),
-      'event_attr_col': self._realm.event_log.attr_to_col
+      'event_attr_col': self._realm.event_log.attr_to_col,
+      'event_stats': self._realm.event_log.get_stat(),
     }
 
   def update(self):
@@ -97,7 +115,7 @@ class FileReplayHelper(ReplayHelper):
       out.write(data)
 
     with open(metadata_file, 'wb') as out:
-      pickle.dump(self._metadata(), out)
+      dill.dump(self._metadata(), out)
 
   @classmethod
   def load(cls, replay_file):

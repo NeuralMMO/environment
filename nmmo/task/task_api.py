@@ -19,7 +19,9 @@ class Task(ABC):
                assignee: Union[Iterable[int], int],
                reward_multiplier = 1.0,
                embedding = None,
-               spec_name: str = None):
+               spec_name: str = None,
+               reward_to = None,
+               tags: List[str] = None):
     if isinstance(assignee, int):
       self._assignee = (assignee,)
     else:
@@ -28,7 +30,8 @@ class Task(ABC):
     self._eval_fn = eval_fn
     self._reward_multiplier = reward_multiplier
     self._embedding = None if embedding is None else np.array(embedding, dtype=np.float16)
-    self.spec_name = spec_name # None if not created using TaskSpec
+    # These are None if not created using TaskSpec
+    self.spec_name, self.reward_to, self.tags = spec_name, reward_to, tags
     self.name = self._make_name(self.__class__.__name__,
                                 eval_fn=eval_fn, assignee=self._assignee)
     self.reset()
@@ -57,6 +60,10 @@ class Task(ABC):
     return self._completed_tick is not None
 
   @property
+  def progress(self) -> float:
+    return self._progress
+
+  @property
   def reward_multiplier(self) -> float:
     return self._reward_multiplier
 
@@ -80,12 +87,11 @@ class Task(ABC):
     if self.completed:
       return 0.0
 
-    new_progress = max(min(self._eval_fn(gs)*1.0,1.0),0.0)
+    new_progress = max(min(float(self._eval_fn(gs)),1.0),0.0)
     diff = new_progress - self._progress
     self._progress = new_progress
     if self._progress >= 1:
       self._completed_tick = gs.current_tick
-      diff = 1.0  # give out the max reward when task is completed
 
     return diff
 
@@ -245,5 +251,4 @@ def nmmo_default_task(agent_list: Iterable[int], test_mode=None) -> List[Task]:
     # pylint: disable=unused-argument
     return make_same_task(lambda gs, subject: True, agent_list, task_cls=OngoingTask)
 
-  # the default is to use the predicate class
-  return make_same_task(bp.StayAlive, agent_list, task_cls=OngoingTask)
+  return make_same_task(bp.TickGE, agent_list)

@@ -20,10 +20,12 @@ def Success(gs: GameState, subject: Group):
   '''
   return True
 
-def TickGE(gs: GameState, subject: Group, num_tick: int):
+def TickGE(gs: GameState, subject: Group, num_tick: int = None):
   """True if the current tick is greater than or equal to the specified num_tick.
   Is progress counter.
   """
+  if num_tick is None:
+    num_tick = gs.config.HORIZON
   return norm(gs.current_tick / num_tick)
 
 def CanSeeTile(gs: GameState, subject: Group, tile_type: type[Material]):
@@ -41,20 +43,23 @@ def AllDead(gs: GameState, subject: Group):
   """
   return norm(1.0 - count(subject.health) / len(subject))
 
+def CheckAgentStatus(gs: GameState, subject: Group, target: Iterable[int], status: str):
+  """Check if target agents are alive or dead using the game status"""
+  if isinstance(target, int):
+    target = [target]
+  num_agents = len(target)
+  num_alive = sum(1 for agent in target if agent in gs.alive_agents)
+  if status == 'alive':
+    return num_alive / num_agents
+  if status == 'dead':
+    return (num_agents - num_alive) / num_agents
+  # invalid status
+  return 0.0
+
 def OccupyTile(gs: GameState, subject: Group, row: int, col: int):
   """True if any subject agent is on the desginated tile.
   """
   return np.any((subject.row == row) & (subject.col == col))
-
-def AllMembersWithinRange(gs: GameState, subject: Group, dist: int):
-  """True if the max l-inf distance of teammates is
-         less than or equal to dist
-  """
-  current_dist = max(subject.row.max()-subject.row.min(),
-      subject.col.max()-subject.col.min())
-  if current_dist <= 0:
-    return 1.0
-  return norm(dist / current_dist)
 
 def CanSeeAgent(gs: GameState, subject: Group, target: int):
   """True if obj_agent is present in the subjects' entities obs.
@@ -129,7 +134,8 @@ def HoardGold(gs: GameState, subject: Group, amount: int):
 def EarnGold(gs: GameState, subject: Group, amount: int):
   """ True if the total amount of gold earned is greater than or equal to amount.
   """
-  return norm(subject.event.EARN_GOLD.gold.sum() / amount)
+  gold = subject.event.EARN_GOLD.gold.sum() + subject.event.LOOT_GOLD.gold.sum()
+  return norm(gold / amount)
 
 def SpendGold(gs: GameState, subject: Group, amount: int):
   """ True if the total amount of gold spent is greater than or equal to amount.
@@ -139,7 +145,7 @@ def SpendGold(gs: GameState, subject: Group, amount: int):
 def MakeProfit(gs: GameState, subject: Group, amount: int):
   """ True if the total amount of gold earned-spent is greater than or equal to amount.
   """
-  profits = subject.event.EARN_GOLD.gold.sum()
+  profits = subject.event.EARN_GOLD.gold.sum() + subject.event.LOOT_GOLD.gold.sum()
   costs = subject.event.BUY_ITEM.gold.sum()
   return  norm((profits-costs) / amount)
 
@@ -207,6 +213,13 @@ def HarvestItem(gs: GameState, subject: Group, item: type[Item], level: int, qua
   lvl_flt = subject.event.HARVEST_ITEM.level >= level
   return norm(subject.event.HARVEST_ITEM.number[type_flt & lvl_flt].sum() / quantity)
 
+def FireAmmo(gs: GameState, subject: Group, item: type[Item], level: int, quantity: int):
+  """True if total quantity consumed of item type above level is >= quantity
+  """
+  type_flt = subject.event.FIRE_AMMO.type == item.ITEM_TYPE_ID
+  lvl_flt = subject.event.FIRE_AMMO.level >= level
+  return norm(subject.event.FIRE_AMMO.number[type_flt & lvl_flt].sum() / quantity)
+
 def ListItem(gs: GameState, subject: Group, item: type[Item], level: int, quantity: int):
   """True if total quantity listed of item type above level is >= quantity
   """
@@ -220,3 +233,102 @@ def BuyItem(gs: GameState, subject: Group, item: type[Item], level: int, quantit
   type_flt = subject.event.BUY_ITEM.type == item.ITEM_TYPE_ID
   lvl_flt = subject.event.BUY_ITEM.level >= level
   return norm(subject.event.BUY_ITEM.number[type_flt & lvl_flt].sum() / quantity)
+
+
+############################################################################################
+# Below are used for the mini games, so these need to be fast
+
+def ProgressTowardCenter(gs, subject):
+  if not any(a in gs.alive_agents for a in subject.agents):  # subject should be alive
+    return 0.0
+  center = gs.config.MAP_SIZE // 2
+  max_dist = center - gs.config.MAP_BORDER
+
+  r = subject.row
+  c = subject.col
+  # distance to the center tile, so dist = 0 when subject is on the center tile
+  if len(r) == 1:
+    dists = utils.linf_single((r[0], c[0]), (center, center))
+  else:
+    coords = np.hstack([r, c])
+    # NOTE: subject can be multiple agents (e.g., team), so taking the minimum
+    dists = np.min(utils.linf(coords, (center, center)))
+  return 1.0 - dists/max_dist
+
+def AllMembersWithinRange(gs: GameState, subject: Group, dist: int):
+  """True if the max l-inf distance of teammates is
+         less than or equal to dist
+  """
+  if dist < 0 or \
+     not any(a in gs.alive_agents for a in subject.agents):  # subject should be alive
+    return 0.0
+
+  max_dist = gs.config.MAP_CENTER
+  r = subject.row
+  c = subject.col
+  current_dist = max(r.max()-r.min(), c.max()-c.min())
+  if current_dist <= dist:
+    return 1.0
+
+  # progress bonus, which takes account of the overall distribution
+  max_dist_score = (max_dist - current_dist) / (max_dist - dist)
+  r_sd_score = dist / max(3*np.std(r), dist)  # becomes 1 if 3*std(r) < dist
+  c_sd_score = dist / max(3*np.std(c), dist)  # becomes 1 if 3*std(c) < dist
+  return (max_dist_score + r_sd_score + c_sd_score) / 3.0
+
+def SeizeTile(gs: GameState, subject: Group, row: int, col: int, num_ticks: int,
+              progress_bonus = 0.4, seize_bonus = 0.3):
+  if not any(subject.health > 0):  # subject should be alive
+    return 0.0
+  target_tile = (row, col)
+
+  # When the subject seizes the target tile
+  if target_tile in gs.seize_status and gs.seize_status[target_tile][0] in subject.agents:
+    seize_duration = gs.current_tick - gs.seize_status[target_tile][1]
+    hold_bonus = (1.0 - progress_bonus - seize_bonus) * seize_duration/num_ticks
+    return norm(progress_bonus + seize_bonus + hold_bonus)
+
+  # motivate agents to seize the target tile
+  #max_dist = utils.linf_single(target_tile, gs.spawn_pos[subject.agents[0]])
+  max_dist = gs.config.MAP_CENTER // 2  # does not have to be precise
+  r = subject.row
+  c = subject.col
+  # distance to the center tile, so dist = 0 when subject is on the center tile
+  if len(r) == 1:
+    dists = utils.linf_single((r[0], c[0]), target_tile)
+  else:
+    coords = np.hstack([r.reshape(-1,1), c.reshape(-1,1)])
+    # NOTE: subject can be multiple agents (e.g., team), so taking the minimum
+    dists = np.min(utils.linf(coords, target_tile))
+
+  return norm(progress_bonus * (1.0 - dists/max_dist))
+
+def SeizeCenter(gs: GameState, subject: Group, num_ticks: int,
+                progress_bonus = 0.3):
+  row = col = gs.config.MAP_SIZE // 2  # center tile
+  return SeizeTile(gs, subject, row, col, num_ticks, progress_bonus)
+
+def SeizeQuadCenter(gs: GameState, subject: Group, num_ticks: int, quadrant: str,
+                    progress_bonus = 0.3):
+  center = gs.config.MAP_SIZE // 2
+  half_dist = gs.config.MAP_CENTER // 4
+  if quadrant == "first":
+    row = col = center + half_dist
+  elif quadrant == "second":
+    row, col = center - half_dist, center + half_dist
+  elif quadrant == "third":
+    row = col = center - half_dist
+  elif quadrant == "fourth":
+    row, col = center + half_dist, center - half_dist
+  else:
+    raise ValueError(f"Invalid quadrant {quadrant}")
+  return SeizeTile(gs, subject, row, col, num_ticks, progress_bonus)
+
+def ProtectLeader(gs, subject, target_protect: int, target_destroy: Iterable[int]):
+  """target_destory is not used for reward, but used as info for the reward wrapper"""
+  # Failed to protect the leader
+  if target_protect not in gs.alive_agents:
+    return 0
+
+  # Reward each tick the target is alive
+  return gs.current_tick / gs.config.HORIZON

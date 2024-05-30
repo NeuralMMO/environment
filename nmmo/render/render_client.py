@@ -1,15 +1,15 @@
 from __future__ import annotations
 import numpy as np
 
-from nmmo.render import websocket
 from nmmo.render.overlay import OverlayRegistry
 from nmmo.render.render_utils import patch_packet
 
 
 # Render is external to the game
-class WebsocketRenderer:
+# NOTE: WebsocketRenderer has been renamed to DummyRenderer
+class DummyRenderer:
   def __init__(self, realm=None) -> None:
-    self._client = websocket.Application(realm)
+    self._client = None  # websocket.Application(realm)
     self.overlay_pos = [256, 256]
 
     self._realm = realm
@@ -53,7 +53,24 @@ class WebsocketRenderer:
     self.packet = packet
 
     # pass the packet to renderer
-    pos, cmd = self._client.update(self.packet)
+    pos, cmd = None, None  # self._client.update(self.packet)
+
+    # NOTE: copy pasted from nmmo/render/websocket.py
+    #   def update(self, packet):
+    #     self.tick += 1
+    #     uptime = np.round(self.tickRate*self.tick, 1)
+    #     delta = time.time() - self.time
+    #     print('Wall Clock: ', str(delta)[:5], 'Uptime: ', uptime, ', Tick: ', self.tick)
+    #     delta = self.tickRate - delta
+    #     if delta > 0:
+    #       time.sleep(delta)
+    #     self.time = time.time()
+    #     for client in self.clients:
+    #       client.sendUpdate(packet)
+    #       if client.pos is not None:
+    #         self.pos = client.pos
+    #         self.cmd = client.cmd
+    #     return self.pos, self.cmd
 
     self.overlay_pos = pos
     self.registry.step(cmd)

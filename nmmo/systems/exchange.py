@@ -5,7 +5,7 @@ import math
 from typing import Dict
 
 from nmmo.systems.item import Item, Stack
-from nmmo.lib.log import EventCode
+from nmmo.lib.event_code import EventCode
 
 """
 The Exchange class is a simulation of an in-game item exchange.
@@ -38,6 +38,10 @@ class Exchange:
     self._realm = realm
     self._config = realm.config
 
+  def reset(self):
+    self._listings_queue.clear()
+    self._item_listings.clear()
+
   def _list_item(self, item: Item, seller, price: int, tick: int):
     item.listed_price.update(price)
     self._item_listings[item.id.val] = ItemListing(item, seller, price, tick)
@@ -51,11 +55,10 @@ class Exchange:
     item = self._item_listings.pop(item_id).item
     item.listed_price.update(0)
 
-  def step(self, current_tick: int):
+  def step(self):
     """
     Remove expired listings from the exchange's listings queue
-    and item listings dictionary. It takes in one parameter,
-    current_tick, which is the current time in the game.
+    and item listings dictionary.
 
     The method starts by checking the oldest listing in the listings
     queue using a while loop. If the current tick minus the
@@ -71,6 +74,10 @@ class Exchange:
     the item's listed price. The process repeats until all expired listings
     are removed from the queue and dictionary.
     """
+    if self._config.EXCHANGE_SYSTEM_ENABLED is False:
+      return
+
+    current_tick = self._realm.tick
 
     # Remove expired listings
     while self._listings_queue:
@@ -97,14 +104,8 @@ class Exchange:
     assert item.listed_price.val == 0, 'Item is already listed'
     assert item.equipped.val == 0, 'Item has been equiped so cannot be listed'
     assert price > 0, 'Price must be larger than 0'
-
     self._list_item(item, seller, price, tick)
-
     self._realm.event_log.record(EventCode.LIST_ITEM, seller, item=item, price=price)
-
-    self._realm.log_milestone(f'Sell_{item.__class__.__name__}', item.level.val,
-      f'EXCHANGE: Offered level {item.level.val} {item.__class__.__name__} for {price} gold',
-      tags={"player_id": seller.ent_id})
 
   def buy(self, buyer, item: Item):
     assert item.quantity.val > 0, f'{item} purchase has quantity {item.quantity.val}'
@@ -133,9 +134,6 @@ class Exchange:
     buyer.gold.decrement(price)
     listing.seller.gold.increment(price)
 
-    # TODO(kywch): tidy up the logs - milestone, event, etc ...
-    #self._realm.log_milestone(f'Buy_{item.__name__}', item.level.val)
-    #self._realm.log_milestone('Transaction_Amount', item.listed_price.val)
     self._realm.event_log.record(EventCode.BUY_ITEM, buyer, item=item, price=price)
     self._realm.event_log.record(EventCode.EARN_GOLD, listing.seller, amount=price)
 
