@@ -95,21 +95,7 @@ def validate(config):
 
 
 class Config(Template):
-  '''An environment configuration object
-
-  Global constants are defined as static class variables. You can override
-  any Config variable using standard CLI syntax (e.g. --NENT=128).
-
-  The default config as of v1.5 uses 1024x1024 maps with up to 2048 agents
-  and 1024 NPCs. It is suitable to time horizons of 8192+ steps. For smaller
-  experiments, consider the SmallMaps config.
-
-  Notes:
-    We use Google Fire internally to replace standard manual argparse
-    definitions for each Config property. This means you can subclass
-    Config to add new static attributes -- CLI definitions will be
-    generated automatically.
-  '''
+  '''An environment configuration object'''
   env_initialized = False
 
   def __init__(self):

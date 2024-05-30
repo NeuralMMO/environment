@@ -276,7 +276,7 @@ class MapGenerator:
     self.textures = lookup
 
   def generate_all_maps(self, seed=None):
-    '''Generates NMAPS maps according to generate_map
+    '''Generates MAP_N maps according to generate_map
 
     Provides additional utilities for saving to .npy and rendering png previews'''
 
