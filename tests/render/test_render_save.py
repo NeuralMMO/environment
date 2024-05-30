@@ -1,4 +1,6 @@
-'''Manual test for render client connectivity and save replay'''
+# Deprecated test; old render system
+
+'''Manual test for render client connectivity and save replay
 import nmmo
 from nmmo.core.config import (AllGameSystems, Combat, Communication,
                               Equipment, Exchange, Item, Medium, Profession,
@@ -71,3 +73,5 @@ if __name__ == '__main__':
     # NOTE: save the data in uncompressed json format, since
     #   the web client has trouble loading the compressed replay file
     replay_helper.save(f'replay_{conf_name}_seed_{RANDOM_SEED:04d}.json')
+
+'''
