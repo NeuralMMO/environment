@@ -24,7 +24,7 @@ class MockTask:
 class MockEntity:
   def __init__(self, ent_id):
     self.ent_id = ent_id
-    self.my_tasks = None
+    self.my_task = None
     if ent_id > 0:  # only for players
       self.my_task = MockTask(ent_id)
 

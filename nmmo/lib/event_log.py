@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 from typing import List
 from copy import deepcopy
+from collections import defaultdict
 
 import numpy as np
 
@@ -86,7 +87,7 @@ class EventLogger(EventCode):
   def record(self, event_code: int, entity: Entity, **kwargs):
     if event_code in [EventCode.EAT_FOOD, EventCode.DRINK_WATER,
                       EventCode.GIVE_ITEM, EventCode.DESTROY_ITEM,
-                      EventCode.GIVE_GOLD]:
+                      EventCode.GIVE_GOLD, EventCode.AGENT_CULLED]:
       # Logs for these events are for counting only
       self._create_event(entity, event_code)
       return
@@ -210,3 +211,54 @@ class EventLogger(EventCode):
       return event_data[flt_idx]
 
     return self._empty_data
+
+  def get_stat(self):
+    event_stat = defaultdict(lambda: defaultdict(int))
+    event_data = EventState.Query.table(self.datastore)
+    for row in event_data:
+      agent_id = row[EventAttr['ent_id']]
+      if agent_id > 0:
+        key = extract_event_key(row)
+        if key is None:
+          continue
+
+        if key[0] == EventCode.GO_FARTHEST:
+          event_stat[agent_id][key] = max(event_stat[agent_id][key],
+                                          row[EventAttr['number']])  # distance
+        elif key[0] in [EventCode.LEVEL_UP, EventCode.EQUIP_ITEM]:
+          event_stat[agent_id][key] = max(event_stat[agent_id][key],
+                                          row[EventAttr['level']])
+        elif key[0] == EventCode.AGENT_CULLED:
+          event_stat[agent_id][key] = row[EventAttr['tick']]  # lifespan
+        else:
+          event_stat[agent_id][key] += 1
+
+    return event_stat
+
+def extract_event_key(event_row):
+  event_code = event_row[EventAttr['event']]
+
+  if event_code in [
+    EventCode.EAT_FOOD,
+    EventCode.DRINK_WATER,
+    EventCode.GO_FARTHEST,
+    EventCode.AGENT_CULLED,
+  ]:
+    return (event_code,)
+
+  if event_code in [
+    EventCode.SCORE_HIT,
+    EventCode.FIRE_AMMO,
+    EventCode.LEVEL_UP,
+    EventCode.HARVEST_ITEM,
+    EventCode.CONSUME_ITEM,
+    EventCode.EQUIP_ITEM,
+    EventCode.LIST_ITEM,
+    EventCode.BUY_ITEM,
+  ]:
+    return (event_code, event_row[EventAttr['type']])
+
+  if event_code == EventCode.PLAYER_KILL:
+    return (event_code, int(event_row[EventAttr['target_ent']] > 0))  # if target is agent or npc
+
+  return None

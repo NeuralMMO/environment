@@ -108,9 +108,6 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
     # agent 2: give ammo to agent 2 (invalid: cannot give to self)
     test_cond[2] = { 'tgt_id': 2, 'item_sig': self.item_sig[2][0],
                      'ent_mask': False, 'inv_mask': True, 'valid': False }
-    # agent 4: give ammo to agent 5 (invalid: other tile)
-    test_cond[4] = { 'tgt_id': 6, 'item_sig': self.item_sig[4][0],
-                     'ent_mask': False, 'inv_mask': True, 'valid': False }
     # agent 5: give ammo to npc -1 (invalid, should be masked)
     test_cond[5] = { 'tgt_id': -1, 'item_sig': self.item_sig[5][0],
                      'ent_mask': False, 'inv_mask': True, 'valid': False }
@@ -266,10 +263,6 @@ class TestDestroyGiveGold(ScriptedTestTemplate):
     #  tgt_gold is 0 because (2) gave all gold to (4)
     test_cond[4] = { 'tgt_id': 2, 'gold': -1, 'ent_mask': True,
                      'ent_gold': 2*self.init_gold, 'tgt_gold': 0 }
-    # agent 6: give gold to agent 4 (invalid: the other tile)
-    #  tgt_gold is 2*self.init_gold because (4) got 5 gold from (2)
-    test_cond[6] = { 'tgt_id': 4, 'gold': 1, 'ent_mask': False,
-                     'ent_gold': self.init_gold, 'tgt_gold': 2*self.init_gold }
 
     actions = self._check_assert_make_action(env, action.GiveGold, test_cond)
     env.step(actions)

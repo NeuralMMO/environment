@@ -1,6 +1,6 @@
-#cython: boundscheck=False
+#cython: boundscheck=True
 #cython: wraparound=True
-#cython: nonecheck=False
+#cython: nonecheck=True
 
 from types import SimpleNamespace
 import numpy as np

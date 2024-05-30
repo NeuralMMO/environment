@@ -27,6 +27,13 @@ class Env(ParallelEnv):
   def __init__(self,
                config: Default = nmmo.config.Default(),
                seed = None):
+    '''Initializes the Neural MMO environment.
+
+    Args:
+      config (Default, optional): Configuration object for the environment.
+      Defaults to nmmo.config.Default().
+      seed (int, optional): Random seed for the environment. Defaults to None.
+    '''
     self._np_random = None
     self._np_seed = None
     self._reset_required = True
@@ -45,7 +52,6 @@ class Env(ParallelEnv):
     self.possible_agents = self.config.POSSIBLE_AGENTS
     self._alive_agents = None
     self._current_agents = None
-    self._dead_agents = set()
     self._dead_this_tick = None
     self.scripted_agents = set()
 
@@ -123,12 +129,12 @@ class Env(ParallelEnv):
   def observation_space(self, agent: AgentID):
     '''Neural MMO Observation Space
 
-    Args:
-        agent: Agent ID
-
-    Returns:
-        observation: gym.spaces object contained the structured observation
-        for the specified agent.'''
+      Args:
+        agent (AgentID): The ID of the agent.
+        
+      Returns:
+        gym.spaces.Dict: The observation space for the agent.
+    '''
     return self._obs_space
 
   # NOTE: make sure this runs once during trainer init and does NOT change afterwards
@@ -159,15 +165,12 @@ class Env(ParallelEnv):
   def action_space(self, agent: AgentID):
     '''Neural MMO Action Space
 
-    Args:
-        agent: Agent ID
+      Args:
+        agent (AgentID): The ID of the agent.
 
-    Returns:
-        actions: gym.spaces object contained the structured actions
-        for the specified agent. Each action is parameterized by a list
-        of discrete-valued arguments. These consist of both fixed, k-way
-        choices (such as movement direction) and selections from the
-        observation space (such as targeting)'''
+      Returns:
+        gym.spaces.Dict: The action space for the agent.
+    '''
     return self._atn_space
 
   ############################################################################
@@ -177,27 +180,20 @@ class Env(ParallelEnv):
             map_id=None,
             make_task_fn: Callable=None,
             game: game_api.Game=None):
-    '''OpenAI Gym API reset function
+    '''Resets the environment and returns the initial observations.
 
-    Loads a new game map and returns initial observations
+      Args:
+        seed (int, optional): Random seed for the environment. Defaults to None.
+        options (dict, optional): Additional options for resetting the environment.
+          Defaults to None.
+        map_id (int, optional): The ID of the map to load. Defaults to None.
+        make_task_fn (callable, optional): Function to create tasks. Defaults to None.
+        game (Game, optional): The game to be played. Defaults to None.
 
-    Args:
-        map_id: Map index to load. Selects a random map by default
-        seed: random seed to use
-        make_task_fn: A function to make tasks
-        game: A game object
-
-    Returns:
-        observations, as documented by _compute_observations()
-
-    Notes:
-        Neural MMO simulates a persistent world. Ideally, you should reset
-        the environment only once, upon creation. In practice, this approach
-        limits the number of parallel environment simulations to the number
-        of CPU cores available. At small and medium hardware scale, we
-        therefore recommend the standard approach of resetting after a long
-        but finite horizon: ~1000 timesteps for small maps and
-        5000+ timesteps for large maps
+      Returns:
+        tuple: A tuple containing:
+          - obs (dict): Dictionary mapping agent IDs to their initial observations.
+          - info (dict): Dictionary containing additional information.
     '''
     # If options are provided, override the kwargs
     if options is not None:
@@ -219,7 +215,7 @@ class Env(ParallelEnv):
       self.game = game
       self.game.reset(self._np_random, map_dict)
       self.tasks = self.game.tasks
-    elif self.curriculum_file_path is not None:
+    elif self.curriculum_file_path is not None or self.game_packs is not None:
       # Assume training -- pick a random game from the game packs
       self.game = self.default_game
       if self.game_packs:
@@ -240,7 +236,6 @@ class Env(ParallelEnv):
 
     # Reset the agent vars
     self._alive_agents = self.possible_agents
-    self._dead_agents.clear()
     self._dead_this_tick = {}
     self._map_task_to_agent()
     self._current_agents = self.possible_agents  # tracking alive + dead_this_tick
@@ -298,7 +293,7 @@ class Env(ParallelEnv):
   def _map_task_to_agent(self):
     self.agent_task_map.clear()
     for agent_id in self.agents:
-      self.realm.players[agent_id].my_tasks = None
+      self.realm.players[agent_id].my_task = None
     for task in self.tasks:
       if task.embedding is None:
         task.set_embedding(self._dummy_task_embedding)
@@ -316,96 +311,20 @@ class Env(ParallelEnv):
         self.realm.players[agent_id].my_task = agent_tasks[0]
 
   def step(self, actions: Dict[int, Dict[str, Dict[str, Any]]]):
-    '''Simulates one game tick or timestep
+    '''Performs one step in the environment given the provided actions.
 
-    Args:
-        actions: A dictionary of agent decisions of format::
+      Args:
+        actions (dict): Dictionary mapping agent IDs to their actions.
 
-              {
-                agent_1: {
-                    action_1: [arg_1, arg_2],
-                    action_2: [...],
-                    ...
-                },
-                agent_2: {
-                    ...
-                },
-                ...
-              }
-
-          Where agent_i is the integer index of the i\'th agent
-
-          The environment only evaluates provided actions for provided
-          gents. Unprovided action types are interpreted as no-ops and
-          illegal actions are ignored
-
-          It is also possible to specify invalid combinations of valid
-          actions, such as two movements or two attacks. In this case,
-          one will be selected arbitrarily from each incompatible sets.
-
-          A well-formed algorithm should do none of the above. We only
-          Perform this conditional processing to make batched action
-          computation easier.
-
-    Returns:
-        (dict, dict, dict, None):
-
-        observations:
-          A dictionary of agent observations of format::
-
-              {
-                agent_1: obs_1,
-                agent_2: obs_2,
-                ...
-              }
-
-          Where agent_i is the integer index of the i\'th agent and
-          obs_i is specified by the observation_space function.
-
-        rewards:
-          A dictionary of agent rewards of format::
-
-              {
-                agent_1: reward_1,
-                agent_2: reward_2,
-                ...
-              }
-
-          Where agent_i is the integer index of the i\'th agent and
-          reward_i is the reward of the i\'th' agent.
-
-          By default, agents receive -1 reward for dying and 0 reward for
-          all other circumstances. Override Env.reward to specify
-          custom reward functions
-
-        dones:
-          A dictionary of agent done booleans of format::
-
-              {
-                agent_1: done_1,
-                agent_2: done_2,
-                ...
-              }
-
-          Where agent_i is the integer index of the i\'th agent and
-          done_i is a boolean denoting whether the i\'th agent has died.
-
-          Note that obs_i will be a garbage placeholder if done_i is true.
-          This is provided only for conformity with PettingZoo. Your
-          algorithm should not attempt to leverage observations outside of
-          trajectory bounds. You can omit garbage obs_i values by setting
-          omitDead=True.
-
-        infos:
-          A dictionary of agent infos of format:
-
-              {
-                agent_1: None,
-                agent_2: None,
-                ...
-              }
-
-          Provided for conformity with PettingZoo
+      Returns:
+        tuple: A tuple containing:
+          - obs (dict): Dictionary mapping agent IDs to their new observations.
+          - rewards (dict): Dictionary mapping agent IDs to their rewards.
+          - terminated (dict): Dictionary mapping agent IDs to whether they reached 
+            a terminal state.
+          - truncated (dict): Dictionary mapping agent IDs to whether the episode was
+            truncated (e.g. reached maximum number of steps).
+          - infos (dict): Dictionary containing additional information.
     '''
     assert not self._reset_required, 'step() called before reset'
     # Add in scripted agents' actions, if any
@@ -421,19 +340,12 @@ class Env(ParallelEnv):
     self._current_agents = list(set(self._alive_agents + list(self._dead_this_tick.keys())))
 
     terminated = {}
-    truncated = {}
     for agent_id in self._current_agents:
       if agent_id in self._dead_this_tick:
-        self._dead_agents.add(agent_id)
         # NOTE: Even though players can be resurrected, the time of death must be marked.
         terminated[agent_id] = True
       else:
         terminated[agent_id] = False
-
-      if self.realm.tick >= self.config.HORIZON:
-        truncated[agent_id] = agent_id not in self._dead_agents
-      else:
-        truncated[agent_id] = False
 
     if self.realm.tick >= self.config.HORIZON:
       self._alive_agents = []  # pettingzoo requires agents to be empty
@@ -441,6 +353,14 @@ class Env(ParallelEnv):
     # Update the game stats, determine winners, etc.
     # Also, resurrect dead agents and/or spawn new npcs if the game allows it
     self.game.update(terminated, self._dead_this_tick, dead_npcs)
+
+    # Some games do additional player cull during update(), so process truncated here
+    truncated = {}
+    for agent_id in self._current_agents:
+      if self.realm.tick >= self.config.HORIZON:
+        truncated[agent_id] = agent_id in self.realm.players
+      else:
+        truncated[agent_id] = False
 
     # Store the observations, since actions reference them
     self._compute_observations()
@@ -557,20 +477,6 @@ class Env(ParallelEnv):
           self._comm_obs[eid] = team_obs
 
   def _compute_rewards(self):
-    '''Computes the reward for the specified agent
-
-    Override this method to create custom reward functions. You have full
-    access to the environment state via self.realm. Our baselines do not
-    modify this method; specify any changes when comparing to baselines
-
-    Args:
-        player: player object
-
-    Returns:
-        reward:
-          The reward for the actions on the previous timestep of the
-          entity identified by ent_id.
-    '''
     # Initialization
     agents = set(self._current_agents)
     infos = {agent_id: {'task': {}} for agent_id in agents}

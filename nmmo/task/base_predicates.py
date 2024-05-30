@@ -277,15 +277,16 @@ def AllMembersWithinRange(gs: GameState, subject: Group, dist: int):
   return (max_dist_score + r_sd_score + c_sd_score) / 3.0
 
 def SeizeTile(gs: GameState, subject: Group, row: int, col: int, num_ticks: int,
-              progress_bonus = 0.3):
+              progress_bonus = 0.4, seize_bonus = 0.3):
   if not any(subject.health > 0):  # subject should be alive
     return 0.0
   target_tile = (row, col)
 
-  # if subject seized the center tile, start counting ticks
+  # When the subject seizes the target tile
   if target_tile in gs.seize_status and gs.seize_status[target_tile][0] in subject.agents:
     seize_duration = gs.current_tick - gs.seize_status[target_tile][1]
-    return norm(progress_bonus + (1.0-progress_bonus)*seize_duration/num_ticks)
+    hold_bonus = (1.0 - progress_bonus - seize_bonus) * seize_duration/num_ticks
+    return norm(progress_bonus + seize_bonus + hold_bonus)
 
   # motivate agents to seize the target tile
   #max_dist = utils.linf_single(target_tile, gs.spawn_pos[subject.agents[0]])
@@ -299,7 +300,8 @@ def SeizeTile(gs: GameState, subject: Group, row: int, col: int, num_ticks: int,
     coords = np.hstack([r.reshape(-1,1), c.reshape(-1,1)])
     # NOTE: subject can be multiple agents (e.g., team), so taking the minimum
     dists = np.min(utils.linf(coords, target_tile))
-  return norm(progress_bonus*(1.0 - dists/max_dist))
+
+  return norm(progress_bonus * (1.0 - dists/max_dist))
 
 def SeizeCenter(gs: GameState, subject: Group, num_ticks: int,
                 progress_bonus = 0.3):
@@ -321,3 +323,12 @@ def SeizeQuadCenter(gs: GameState, subject: Group, num_ticks: int, quadrant: str
   else:
     raise ValueError(f"Invalid quadrant {quadrant}")
   return SeizeTile(gs, subject, row, col, num_ticks, progress_bonus)
+
+def ProtectLeader(gs, subject, target_protect: int, target_destroy: Iterable[int]):
+  """target_destory is not used for reward, but used as info for the reward wrapper"""
+  # Failed to protect the leader
+  if target_protect not in gs.alive_agents:
+    return 0
+
+  # Reward each tick the target is alive
+  return gs.current_tick / gs.config.HORIZON

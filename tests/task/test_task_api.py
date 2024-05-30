@@ -243,7 +243,7 @@ class TestTaskAPI(unittest.TestCase):
       _, rewards, _, _, infos = env.step({})
 
       if tick < 10:
-        target_reward = 1.0 if env.realm.tick == goal_tick else 1/goal_tick
+        target_reward = 1/goal_tick
         self.assertAlmostEqual(rewards[1], target_reward)
         self.assertAlmostEqual((1+tick)/goal_tick,
                                infos[1]["task"][env.tasks[0].name]["progress"])

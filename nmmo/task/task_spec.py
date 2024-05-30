@@ -32,9 +32,8 @@ from nmmo.lib.team_helper import TeamHelper
 """
 
 REWARD_TO = ["agent", "team"]
-VALID_TARGET = ["left_team", "left_team_leader",
-                "right_team", "right_team_leader",
-                "my_team_leader", "all_foes"]
+VALID_TARGET = ["left_team", "left_team_leader", "right_team", "right_team_leader",
+                "my_team_leader", "all_foes", "all_foe_leaders"]
 
 @dataclass
 class TaskSpec:

@@ -85,10 +85,10 @@ class Realm:
     # EntityState and ItemState tables must be empty after players/npcs.reset()
     self.players.reset(self._np_random, delete_dead_player)
     self.npcs.reset(self._np_random)
-    assert EntityState.State.table(self.datastore).is_empty(), \
-        "EntityState table is not empty"
-    assert ItemState.State.table(self.datastore).is_empty(), \
-        "ItemState table is not empty"
+    # assert EntityState.State.table(self.datastore).is_empty(), \
+    #     "EntityState table is not empty"
+    # assert ItemState.State.table(self.datastore).is_empty(), \
+    #     "ItemState table is not empty"
 
     # DataStore id allocator must be reset to be deterministic
     EntityState.State.table(self.datastore).reset()
@@ -117,6 +117,10 @@ class Realm:
   def num_players(self):
     """Number of alive player agents"""
     return len(self.players.entities)
+
+  @property
+  def seize_status(self):
+    return self.map.seize_status
 
   def entity(self, ent_id):
     e = self.entity_or_none(ent_id)

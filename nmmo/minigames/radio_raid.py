@@ -14,7 +14,7 @@ def hunt_task(num_npc):
 
 class RadioRaid(TeamBattle):
   required_systems = ["TERRAIN", "COMBAT", "COMMUNICATION", "NPC"]
-  num_teams = 6
+  num_teams = 8
 
   def __init__(self, env, sampling_weight=None):
     super().__init__(env, sampling_weight)
@@ -28,13 +28,13 @@ class RadioRaid(TeamBattle):
 
     # npc danger: 0=all npc are passive, 1=all npc are aggressive
     self._npc_danger = 0  # increase by .1 per wave
-    self._danger_step_size = .15
+    self._danger_step_size = .1
     self._spawn_center_crit = 0.4  # if danger is less than crit, spawn at center
     self.npc_wave_num = 10  # number of npc to spawn per wave
     self._last_wave_tick = 0
     self.npc_spawn_crit = 3
     self.npc_spawn_radius = 5
-    self.max_wave_interval = 25
+    self.max_wave_interval = 20
 
     # These will probably affect the difficulty
     self.map_size = 48
@@ -47,9 +47,9 @@ class RadioRaid(TeamBattle):
   @property
   def teams(self):
     team_size = self.config.PLAYER_N // self.num_teams
-    teams = {f"Team{i}": list(range((i-1)*team_size+1, i*team_size+1))
+    teams = {i: list(range((i-1)*team_size+1, i*team_size+1))
              for i in range(1, self.num_teams)}
-    teams[f"Team{self.num_teams}"] = \
+    teams[self.num_teams] = \
       list(range((self.num_teams-1)*team_size+1, self.config.PLAYER_N+1))
     return teams
 
@@ -84,6 +84,7 @@ class RadioRaid(TeamBattle):
     self.config.set_for_episode("MAP_RESET_FROM_FRACTAL", True)
     self.config.set_for_episode("TERRAIN_WATER", 0.1)
     self.config.set_for_episode("TERRAIN_FOILAGE", 0.95)
+    self.config.set_for_episode("TERRAIN_SCATTER_EXTRA_RESOURCES", False)
     self.config.set_for_episode("TERRAIN_RESET_TO_GRASS", self._grass_map)
     # NO death fog
     self.config.set_for_episode("DEATH_FOG_ONSET", None)

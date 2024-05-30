@@ -95,21 +95,7 @@ def validate(config):
 
 
 class Config(Template):
-  '''An environment configuration object
-
-  Global constants are defined as static class variables. You can override
-  any Config variable using standard CLI syntax (e.g. --NENT=128).
-
-  The default config as of v1.5 uses 1024x1024 maps with up to 2048 agents
-  and 1024 NPCs. It is suitable to time horizons of 8192+ steps. For smaller
-  experiments, consider the SmallMaps config.
-
-  Notes:
-    We use Google Fire internally to replace standard manual argparse
-    definitions for each Config property. This means you can subclass
-    Config to add new static attributes -- CLI definitions will be
-    generated automatically.
-  '''
+  '''An environment configuration object'''
   env_initialized = False
 
   def __init__(self):
@@ -391,7 +377,7 @@ class Terrain:
   TERRAIN_DISABLE_STONE        = False
   '''Disable stone (obstacle) tiles'''
 
-  TERRAIN_SCATTER_EXTRA_RESOURCES = False
+  TERRAIN_SCATTER_EXTRA_RESOURCES = True
   '''Whether to scatter extra food, water on the map.
      Only works when MAP_RESET_FROM_FRACTAL is True'''
 
@@ -587,6 +573,9 @@ class NPC:
 
   NPC_LEVEL_DAMAGE                    = 8
   '''Bonus NPC damage per level'''
+
+  NPC_LEVEL_MULTIPLIER                = 1.0
+  '''Multiplier for NPC level damage and defense, for easier difficulty tuning'''
 
   NPC_ALLOW_ATTACK_OTHER_NPCS         = False
   '''Whether NPCs can attack other NPCs'''

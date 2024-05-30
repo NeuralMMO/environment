@@ -66,6 +66,12 @@ class TeamHelper:
         if foe_team_id != team_id:
           all_foes += self.teams[foe_team_id]
       return all_foes
+    if target == "all_foe_leaders":
+      leaders = []
+      for foe_team_id in self.team_list:
+        if foe_team_id != team_id:
+          leaders.append(self.teams[foe_team_id][0])
+      return leaders
     return None
 
 class RefillPopper:
@@ -101,6 +107,8 @@ class TeamLoader(spawn.SequentialLoader):
     elif not isinstance(candidate_spawn_pos[0], list):
       # candidate_spawn_pos for teams should be List[List]
       candidate_spawn_pos = [[pos] for pos in candidate_spawn_pos]
+
+    np_random.shuffle(candidate_spawn_pos)
     self.candidate_spawn_pos = [RefillPopper(pos_list, np_random)
                                 for pos_list in candidate_spawn_pos]
 

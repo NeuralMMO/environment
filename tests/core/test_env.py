@@ -88,7 +88,6 @@ class TestEnv(unittest.TestCase):
       alive_agents = set(alive_agents[alive_agents > 0])
       for agent_id in alive_agents:
         self.assertTrue(agent_id in self.env.realm.players)
-        self.assertTrue(agent_id not in self.env._dead_agents)
 
   def _validate_tiles(self, obs, realm: Realm):
     for tile_obs in obs["Tile"]:

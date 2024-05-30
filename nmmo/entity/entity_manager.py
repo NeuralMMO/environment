@@ -3,7 +3,7 @@ from typing import Dict
 
 from nmmo.entity.entity import Entity, EntityState
 from nmmo.entity.player import Player
-from nmmo.lib import spawn
+from nmmo.lib import spawn, event_code
 
 
 class EntityGroup(Mapping):
@@ -68,6 +68,8 @@ class EntityGroup(Mapping):
     if self.config.ITEM_SYSTEM_ENABLED:
       for item in list(entity.inventory.items):
         item.destroy()
+    if ent_id > 0:
+      self.realm.event_log.record(event_code.EventCode.AGENT_CULLED, entity)
 
   def cull(self):
     self.dead_this_tick.clear()

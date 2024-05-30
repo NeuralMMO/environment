@@ -277,7 +277,7 @@ class GameStateGenerator:
       item_index = precompute_index(item_data, ItemAttr["owner_id"]),
       event_data = event_data,
       event_index = precompute_index(event_data, EventAttr['ent_id']),
-      seize_status = realm.map.seize_status,
+      seize_status = realm.seize_status,
       cache_result = {}
     )
 
