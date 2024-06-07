@@ -79,6 +79,7 @@ class TestEntity(unittest.TestCase):
     # resurrect player1
     player1.health.update(0)
     self.assertEqual(player1.alive, False)
+    env.step({})
 
     player1.resurrect(health_prop=0.5, freeze_duration=10)
     self.assertEqual(player1.health.val, 50)
