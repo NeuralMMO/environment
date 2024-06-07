@@ -1,1 +1,2 @@
+global-include *.pyx
 include nmmo/resource/*
