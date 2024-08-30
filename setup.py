@@ -51,7 +51,7 @@ setup(
   ext_modules = cythonize(["nmmo/lib/cython_helper.pyx"]),
   include_dirs=[np.get_include()],
   extras_require=extra,
-  python_requires=">=3.7",
+  python_requires=">=3.7,<3.11",
   license="MIT",
   author="Joseph Suarez",
   author_email="jsuarez@mit.edu",
