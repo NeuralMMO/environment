@@ -2,11 +2,10 @@ import os
 import logging
 
 import numpy as np
-import vec_noise
 from imageio.v2 import imread, imsave
 from scipy import stats
 
-from nmmo.lib import material, seeding, utils
+from nmmo.lib import material, seeding, utils, vec_noise
 
 
 def sharp(noise):

@@ -1,6 +1,7 @@
 # pylint: disable=no-member,bare-except
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import Dict
+from collections import deque
 import dill
 import numpy as np
 
@@ -24,7 +25,7 @@ class Game(ABC):
     self._agent_stats = {}
     self._winners = None
     self._game_done = False
-    self.history: List[Dict] = []
+    self.history: deque[Dict] = deque(maxlen=100)
     assert self.is_compatible(), "Game is not compatible with the config"
 
   @abstractmethod
